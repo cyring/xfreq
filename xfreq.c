@@ -1,8 +1,15 @@
 /*
+<<<<<<< HEAD
  * XFreq.c #0.04 by CyrIng
  *
  * Copyright (C) 2013 CYRIL INGENIERIE
  * Licenses: GPL2
+=======
+ * XFreq.c #0.02 by CyrIng
+ *
+ * Copyright (C) 2013 CYRIL INGENIERIE
+ * bwcenses: GPL2
+>>>>>>> parent of ed8d148... Less text, more drawing -;)
  */
 
 #include <X11/Xlib.h>
@@ -57,9 +64,13 @@ int	Get_Ratio(int cpu) {
 int	External_Clock() {
 	int	BCLK=0;
 
+<<<<<<< HEAD
 	if( Read_SMBIOS(SMBIOS_PROCINFO_STRUCTURE, \
 			SMBIOS_PROCINFO_INSTANCE, \
 			SMBIOS_PROCINFO_EXTCLK, &BCLK, 1) != -1)
+=======
+	if( Read_SMBIOS(SMBIOS_PROCINFO_STRUCTURE, SMBIOS_PROCINFO_INSTANCE, SMBIOS_PROCINFO_EXTCLK, &BCLK, 1) != -1)
+>>>>>>> parent of ed8d148... Less text, more drawing -;)
 		return(BCLK);
 	else
 		return(0);
@@ -171,13 +182,18 @@ static void *uLoop(void *uArg) {
 			switch(E.type) {
 				case ClientMessage:
 					if(E.xclient.send_event) {
+<<<<<<< HEAD
 						XClearArea(A->W.display, A->W.window, \
 							   A->W.margin.width, A->W.margin.height, \
 							   A->W.width, A->W.height+1, false);
+=======
+						XClearArea(A->W.display,A->W.window, A->W.margin.width, A->W.margin.height-(A->W.overall.ascent+A->W.overall.descent), A->W.width, A->W.height, false);
+>>>>>>> parent of ed8d148... Less text, more drawing -;)
 					}
 					else break;
 				case Expose: {
 					if(!E.xexpose.count) {
+<<<<<<< HEAD
 						XDrawImageString(A->W.display, \
 								A->W.window, \
 								A->W.gc, \
@@ -222,6 +238,30 @@ static void *uLoop(void *uArg) {
 						sprintf(A->L.string, TITLE, \
 							A->P.Top, A->P.Core[A->P.Top].Freq);
 						XStoreName(A->W.display, A->W.window, A->L.string);
+=======
+						char string[80]={0};
+						int len=0;
+						int dir=0, ascent=0, descent=0;
+
+						int cpu=0;
+						for(cpu=0, A->W.width=0, A->W.height=0; cpu < A->P.Features.ThreadCount; cpu++) {
+							sprintf(string, "Core#%d @ %dMHz [%dx%2d]",
+								cpu,
+								A->P.Core[cpu].Freq,
+								A->P.ClockSpeed,
+								A->P.Core[cpu].Ratio);
+							len=strlen(string);
+
+							XDrawImageString(A->W.display,A->W.window,A->W.gc, A->W.margin.width, A->W.margin.height+A->W.height, string, len);
+
+							XTextExtents(A->W.font, string, len, &dir, &ascent, &descent, &A->W.overall);
+							A->W.width=(A->W.width < A->W.overall.width)? A->W.overall.width : A->W.width;
+							A->W.height+=A->W.overall.ascent+A->W.overall.descent;
+						}
+// uncomment to show drawing area //		XDrawRectangle(A->W.display,A->W.window,A->W.gc, A->W.margin.width, A->W.margin.height-(A->W.overall.ascent+A->W.overall.descent), A->W.width, A->W.height);
+						sprintf(string, "#%d@%dMHz", A->P.Top, A->P.Core[A->P.Top].Freq);
+						XStoreName(A->W.display, A->W.window, string);
+>>>>>>> parent of ed8d148... Less text, more drawing -;)
 					}
 				}
 					break;
@@ -246,7 +286,11 @@ int main(int argc, char *argv[]) {
 	if(argc >= 5) {
 		uARG	A= {
 			    LOOP: true,
+<<<<<<< HEAD
 			    W: {
+=======
+			    W:{
+>>>>>>> parent of ed8d148... Less text, more drawing -;)
 			        display:NULL,
 				window:0,
 				screen:NULL,
@@ -255,6 +299,7 @@ int main(int argc, char *argv[]) {
 				y:atoi(argv[2]),
 				width:atoi(argv[3]),
 				height:atoi(argv[4]),
+<<<<<<< HEAD
 				margin: {
 					width :0,
 					height:0,
@@ -272,6 +317,12 @@ int main(int argc, char *argv[]) {
 				string:{0},
 				format:FORMAT,
 				cols:strlen(A.L.header),
+=======
+				margin:{
+					width :16,
+					height:16,
+					},
+>>>>>>> parent of ed8d148... Less text, more drawing -;)
 			    },
 			};
 
@@ -279,6 +330,7 @@ int main(int argc, char *argv[]) {
 		A.P.ClockSpeed=External_Clock();
 		A.P.Core=malloc(A.P.Features.ThreadCount * sizeof(struct CORE));
 
+<<<<<<< HEAD
 		A.L.rows=A.P.Features.ThreadCount + 1;	// + header;
 
 		if( XInitThreads()
@@ -297,6 +349,20 @@ int main(int argc, char *argv[]) {
 				A.W.extents.font = XLoadQueryFont(A.W.display, "7x13");
 			if(A.W.extents.font)
 				XSetFont(A.W.display, A.W.gc, A.W.extents.font->fid);
+=======
+		if( XInitThreads()
+		&& (A.W.display=XOpenDisplay(NULL))
+		&& (A.W.screen=DefaultScreenOfDisplay(A.W.display))
+		&& (A.W.window=XCreateSimpleWindow(A.W.display, DefaultRootWindow(A.W.display), A.W.x, A.W.y, A.W.width, A.W.height, 0, BlackPixelOfScreen(A.W.screen), WhitePixelOfScreen(A.W.screen)))
+		&& (A.W.gc=XCreateGC(A.W.display, A.W.window, 0, NULL)))
+		{
+			if(argc > 5)
+				A.W.font = XLoadQueryFont(A.W.display, argv[5]);
+			else
+				A.W.font = XLoadQueryFont(A.W.display, "7x13");
+			if(A.W.font)
+				XSetFont(A.W.display, A.W.gc, A.W.font->fid);
+>>>>>>> parent of ed8d148... Less text, more drawing -;)
 
 			if(argc > 6) {
 				XSetWindowBackground(A.W.display, A.W.window, strtod(argv[6], NULL));
@@ -314,6 +380,7 @@ int main(int argc, char *argv[]) {
 			if(argc > 9)
 				A.W.margin.height=atoi(argv[9]);
 
+<<<<<<< HEAD
 			XTextExtents(	A.W.extents.font, A.L.header, A.L.cols, \
 					&A.W.extents.dir, &A.W.extents.ascent, \
 					&A.W.extents.descent, &A.W.extents.overall);
@@ -321,6 +388,8 @@ int main(int argc, char *argv[]) {
 			A.W.width=A.W.extents.overall.width;
 			A.W.height=(A.W.extents.ascent + A.W.extents.descent) * A.L.rows;
 
+=======
+>>>>>>> parent of ed8d148... Less text, more drawing -;)
 			XSelectInput(A.W.display, A.W.window, ExposureMask | KeyPressMask);
 			XMapWindow(A.W.display, A.W.window);
 
@@ -329,7 +398,11 @@ int main(int argc, char *argv[]) {
 			&& !pthread_create(&TID_Exec, NULL, uExec, &A))
 				pthread_join(TID_Loop, NULL);
 
+<<<<<<< HEAD
 			XUnloadFont(A.W.display, A.W.extents.font->fid);
+=======
+			XUnloadFont(A.W.display, A.W.font->fid);
+>>>>>>> parent of ed8d148... Less text, more drawing -;)
 			XFreeGC(A.W.display, A.W.gc);
 			XDestroyWindow(A.W.display, A.W.window);
 			XCloseDisplay(A.W.display);
@@ -337,6 +410,7 @@ int main(int argc, char *argv[]) {
 		free(A.P.Core);
 	}
 	else {
+<<<<<<< HEAD
 		fprintf(stderr, "Usage  : %s <X> <Y> <Width> <Height> [OPTIONS]\n" \
 				"Options:\n" \
 				"\t<Font>\n" \
@@ -344,6 +418,9 @@ int main(int argc, char *argv[]) {
 				"\t<Foreground>\n" \
 				"\t<Margin-width>\n" \
 				"\t<Margin-height>\n", argv[0]);
+=======
+		fprintf(stderr, "Usage  : %s <X> <Y> <Width> <Height> [OPTIONS]\nOptions:\n\t<Font>\n\t<Background>\n\t<Foreground>\n\t<Margin-width>\n\t<Margin-height>\n", argv[0]);
+>>>>>>> parent of ed8d148... Less text, more drawing -;)
 		return(1);
 	}
 	return(0);
