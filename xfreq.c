@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.04 by CyrIng
+ * XFreq.c #0.05 by CyrIng
  *
  * Copyright (C) 2013 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -45,6 +45,15 @@ int	Read_SMBIOS(int structure, int instance, off_t offset, void *buf, size_t nby
 	return(rc);
 }
 
+PLATFORM Get_Platform_Info(int cpu) {
+	PLATFORM msr={0};
+
+	if( Read_MSR(cpu, MSR_PLATFORM_INFO, (unsigned long long *) &msr) != -1)
+		return(msr);
+	else
+		return((PLATFORM) {0});
+}
+
 int	Get_Ratio(int cpu) {
 	unsigned long long msr=0;
 
@@ -52,6 +61,15 @@ int	Get_Ratio(int cpu) {
 		return((int) msr);
 	else
 		return(0);
+}
+
+TURBO	Get_Turbo(int cpu) {
+	TURBO msr={0};
+
+	if( Read_MSR(cpu, MSR_TURBO_RATIO_LIMIT, (unsigned long long *) &msr) != -1)
+		return(msr);
+	else
+		return((TURBO) {0});
 }
 
 int	External_Clock() {
@@ -65,7 +83,7 @@ int	External_Clock() {
 		return(0);
 }
 
-void	CPUID(struct FEATURES *features)
+void	CPUID(FEATURES *features)
 {
 	__asm__ volatile
 	(
@@ -155,7 +173,7 @@ static void *uExec(void *uArg) {
 		XSendEvent(A->W.display, A->W.window, 0, 0, (XEvent *)&E);
 		XUnlockDisplay(A->W.display);
 
-		usleep(500000);
+		usleep(1500000);
 	}
 	return(NULL);
 }
@@ -205,20 +223,25 @@ static void *uLoop(void *uArg) {
 									 * (cpu + 1 + 1), \
 									 A->L.string, strlen(A->L.string));
 
-							XDrawRectangle(	A->W.display, \
-									A->W.window, \
-									A->W.gc, \
-									A->W.margin.width, \
-									A->W.margin.height+3 \
-									 + ( \
-									     A->W.extents.ascent \
-									   + A->W.extents.descent \
-									   ) \
-									 * (cpu + 1), \
-									(A->W.width*A->P.Core[cpu].Ratio)/24, \
-									A->W.extents.ascent \
-									+ A->W.extents.descent-3);
+							A->W.rectangle[cpu].x=A->W.margin.width;
+							A->W.rectangle[cpu].y=A->W.margin.height+3 \
+									  + ( \
+									      A->W.extents.ascent \
+									    + A->W.extents.descent \
+									    ) \
+									  * (cpu + 1);
+							A->W.rectangle[cpu].width=( \
+										    A->W.width \
+										  * A->P.Core[cpu].Ratio \
+										  ) / 24;
+							A->W.rectangle[cpu].height=A->W.extents.ascent \
+									         + A->W.extents.descent-3;
 						}
+						XDrawRectangles(A->W.display, \
+								A->W.window, \
+								A->W.gc, \
+								A->W.rectangle, \
+								A->P.Features.ThreadCount);
 						sprintf(A->L.string, TITLE, \
 							A->P.Top, A->P.Core[A->P.Top].Freq);
 						XStoreName(A->W.display, A->W.window, A->L.string);
@@ -268,18 +291,31 @@ int main(int argc, char *argv[]) {
 				},
 			    },
 			    L: {
-			        header:HEADER,
+				hdmask:{0},
+			        header:{0},
 				string:{0},
 				format:FORMAT,
-				cols:strlen(A.L.header),
 			    },
 			};
 
 		CPUID(&A.P.Features);
+		A.P.Platform=Get_Platform_Info(0);
+		A.P.Turbo=Get_Turbo(0);
 		A.P.ClockSpeed=External_Clock();
 		A.P.Core=malloc(A.P.Features.ThreadCount * sizeof(struct CORE));
 
-		A.L.rows=A.P.Features.ThreadCount + 1;	// + header;
+		sprintf(A.L.hdmask, HEADER,
+			 A.P.Platform.MinimumRatio<<1,
+			(A.P.Platform.MaxNonTurboRatio - A.P.Platform.MinimumRatio)<<1,
+			(A.P.Turbo.MaxRatio_1C - A.P.Platform.MaxNonTurboRatio)<<1);
+		sprintf(A.L.header, A.L.hdmask,
+			A.P.Platform.MinimumRatio,
+			A.P.Platform.MaxNonTurboRatio,
+			A.P.Turbo.MaxRatio_1C);
+		memmove(A.L.header, HDINFO, sizeof(HDINFO)-1);
+
+		A.L.cols=strlen(A.L.header);
+		A.L.rows=A.P.Features.ThreadCount + 1;	// + header line;
 
 		if( XInitThreads()
 		&& (A.W.display=XOpenDisplay(NULL))
@@ -320,6 +356,8 @@ int main(int argc, char *argv[]) {
 
 			A.W.width=A.W.extents.overall.width;
 			A.W.height=(A.W.extents.ascent + A.W.extents.descent) * A.L.rows;
+			
+			A.W.rectangle=malloc(A.P.Features.ThreadCount * sizeof(XRectangle));
 
 			XSelectInput(A.W.display, A.W.window, ExposureMask | KeyPressMask);
 			XMapWindow(A.W.display, A.W.window);
@@ -328,6 +366,8 @@ int main(int argc, char *argv[]) {
 			if(!pthread_create(&TID_Loop, NULL, uLoop, &A)
 			&& !pthread_create(&TID_Exec, NULL, uExec, &A))
 				pthread_join(TID_Loop, NULL);
+
+			free(A.W.rectangle);
 
 			XUnloadFont(A.W.display, A.W.extents.font->fid);
 			XFreeGC(A.W.display, A.W.gc);

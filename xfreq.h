@@ -1,11 +1,11 @@
 /*
- * XFreq.c #0.04 by CyrIng
+ * XFreq.c #0.05 by CyrIng
  *
  * Copyright (C) 2013 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
-struct FEATURES
+typedef struct
 {
 	struct
 	{
@@ -128,22 +128,49 @@ struct FEATURES
 		} EDX;
 	} Ext;
 	char		BrandString[48+1];
-};
+} FEATURES;
 
 
+#define	MSR_PLATFORM_INFO		0xce
 #define	IA32_PERF_STATUS		0x198
+#define	MSR_TURBO_RATIO_LIMIT		0x1ad
+
 #define	SMBIOS_PROCINFO_STRUCTURE	4
 #define	SMBIOS_PROCINFO_INSTANCE	0
 #define	SMBIOS_PROCINFO_EXTCLK		0x12
 
+typedef struct
+{
+	unsigned  long long
+		ReservedBits1	:  8-0,
+		MaxNonTurboRatio: 16-8,
+		ReservedBits2	: 28-16,
+		Ratio_Limited	: 29-28,
+		TDC_TDP_Limited	: 30-29,
+		ReservedBits3	: 40-30,
+		MinimumRatio	: 48-40,
+		ReservedBits4	: 64-48;
+} PLATFORM;
+
 typedef struct {
-	struct FEATURES Features;
+	unsigned long long
+		MaxRatio_1C	:  8-0,
+		MaxRatio_2C	: 16-8,
+		MaxRatio_3C	: 24-16,
+		MaxRatio_4C	: 32-24,
+		ReservedBits1	: 64-32;
+} TURBO;
+
+typedef struct {
+		FEATURES Features;
+		PLATFORM Platform;
+		TURBO	Turbo;
+		int	ClockSpeed;
 		struct	CORE {
 			int Ratio;
 			int Freq;
 		}	*Core;
 		int	Top;
-		int	ClockSpeed;
 }	PROCESSOR;
 
 typedef struct {
@@ -166,17 +193,19 @@ typedef struct {
 			ascent,
 			descent;
 	} extents;
+	XRectangle	*rectangle;
 } XWINDOW;
 
-//               123456789012345678901234
-#define	HEADER	"Core#     12......20..24"
-#define	STRING	40
+#define	HDSIZE	".1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0"
+#define	HEADER	"%%%dd%%%dd%%%dd"
+#define	HDINFO	"Core#"
 #define	FORMAT	"%3d%5dMHz"
 #define	TITLE	"#%d@%dMHz"
 
 typedef struct {
-	char	header[sizeof(HEADER)];
-	char	string[STRING];
+	char	hdmask[sizeof(HEADER)];
+	char	header[sizeof(HDSIZE)];
+	char	string[sizeof(HDSIZE)];
 	char	format[sizeof(FORMAT)];
 	int	cols,
 		rows;
