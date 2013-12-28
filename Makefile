@@ -1,4 +1,4 @@
-CC = cc
+CC = gcc
 CFLAGS = -Wall -g -pthread -x c
 APP_NAME=xfreq
 SRC_PATH=.

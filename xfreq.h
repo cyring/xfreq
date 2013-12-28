@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.05 by CyrIng
+ * XFreq.c #0.08 by CyrIng
  *
  * Copyright (C) 2013 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -133,6 +133,8 @@ typedef struct
 
 #define	MSR_PLATFORM_INFO		0xce
 #define	IA32_PERF_STATUS		0x198
+#define IA32_THERM_STATUS		0x19c
+#define MSR_TEMPERATURE_TARGET		0x1a2
 #define	MSR_TURBO_RATIO_LIMIT		0x1ad
 
 #define	SMBIOS_PROCINFO_STRUCTURE	4
@@ -162,15 +164,46 @@ typedef struct {
 } TURBO;
 
 typedef struct {
+	unsigned long long
+		Status		:  1-0,
+		StatusLog	:  2-1,
+		PROCHOT		:  3-2,
+		PROCHOTLog	:  4-3,
+		CriticalTemp	:  5-4,
+		CriticalTempLog	:  6-5,
+		Threshold1	:  7-6,
+		Threshold1Log	:  8-7,
+		Threshold2	:  9-8,
+		Threshold2Log	: 10-9,
+		PowerLimit	: 11-10,
+		PowerLimitLog	: 12-11,
+		ReservedBits1	: 16-12,
+		DTS		: 23-16,
+		ReservedBits2	: 27-23,
+		Resolution	: 31-27,
+		ReadingValid	: 32-31,
+		ReservedBits3	: 64-32;
+} THERM;
+
+typedef struct {
+	unsigned long long
+		ReservedBits1	: 16-0,
+		Target		: 24-16,
+		ReservedBits2	: 64-24;
+} TEMP;
+
+typedef struct {
 		FEATURES Features;
 		PLATFORM Platform;
 		TURBO	Turbo;
-		int	ClockSpeed;
 		struct	CORE {
-			int Ratio;
-			int Freq;
+			int	FD,
+				Ratio,
+				Freq,
+				Temp;
 		}	*Core;
 		int	Top;
+		int	ClockSpeed;
 }	PROCESSOR;
 
 typedef struct {
@@ -187,28 +220,28 @@ typedef struct {
 			height;
 	} margin;
 	struct	{
+		char	fname[256];
 	    XFontStruct	*font;
 	    XCharStruct	overall;
 		int	dir,
 			ascent,
 			descent;
 	} extents;
-	XRectangle	*rectangle;
+	unsigned long	background,
+			foreground;
 } XWINDOW;
 
-#define	HDSIZE	".1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0"
-#define	HEADER	"%%%dd%%%dd%%%dd"
-#define	HDINFO	"Core#"
-#define	FORMAT	"%3d%5dMHz"
 #define	TITLE	"#%d@%dMHz"
+#define	HDSIZE	".1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0"
+#define	FREQ	" #%-2d%5d MHz "
+#define	BCLOCK	"Clock[%3d MHz]"
 
 typedef struct {
-	char	hdmask[sizeof(HEADER)];
-	char	header[sizeof(HDSIZE)];
-	char	string[sizeof(HDSIZE)];
-	char	format[sizeof(FORMAT)];
-	int	cols,
-		rows;
+	char		string[sizeof(HDSIZE)];
+	char		bclock[sizeof(BCLOCK)];
+	char		ratios[2+2+2+1];
+	XRectangle	*usage;
+	XSegment	*axes;
 } LAYOUT;
 
 typedef enum {false=0, true=1} bool;
@@ -219,3 +252,10 @@ typedef struct {
 	XWINDOW		W;
 	LAYOUT		L;
 } uARG;
+
+typedef	struct {
+	char *argument;
+	char *format;
+	void *pointer;
+	char *manual;
+} OPTION;
