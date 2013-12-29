@@ -1,0 +1,69 @@
+/*
+ * XFreq.c by CyrIng
+ * 
+ * A Widget to display the frequency & the temperature of each core in the Intel i7 processor.
+ * 
+ * Copyright (C) 2013 CYRIL INGENIERIE
+ * Licenses: GPL2
+ * 
+ * 
+ * TODO
+ * 
+ *  Hardware
+ * ----------
+ * 
+ * + kernel module : to reduce cpu usage near to 0.01%
+ *     using mmap to transfer the complete RO data structure to userland.
+ *     compute the best idle sleep time.
+ *     change from "pull" to "push" with a "data is ready" event.
+ * 
+ * + memory fetch : to remove dependancies with the dmi_sysfs & msr Linux modules.
+ *     using a R/O mmap to "/dev/mem".
+ *     base clock is a 2 bytes word found at address 0xf08d9 + 0x12 (Rampage II GENE).
+ *     rather use the msr assembler instruction.
+ * 
+ * + provide a better processor brand string.
+ *     a more compact string which will be included in the app header.
+ *     avoid a processor references table to less maintain source code.
+ *
+ * + re-use any work I've done or started in coremod.c
+ *     some SMBIOS structures.
+ *     DDR timings & channels count.
+ *     on-fly overclocking.
+ *
+ * + GPU sensors.
+ *     compile with the NVIDIA (first), the AMD & Intel frameworks (seconds) ?
+ * 
+ * + other processors ...
+ *
+ * 
+ *  Graphical
+ * -----------
+ * 
+ * + full transparency & opacity.
+ * + remove the window decoration.
+ * + optimize the event loop & reduce the number of Xlib calls.
+ * + integrate XCB, wayland ?
+ * + handle skins : 
+ *     second layout should provide processor usage history.
+ *     compute which core have the longest usage (displayed as the App title name).
+ * + provide mutex : between the uExec & uLoop threads.
+ * + manage others XEvent : close, move, resize, etc.
+ * + better fonts support :
+ *     especially when none supplied.
+ *     layout scaling.
+ * + compatibilty with Xsession & any DE greeters.
+ *
+ *
+ *  Source code
+ * -------------
+ * + clean makefile : remove my previous Raspberry instructions.
+ * + clang compliant : rewrite code to remove any "warning: use of GNU old-style ..."
+ * + provide some configure and install scripts.
+ * 
+ * 
+ * HISTORY
+ * 
+ * R 0.09 : transparency in progress.
+ * R 0.08 : Widget ready as a beta release.
+ */
