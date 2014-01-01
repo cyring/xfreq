@@ -7,7 +7,7 @@
  * Licenses: GPL2
  * 
  * 
- * TODO
+ * [TODO]
  * 
  *  Hardware
  * ----------
@@ -53,6 +53,9 @@
  *     especially when none supplied.
  *     layout scaling.
  * + compatibilty with Xsession & any DE greeters.
+ * + keep above others.
+ * + gradiant coloring.
+ * + screenshot key.
  *
  *
  *  Source code
@@ -62,8 +65,19 @@
  * + provide some configure and install scripts.
  * 
  * 
- * HISTORY
  * 
- * R 0.09 : transparency in progress.
+ * [HISTORY]
+ * 
+ * R 0.09 : 01/01 2014
+ *        - PAUSE key to suspend drawing.
+ *        - double buffering.
+ *        - pseudo transparency with any window id (see option -D[esktop]).
+ *        - read SMBIOS @ 0x24 to get the true number of active Core threads (instead of CPUID).
+ *        - some drawing alignment; text scaling; coloring based on the ratios.
+ *        - add the temperature & a few spaces in the application title name.
+ *        - inform the WM of the Widget fixed size : no resize faisable.
+ *        - new option -s to set the idle time (micro-seconds) inside function uExec().
+ *        - leave Event Loop, uLoop() as the main thread.
  * R 0.08 : Widget ready as a beta release.
+ * R 0.01 to 0.07 : initial source code.
  */

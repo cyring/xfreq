@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.08 by CyrIng
+ * XFreq.c #0.09 by CyrIng
  *
  * Copyright (C) 2013 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -19,11 +19,11 @@
 
 
 void	Open_MSR(uARG *A) {
-	A->P.Core=malloc(A->P.Features.ThreadCount * sizeof(struct CORE));
+	A->P.Core=malloc(A->P.ThreadCount * sizeof(struct CORE));
 
 	char	pathname[]="/dev/cpu/999/msr";
 	int	cpu=0;
-	for(cpu=0; cpu < A->P.Features.ThreadCount; cpu++) {
+	for(cpu=0; cpu < A->P.ThreadCount; cpu++) {
 		sprintf(pathname, "/dev/cpu/%d/msr", cpu);
 		A->P.Core[cpu].FD=open(pathname, O_RDONLY);
 	}
@@ -31,7 +31,7 @@ void	Open_MSR(uARG *A) {
 
 void	Close_MSR(uARG *A) {
 	int	cpu=0;
-	for(cpu=0; cpu < A->P.Features.ThreadCount; cpu++) {
+	for(cpu=0; cpu < A->P.ThreadCount; cpu++) {
 		close(A->P.Core[cpu].FD);
 	}
 	free(A->P.Core);
@@ -94,13 +94,24 @@ int	Get_Temperature(uARG *A, int cpu) {
 		return(0);
 }
 
-int	External_Clock() {
+int	Get_ExternalClock() {
 	int	BCLK=0;
 
 	if( Read_SMBIOS(SMBIOS_PROCINFO_STRUCTURE, \
 			SMBIOS_PROCINFO_INSTANCE, \
 			SMBIOS_PROCINFO_EXTCLK, &BCLK, 1) != -1)
 		return(BCLK);
+	else
+		return(0);
+}
+
+int	Get_ThreadCount() {
+	short int ThreadCount=0;
+
+	if( Read_SMBIOS(SMBIOS_PROCINFO_STRUCTURE, \
+			SMBIOS_PROCINFO_INSTANCE, \
+			SMBIOS_PROCINFO_THREADS, &ThreadCount, 1) != -1)
+		return(ThreadCount);
 	else
 		return(0);
 }
@@ -176,39 +187,130 @@ void	CPUID(FEATURES *features)
 	}
 }
 
-void	BuildLayout(uARG *A) {
-	A->L.usage=malloc(A->P.Features.ThreadCount * sizeof(XRectangle));
-	A->L.axes=malloc(A->P.Turbo.MaxRatio_1C * sizeof(XSegment));
+int	BuildLayout(uARG *A) {
+	GC tmpGC=0;
 
-	sprintf(A->L.bclock, BCLOCK, A->P.ClockSpeed);
-	sprintf(A->L.ratios, "%02d%02d%02d",	A->P.Platform.MinimumRatio,
-						A->P.Platform.MaxNonTurboRatio,
-						A->P.Turbo.MaxRatio_1C);
+	if((A->W.display=XOpenDisplay(NULL))
+	&& (A->W.screen=DefaultScreenOfDisplay(A->W.display))
+	&& (A->W.window=XCreateSimpleWindow(	A->W.display, \
+						DefaultRootWindow(A->W.display), \
+						A->W.x, A->W.y, A->W.width, A->W.height, \
+						0, BlackPixelOfScreen(A->W.screen), \
+						A->W.background)))
+	{
+		if((tmpGC=XCreateGC(A->W.display, A->W.window, 0, NULL))
+		&& (A->W.extents.font = XLoadQueryFont(A->W.display, A->W.extents.fname)))
+		{
+				XSetFont(A->W.display, tmpGC, A->W.extents.font->fid);
 
-	int i=0, j=A->W.extents.overall.width / A->P.Turbo.MaxRatio_1C;
-	for(i=0; i <= A->P.Turbo.MaxRatio_1C; i++) {
-		A->L.axes[i].x1 = A->W.margin.width + (j * i) \
-				+ A->W.extents.font->max_bounds.rbearing \
-				- A->W.extents.font->min_bounds.lbearing;
-		A->L.axes[i].y1 = A->W.margin.height \
-				+ (A->W.extents.ascent + A->W.extents.descent);
-		A->L.axes[i].x2 = A->L.axes[i].x1;
-		A->L.axes[i].y2 = A->W.margin.height \
-				+ ((A->P.Features.ThreadCount + 1) \
-				* ( A->W.extents.ascent + A->W.extents.descent));
+				XTextExtents(	A->W.extents.font, HDSIZE, A->P.Turbo.MaxRatio_1C << 1, \
+						&A->W.extents.dir, &A->W.extents.ascent, \
+						&A->W.extents.descent, &A->W.extents.overall);
+
+				A->W.extents.charWidth=A->W.extents.font->max_bounds.rbearing - A->W.extents.font->min_bounds.lbearing;
+				A->W.extents.charHeight=A->W.extents.ascent + A->W.extents.descent;
+
+				A->W.width=(A->W.margin.width << 1) + A->W.extents.overall.width + (A->W.extents.charWidth << 2);
+				A->W.height=(A->W.margin.height << 1) + A->W.extents.charHeight * (A->P.ThreadCount + 1 + 1);
+
+				XUnloadFont(A->W.display, A->W.extents.font->fid);
+				XFreeGC(A->W.display, tmpGC);
+		}
+		else
+			return(false);
+
+		if((A->W.pixmap=XCreatePixmap(A->W.display, A->W.window, A->W.width, A->W.height, DefaultDepthOfScreen(A->W.screen)))
+		&& (A->W.gc=XCreateGC(A->W.display, A->W.pixmap, 0, NULL))
+		&& (A->W.extents.font = XLoadQueryFont(A->W.display, A->W.extents.fname)))
+		{
+			XSetFont(A->W.display, A->W.gc, A->W.extents.font->fid);
+
+			A->L.usage=malloc(A->P.ThreadCount * sizeof(XRectangle));
+			A->L.axes=malloc(A->P.Turbo.MaxRatio_1C * sizeof(XSegment));
+
+			if(A->D.window != (XID)-1) {
+				if(A->D.window == 0x0)
+					A->D.window=DefaultRootWindow(A->W.display);
+				else {
+					char *tmpDesktop=NULL;
+					if(XFetchName(A->W.display, A->D.window, &tmpDesktop) == 0)
+						A->D.window=(XID)-1;
+					else {
+						strcpy(A->D.name, tmpDesktop);
+						XFree(tmpDesktop);
+					}
+				}
+			}
+			if((A->W.hints=XAllocSizeHints()) != NULL) {
+				A->W.hints->min_width= A->W.hints->max_width= A->W.width;
+				A->W.hints->min_height=A->W.hints->max_height=A->W.height;
+				A->W.hints->flags=PMinSize|PMaxSize;
+				XSetWMNormalHints(A->W.display, A->W.window, A->W.hints);
+				XFree(A->W.hints);
+			}
+			XWindowAttributes xwa={0};
+			XGetWindowAttributes(A->W.display, A->W.window, &xwa);
+			if((xwa.width != A->W.width) || (xwa.height != A->W.height))
+				XResizeWindow(A->W.display, A->W.window, A->W.width, A->W.height);
+
+			XSetBackground(A->W.display, A->W.gc, A->W.background);
+
+			sprintf(A->L.bclock, BCLOCK, A->P.ClockSpeed);
+			sprintf(A->L.ratios, "%02d%02d%02d",	A->P.Platform.MinimumRatio,
+								A->P.Platform.MaxNonTurboRatio,
+								A->P.Turbo.MaxRatio_1C);
+
+			int i=0, j=A->W.extents.overall.width / A->P.Turbo.MaxRatio_1C;
+			for(i=1; i <= A->P.Turbo.MaxRatio_1C; i++) {
+				A->L.axes[i].x1 = A->W.margin.width + (j * i) + (A->W.extents.charWidth >> 1);
+				A->L.axes[i].y1 = 3 + A->W.margin.height + A->W.extents.charHeight;
+				A->L.axes[i].x2 = A->L.axes[i].x1;
+				A->L.axes[i].y2 = A->W.margin.height + ((A->P.ThreadCount + 1) * A->W.extents.charHeight) - 3;
+			}
+
+			XSelectInput(A->W.display, A->W.window, ExposureMask | KeyPressMask);
+			XMapWindow(A->W.display, A->W.window);
+		}
+		else
+			return(false);
 	}
+	return(true);
 }
 
 void	CloseLayout(uARG *A) {
 	free(A->L.axes);
 	free(A->L.usage);
+
+	XUnloadFont(A->W.display, A->W.extents.font->fid);
+	XFreeGC(A->W.display, A->W.gc);
+	XFreePixmap(A->W.display, A->W.pixmap);
+	XDestroyWindow(A->W.display, A->W.window);
+	XCloseDisplay(A->W.display);
+}
+
+void	ClearLayout(uARG *A) {
+	if((A->D.window != (XID)-1)
+	&& XGetWindowAttributes(A->W.display, A->W.window, &A->W.attribs)
+	&& XTranslateCoordinates(A->W.display, A->W.window, A->D.window,
+				0, 0, &A->W.x, &A->W.y, &A->D.child) )
+	{
+		XCopyArea(A->W.display, A->D.window, A->W.pixmap, A->W.gc, \
+				A->W.x, A->W.y, \
+				A->W.attribs.width, A->W.attribs.height, \
+				0, 0);
+	}
+	else
+	{
+		XSetForeground(A->W.display, A->W.gc, A->W.background);
+		XFillRectangle(A->W.display, A->W.pixmap, A->W.gc, 0, 0, A->W.width, A->W.height);
+	}
 }
 
 void	DrawLayout(uARG *A) {
 	XSetForeground(A->W.display, A->W.gc, 0x666666);
 
 	XDrawSegments(	A->W.display, \
-			A->W.window, \
+			A->W.pixmap, \
 			A->W.gc, \
 			A->L.axes, \
 			A->P.Turbo.MaxRatio_1C + 1);
@@ -216,134 +318,105 @@ void	DrawLayout(uARG *A) {
 	XSetForeground(A->W.display, A->W.gc, A->W.foreground);
 
 	XDrawString(A->W.display, \
-		A->W.window, \
+		A->W.pixmap, \
 		A->W.gc, \
 		A->W.margin.width, \
-		A->W.margin.height \
-		+ ( A->W.extents.ascent \
-		  + A->W.extents.descent), \
+		A->W.margin.height + A->W.extents.charHeight, \
 		"Core", 4);
 
 	XDrawString(A->W.display, \
-		A->W.window, \
+		A->W.pixmap, \
 		A->W.gc, \
-		A->W.margin.width \
-		+ ( A->W.extents.font->max_bounds.rbearing  \
-		  - A->W.extents.font->min_bounds.lbearing) \
-		* ( A->P.Turbo.MaxRatio_1C >> 1), \
-		A->W.margin.height \
-		+ ( A->W.extents.ascent \
-		  + A->W.extents.descent), \
+		A->W.margin.width + ( A->W.extents.charWidth * (A->P.Turbo.MaxRatio_1C >> 1) ), \
+		A->W.margin.height + A->W.extents.charHeight, \
 		A->L.bclock, strlen(A->L.bclock));
 
 	XDrawString(A->W.display, \
-		A->W.window, \
+		A->W.pixmap, \
 		A->W.gc, \
-		A->W.margin.width \
-		+ A->W.extents.overall.width \
-		- ((A->W.extents.font->max_bounds.rbearing \
-		  - A->W.extents.font->min_bounds.lbearing)), \
-		A->W.margin.height \
-		+ ( A->W.extents.ascent \
-		  + A->W.extents.descent), \
+		A->W.margin.width + A->W.extents.overall.width - A->W.extents.charWidth, \
+		A->W.margin.height + A->W.extents.charHeight, \
 		"Temps", 5);
 
 	XDrawString(A->W.display, \
-		A->W.window, \
+		A->W.pixmap, \
 		A->W.gc, \
 		A->W.margin.width, \
-		A->W.margin.height \
-		+ ( A->W.extents.ascent \
-		  + A->W.extents.descent) \
-		* ( A->P.Features.ThreadCount + 1 + 1), \
+		A->W.margin.height + ( A->W.extents.charHeight * (A->P.ThreadCount + 1 + 1) ), \
 		"Ratio", 5);
 
 	XDrawString(A->W.display, \
-		A->W.window, \
+		A->W.pixmap, \
 		A->W.gc, \
-		A->W.margin.width \
-		+ ( A->W.extents.font->max_bounds.rbearing  \
-		  - A->W.extents.font->min_bounds.lbearing) \
-		* ( A->P.Platform.MinimumRatio << 1), \
-		A->W.margin.height \
-		+ ( A->W.extents.ascent \
-		  + A->W.extents.descent) \
-		* ( A->P.Features.ThreadCount + 1 + 1), \
+		A->W.margin.width + ( A->W.extents.charWidth * (A->P.Platform.MinimumRatio << 1) ), \
+		A->W.margin.height + ( A->W.extents.charHeight * (A->P.ThreadCount + 1 + 1) ), \
 		&A->L.ratios[0], 2);
 
 	XDrawString(A->W.display, \
-		A->W.window, \
+		A->W.pixmap, \
 		A->W.gc, \
-		A->W.margin.width \
-		+ ( A->W.extents.font->max_bounds.rbearing  \
-		  - A->W.extents.font->min_bounds.lbearing) \
-		* ( A->P.Platform.MaxNonTurboRatio << 1), \
-		A->W.margin.height \
-		+ ( A->W.extents.ascent \
-		  + A->W.extents.descent) \
-		* ( A->P.Features.ThreadCount + 1 + 1), \
+		A->W.margin.width + ( A->W.extents.charWidth * (A->P.Platform.MaxNonTurboRatio << 1) ), \
+		A->W.margin.height + ( A->W.extents.charHeight * (A->P.ThreadCount + 1 + 1) ), \
 		&A->L.ratios[2], 2);
 
 	XDrawString(A->W.display, \
-		A->W.window, \
+		A->W.pixmap, \
 		A->W.gc, \
-		A->W.margin.width \
-		+ ( A->W.extents.font->max_bounds.rbearing  \
-		  - A->W.extents.font->min_bounds.lbearing) \
-		* ( A->P.Turbo.MaxRatio_1C << 1), \
-		A->W.margin.height \
-		+ ( A->W.extents.ascent \
-		  + A->W.extents.descent) \
-		* ( A->P.Features.ThreadCount + 1 + 1), \
+		A->W.margin.width + ( A->W.extents.charWidth * (A->P.Turbo.MaxRatio_1C << 1) ), \
+		A->W.margin.height + ( A->W.extents.charHeight * (A->P.ThreadCount + 1 + 1) ), \
 		&A->L.ratios[4], 2);
 
-	XFillRectangles(A->W.display, \
-			A->W.window, \
-			A->W.gc, \
-			A->L.usage, \
-			A->P.Features.ThreadCount);
 	int cpu=0;
-	for(cpu=0; cpu < A->P.Features.ThreadCount; cpu++) {
-		sprintf(A->L.string, FREQ, cpu, A->P.Core[cpu].Freq);
+	for(cpu=0; cpu < A->P.ThreadCount; cpu++) {
+			A->L.usage[cpu].x=A->W.margin.width;
+			A->L.usage[cpu].y=3 + A->W.margin.height + ( A->W.extents.charHeight * (cpu + 1) );
+			A->L.usage[cpu].width=(A->W.extents.overall.width * A->P.Core[cpu].Ratio) / A->P.Turbo.MaxRatio_1C;
+			A->L.usage[cpu].height=A->W.extents.charHeight - 3;
 
+		if(A->P.Core[cpu].Ratio >= A->P.Platform.MinimumRatio)
+			XSetForeground(A->W.display, A->W.gc, 0x009966);
 		if(A->P.Core[cpu].Ratio >= A->P.Platform.MaxNonTurboRatio)
+			XSetForeground(A->W.display, A->W.gc, 0xffa500);
+		if(A->P.Core[cpu].Ratio >= A->P.Turbo.MaxRatio_4C)
 			XSetForeground(A->W.display, A->W.gc, 0xffff00);
 
-		XDrawImageString(A->W.display, \
-				A->W.window, \
+		XFillRectangle(A->W.display, \
+				A->W.pixmap, \
 				A->W.gc, \
-				A->W.margin.width, \
-				A->W.margin.height \
-				+ ( A->W.extents.ascent \
-				  + A->W.extents.descent) \
-				* (cpu + 1 + 1), \
-				A->L.string, strlen(A->L.string));
+				A->L.usage[cpu].x, \
+				A->L.usage[cpu].y, \
+				A->L.usage[cpu].width, \
+				A->L.usage[cpu].height);
 
 		XSetForeground(A->W.display, A->W.gc, A->W.foreground);
 
+		sprintf(A->L.string, FREQ, cpu, A->P.Core[cpu].Freq);
+		XDrawImageString(A->W.display, \
+				A->W.pixmap, \
+				A->W.gc, \
+				A->W.margin.width, \
+				A->W.margin.height + ( A->W.extents.charHeight * (cpu + 1 + 1) ), \
+				A->L.string, strlen(A->L.string));
+
 		sprintf(A->L.string, "%2d", A->P.Core[cpu].Temp);
 		XDrawString(A->W.display, \
-				A->W.window, \
+				A->W.pixmap, \
 				A->W.gc, \
-				A->W.margin.width \
-				+ A->W.extents.overall.width \
-				+ ((A->W.extents.font->max_bounds.rbearing \
-				  - A->W.extents.font->min_bounds.lbearing) << 1), \
-				A->W.margin.height \
-				+ ( A->W.extents.ascent \
-				  + A->W.extents.descent) \
-				* (cpu + 1 + 1), \
+				A->W.margin.width + A->W.extents.overall.width + (A->W.extents.charWidth << 1), \
+				A->W.margin.height + ( A->W.extents.charHeight * (cpu + 1 + 1) ), \
 				A->L.string, 2);
 	}
+	XSetForeground(A->W.display, A->W.gc, 0x666666);
 	XDrawRectangles(A->W.display, \
-			A->W.window, \
+			A->W.pixmap, \
 			A->W.gc, \
 			A->L.usage, \
-			A->P.Features.ThreadCount);
+			A->P.ThreadCount);
 
 	sprintf(A->L.string, TITLE, \
-		A->P.Top, A->P.Core[A->P.Top].Freq);
+		A->P.Top, A->P.Core[A->P.Top].Freq, A->P.Core[A->P.Top].Temp);
 	XStoreName(A->W.display, A->W.window, A->L.string);
+	XSetIconName(A->W.display, A->W.window, A->L.string);
 }
 
 static void *uExec(void *uArg) {
@@ -351,7 +424,7 @@ static void *uExec(void *uArg) {
 
 	int cpu=0, max=0;
 	while(A->LOOP) {
-		for(cpu=0, max=0; cpu < A->P.Features.ThreadCount; cpu++) {
+		for(cpu=0, max=0; cpu < A->P.ThreadCount; cpu++) {
 			A->P.Core[cpu].Ratio=Get_Ratio(A, cpu);
 			A->P.Core[cpu].Freq=A->P.Core[cpu].Ratio * A->P.ClockSpeed;
 			if(max < A->P.Core[cpu].Ratio) {
@@ -359,34 +432,21 @@ static void *uExec(void *uArg) {
 				A->P.Top=cpu;
 			}
 			A->P.Core[cpu].Temp=Get_Temperature(A, cpu);
-
-			A->L.usage[cpu].x=	A->W.margin.width;
-
-			A->L.usage[cpu].y=	A->W.margin.height + 3 \
-						+ ( A->W.extents.ascent \
-						  + A->W.extents.descent) \
-						* (cpu + 1);
-
-			A->L.usage[cpu].width=	( A->W.extents.overall.width \
-						* A->P.Core[cpu].Ratio) \
-						/ A->P.Turbo.MaxRatio_1C;
-
-			A->L.usage[cpu].height=	  A->W.extents.ascent \
-						+ A->W.extents.descent - 3;
 		}
-		XClientMessageEvent E={type:ClientMessage, window:A->W.window, format:32};
-		XLockDisplay(A->W.display);
-		XSendEvent(A->W.display, A->W.window, 0, 0, (XEvent *)&E);
-		XUnlockDisplay(A->W.display);
-
-		usleep(750000);
+		if(!A->PAUSE) {
+			XLockDisplay(A->W.display);
+			XClientMessageEvent E={type:ClientMessage, window:A->W.window, format:32};
+			XSendEvent(A->W.display, A->W.window, 0, 0, (XEvent *)&E);
+			XUnlockDisplay(A->W.display);
+// 			printf("DEBUG:uExec[CPU#%d @ %dMHz]\n",A->P.Top,A->P.Core[A->P.Top].Freq);
+		}
+		usleep(A->P.IdleTime);
 	}
 	return(NULL);
 }
 
 static void *uLoop(void *uArg) {
 	uARG *A=(uARG *) uArg;
-
 	XEvent	E={0};
 	while(A->LOOP) {
 		XLockDisplay(A->W.display);
@@ -395,29 +455,57 @@ static void *uLoop(void *uArg) {
 			switch(E.type) {
 				case ClientMessage:
 					if(E.xclient.send_event) {
-						XClearArea(A->W.display, A->W.window, \
-							A->W.margin.width, \
-							A->W.margin.height \
-							+ (A->W.extents.ascent + A->W.extents.descent), \
-							A->W.extents.overall.width \
-							+ ((A->W.extents.font->max_bounds.rbearing \
-							-   A->W.extents.font->min_bounds.lbearing) << 2), \
-							1 +(A->W.extents.ascent + A->W.extents.descent) \
-								* (A->P.Features.ThreadCount), \
-							false);
-					}
-					else break;
-				case Expose: {
-					if(!E.xexpose.count)
+// 						printf("DEBUG:uLoop[CPU#%d @ %dMHz]\n",A->P.Top,A->P.Core[A->P.Top].Freq);
+						ClearLayout(A);
 						DrawLayout(A);
-				}
+						XCopyArea(A->W.display,A->W.pixmap,A->W.window,A->W.gc, \
+								0, \
+								0, \
+								A->W.width, \
+								A->W.height, \
+								0, \
+								0);
+						XFlush(A->W.display);
+					}
+					break;
+				case Expose:
+					if(!E.xexpose.count) {
+						while(XCheckTypedEvent(A->W.display, Expose, &E)) ;
+						XCopyArea(A->W.display,A->W.pixmap,A->W.window,A->W.gc, \
+								0, \
+								0, \
+								A->W.width, \
+								A->W.height, \
+								0, \
+								0);
+// 						printf("DEBUG:uLoop[EXPOSE]\n");
+					}
 					break;
 				case KeyPress:
 					switch(XLookupKeysym(&E.xkey, 0)) {
 						case XK_Escape:
 							A->LOOP=false;
 							break;
+						case XK_Pause:
+							A->PAUSE=!A->PAUSE;
+							break;
+						case XK_Return: {
+							ClearLayout(A);
+							DrawLayout(A);
+							XCopyArea(A->W.display,A->W.pixmap,A->W.window,A->W.gc, \
+									0, \
+									0, \
+									A->W.width, \
+									A->W.height, \
+									0, \
+									0);
+							XFlush(A->W.display);
+						}
+							break;
 					}
+					break;
+				case DestroyNotify:
+					A->LOOP=false;
 					break;
 				default:
 					break;
@@ -429,28 +517,66 @@ static void *uLoop(void *uArg) {
 	return(NULL);
 }
 
-void Help(OPTION *options, char *argv[])
-{
+int	Help(uARG *A, int argc, char *argv[]) {
+	OPTION	options[] = {	{"-x", "%d", &A->W.x,             "Left position"},
+				{"-y", "%d", &A->W.y,             "Top position" },
+				{"-w", "%d", &A->W.margin.width,  "Margin-width" },
+				{"-h", "%d", &A->W.margin.height, "Margin-height"},
+				{"-F", "%s", &A->W.extents.fname, "Font name"},
+				{"-b", "%x", &A->W.background,    "Background color"},
+				{"-f", "%x", &A->W.foreground,    "Foreground color"},
+				{"-D", "%lx",&A->D.window,        "Desktop Window id"},
+				{"-s", "%ld",&A->P.IdleTime,      "Idle time (usec)"},
+		};
 	const int s=sizeof(options)/sizeof(OPTION);
-	int i=0;
-	printf("Usage: %s [OPTION...]\n\n", argv[0]);
-	for(i=0; i < s; i++)
-		printf("\t%s\t%s\n", options[i].argument, options[i].manual);
-	printf("\nExit status:\n0\tif OK,\n1\tif problems,\n2\tif serious trouble.\n\nReport bugs to webmaster@cyring.fr\n");
+	int uid=geteuid(), i=0, j=0, noerr=true;
+
+	if((argc - ((argc >> 1) << 1)) && (uid == 0)) {
+		for(j=1; j < argc; j+=2) {
+			for(i=0; i < s; i++)
+				if(!strcmp(argv[j], options[i].argument)) {
+					sscanf(argv[j+1], options[i].format, options[i].pointer);
+					break;
+				}
+			if(i == s) {
+				noerr=false;
+				break;
+			}
+		}
+	}
+	else
+		noerr=false;
+
+	if(noerr == false) {
+		printf("Usage: %s [OPTION...]\n\n", argv[0]);
+		for(i=0; i < s; i++)
+			printf("\t%s\t%s\n", options[i].argument, options[i].manual);
+		printf("\nExit status:\n0\tif OK,\n1\tif problems,\n2\tif serious trouble.\n\nReport bugs to webmaster@cyring.fr\n");
+	}
+	return(noerr);
 }
 
 int main(int argc, char *argv[]) {
 	uARG	A= {
 			LOOP: true,
+			PAUSE: false,
+			P: {
+				ThreadCount:0,
+				Core:NULL,
+				Top:0,
+				ClockSpeed:0,
+				IdleTime:750000,
+			},
 			W: {
 				display:NULL,
 				window:0,
 				screen:NULL,
+				pixmap:0,
 				gc:0,
 				x:0,
 				y:0,
-				width:0,
-				height:0,
+				width:360,
+				height:180,
 				margin: {
 					width :4,
 					height:2,
@@ -460,105 +586,48 @@ int main(int argc, char *argv[]) {
 					font:NULL,
 					overall:{0},
 					dir:0,
-					ascent:0,
-					descent:0,
+					ascent:11,
+					descent:2,
+					charWidth:7,
+					charHeight:13,
 				},
 				background:0x333333,
 				foreground:0x8fcefa,
+				hints:NULL,
+				attribs:{0},
+			},
+			D: {
+				window:(XID)-1,
+				name:{0},
+				child:0,
 			},
 			L: {
 				string:{0},
 				bclock:{0},
 				ratios:{0},
+				usage:NULL,
+				axes:NULL,
 			},
 		};
-
-	OPTION	options[] = {	{"-x", "%d", &A.W.x,             "Left position"},
-				{"-y", "%d", &A.W.y,             "Top position" },
-				{"-w", "%d", &A.W.margin.width,  "Margin-width" },
-				{"-h", "%d", &A.W.margin.height, "Margin-height"},
-				{"-F", "%s", &A.W.extents.fname, "Font name"},
-				{"-b", "%x", &A.W.background,    "Background color"},
-				{"-f", "%x", &A.W.foreground,    "Foreground color"},
-		};
-	const int s=sizeof(options)/sizeof(OPTION);
-	
-	if(argc - ((argc >> 1) << 1)) {
-		int i=0, j=0;
-		for(j=1; j < argc; j+=2) {
-			for(i=0; i < s; i++)
-				if(!strcmp(argv[j], options[i].argument)) {
-					sscanf(argv[j+1], options[i].format, options[i].pointer);
-					break;
-				}
-			if(i == s) {
-				Help(options, argv);
-				return(1);
-			}
-		}
-	}
-	else {
-		Help(options, argv);
-		return(1);
-	}
-
-	CPUID(&A.P.Features);
-	Open_MSR(&A);
-
-	A.P.Platform=Get_Platform_Info(&A, 0);
-	A.P.Turbo=Get_Turbo(&A, 0);
-	A.P.ClockSpeed=External_Clock();
-
-	if( XInitThreads()
-	&& (A.W.display=XOpenDisplay(NULL))
-	&& (A.W.screen=DefaultScreenOfDisplay(A.W.display))
-	&& (A.W.window=XCreateSimpleWindow(	A.W.display, \
-						DefaultRootWindow(A.W.display), \
-						A.W.x, A.W.y, 1, 1, \
-						0, BlackPixelOfScreen(A.W.screen), \
-						WhitePixelOfScreen(A.W.screen)))
-	&& (A.W.gc=XCreateGC(A.W.display, A.W.window, 0, NULL)))
+	if(Help(&A, argc, argv))
 	{
-		if((A.W.extents.font = XLoadQueryFont(A.W.display, A.W.extents.fname)))
-			XSetFont(A.W.display, A.W.gc, A.W.extents.font->fid);
+		A.P.ThreadCount=Get_ThreadCount();
+		CPUID(&A.P.Features);
+		Open_MSR(&A);
+		A.P.Platform=Get_Platform_Info(&A, 0);
+		A.P.Turbo=Get_Turbo(&A, 0);
+		A.P.ClockSpeed=Get_ExternalClock();
 
-		XTextExtents(	A.W.extents.font, HDSIZE, A.P.Turbo.MaxRatio_1C << 1, \
-				&A.W.extents.dir, &A.W.extents.ascent, \
-				&A.W.extents.descent, &A.W.extents.overall);
+		if( XInitThreads() && BuildLayout(&A))
+		{
+			pthread_t TID_Exec=0;
+			if(!pthread_create(&TID_Exec, NULL, uExec, &A))
+				uLoop((void*) &A);
+			pthread_join(TID_Exec, NULL);
 
-		A.W.width=	(   A.W.margin.width << 1) \
-				+   A.W.extents.overall.width \
-				+ ((A.W.extents.font->max_bounds.rbearing \
-				-   A.W.extents.font->min_bounds.lbearing) << 2);
-
-		A.W.height=	(  A.W.margin.height << 1) \
-				+ (A.W.extents.ascent + A.W.extents.descent) \
-				* (A.P.Features.ThreadCount + 1 + 1);
-
-		XResizeWindow(A.W.display, A.W.window, A.W.width, A.W.height);
-
-		XSetWindowBackground(A.W.display, A.W.window, A.W.background);
-		XSetBackground(A.W.display, A.W.gc, A.W.background);
-		XSetForeground(A.W.display, A.W.gc, A.W.foreground);
-
-		BuildLayout(&A);
-
-		XSelectInput(A.W.display, A.W.window, ExposureMask | KeyPressMask);
-		XMapWindow(A.W.display, A.W.window);
-
-		pthread_t TID_Loop=0, TID_Exec=0;
-		if(!pthread_create(&TID_Loop, NULL, uLoop, &A)
-		&& !pthread_create(&TID_Exec, NULL, uExec, &A))
-			pthread_join(TID_Loop, NULL);
-
-		CloseLayout(&A);
-
-		XUnloadFont(A.W.display, A.W.extents.font->fid);
-		XFreeGC(A.W.display, A.W.gc);
-		XDestroyWindow(A.W.display, A.W.window);
-		XCloseDisplay(A.W.display);
+			CloseLayout(&A);
+		}
+		Close_MSR(&A);
 	}
-	Close_MSR(&A);
-
 	return(0);
 }

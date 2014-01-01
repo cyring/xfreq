@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.08 by CyrIng
+ * XFreq.c #0.09 by CyrIng
  *
  * Copyright (C) 2013 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -140,6 +140,7 @@ typedef struct
 #define	SMBIOS_PROCINFO_STRUCTURE	4
 #define	SMBIOS_PROCINFO_INSTANCE	0
 #define	SMBIOS_PROCINFO_EXTCLK		0x12
+#define	SMBIOS_PROCINFO_THREADS		0x25
 
 typedef struct
 {
@@ -196,6 +197,7 @@ typedef struct {
 		FEATURES Features;
 		PLATFORM Platform;
 		TURBO	Turbo;
+		short int ThreadCount;
 		struct	CORE {
 			int	FD,
 				Ratio,
@@ -204,12 +206,14 @@ typedef struct {
 		}	*Core;
 		int	Top;
 		int	ClockSpeed;
+		useconds_t IdleTime;
 }	PROCESSOR;
 
 typedef struct {
 	Display		*display;
 	Window		window;
 	Screen		*screen;
+	Pixmap		pixmap;
 	GC		gc;
 	int		x,
 			y;
@@ -225,13 +229,23 @@ typedef struct {
 	    XCharStruct	overall;
 		int	dir,
 			ascent,
-			descent;
+			descent,
+			charWidth,
+			charHeight;
 	} extents;
 	unsigned long	background,
 			foreground;
+	XSizeHints	*hints;
+	XWindowAttributes attribs;
 } XWINDOW;
 
-#define	TITLE	"#%d@%dMHz"
+typedef struct {
+	Window		window;
+	char		name[32];
+	Window		child;
+} DESKTOP;
+
+#define	TITLE	"#%d @ %dMHz - %dC"
 #define	HDSIZE	".1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0"
 #define	FREQ	" #%-2d%5d MHz "
 #define	BCLOCK	"Clock[%3d MHz]"
@@ -247,13 +261,15 @@ typedef struct {
 typedef enum {false=0, true=1} bool;
 
 typedef struct {
-	bool		LOOP;
+	bool		LOOP,
+			PAUSE;
 	PROCESSOR	P;
 	XWINDOW		W;
+	DESKTOP		D;
 	LAYOUT		L;
 } uARG;
 
-typedef	struct {
+typedef struct {
 	char *argument;
 	char *format;
 	void *pointer;
