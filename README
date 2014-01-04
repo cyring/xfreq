@@ -67,7 +67,17 @@
  * 
  * 
  * [HISTORY]
- * 
+ *
+ * R 0.10 : 01/04 2014
+ *        - the MSR readings are optimized a little bit, however turbo ratios don't show up yet.
+ *        - drawing is now done with 2 pixmaps :
+ *            B, for the background layout,
+ *            F, to display the dynamics.
+ *        - the event loop does not sleep anymore but waits for any event on the socket.
+ *        - the '-a' argument allows to show the activity of the loop.
+ *        - transparency only works with a composite manager.
+ *        - the project is ported to Code::Blocks, however not delivered yet.
+ *        - semaphore lock is still questioned ?
  * R 0.09 : 01/01 2014
  *        - PAUSE key to suspend drawing.
  *        - double buffering.

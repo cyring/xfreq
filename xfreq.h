@@ -1,9 +1,11 @@
 /*
- * XFreq.c #0.09 by CyrIng
+ * XFreq.c #0.10 by CyrIng
  *
  * Copyright (C) 2013 CYRIL INGENIERIE
  * Licenses: GPL2
  */
+
+typedef enum {false=0, true=1} bool;
 
 typedef struct
 {
@@ -191,7 +193,9 @@ typedef struct {
 		ReservedBits1	: 16-0,
 		Target		: 24-16,
 		ReservedBits2	: 64-24;
-} TEMP;
+} TJMAX;
+
+#define	Read_MSR(FD, offset, msr) pread(FD, msr, sizeof(*msr), offset)
 
 typedef struct {
 		FEATURES Features;
@@ -201,8 +205,9 @@ typedef struct {
 		struct	CORE {
 			int	FD,
 				Ratio,
-				Freq,
-				Temp;
+				Freq;
+			TJMAX	TjMax;
+			THERM	Therm;
 		}	*Core;
 		int	Top;
 		int	ClockSpeed;
@@ -213,7 +218,10 @@ typedef struct {
 	Display		*display;
 	Window		window;
 	Screen		*screen;
-	Pixmap		pixmap;
+	struct {
+		Pixmap	B,
+			F;
+	} pixmap;
 	GC		gc;
 	int		x,
 			y;
@@ -223,6 +231,8 @@ typedef struct {
 		int	width,
 			height;
 	} margin;
+	bool		activity,
+			pulse;
 	struct	{
 		char	fname[256];
 	    XFontStruct	*font;
@@ -257,8 +267,6 @@ typedef struct {
 	XRectangle	*usage;
 	XSegment	*axes;
 } LAYOUT;
-
-typedef enum {false=0, true=1} bool;
 
 typedef struct {
 	bool		LOOP,
