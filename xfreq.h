@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.10 by CyrIng
+ * XFreq.c #0.11 by CyrIng
  *
  * Copyright (C) 2013 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -132,6 +132,31 @@ typedef struct
 	char		BrandString[48+1];
 } FEATURES;
 
+#define PCI_CONFIG_ADDRESS(bus, dev, fn, reg) \
+	(0x80000000 | (bus << 16) | (dev << 11) | (fn << 8) | (reg & ~3))
+
+struct IMCINFO
+{
+	unsigned ChannelCount;
+	struct CHANNEL
+	{
+		struct
+		{
+			unsigned
+			tCL,
+			tRCD,
+			tRP,
+			tRAS,
+			tRRD,
+			tRFC,
+			tWR,
+			tRTPr,
+			tWTPr,
+			tFAW,
+			B2B;
+		} Timing;
+	}	*Channel;
+};
 
 #define	MSR_PLATFORM_INFO		0xce
 #define	IA32_PERF_STATUS		0x198
@@ -202,13 +227,13 @@ typedef struct {
 		PLATFORM Platform;
 		TURBO	Turbo;
 		short int ThreadCount;
-		struct	CORE {
+		struct THREADS {
 			int	FD,
 				Ratio,
 				Freq;
 			TJMAX	TjMax;
 			THERM	Therm;
-		}	*Core;
+		} *Core;
 		int	Top;
 		int	ClockSpeed;
 		useconds_t IdleTime;
@@ -231,7 +256,8 @@ typedef struct {
 		int	width,
 			height;
 	} margin;
-	bool		activity,
+	bool		alwaysOnTop,
+			activity,
 			pulse;
 	struct	{
 		char	fname[256];
@@ -255,14 +281,54 @@ typedef struct {
 	Window		child;
 } DESKTOP;
 
-#define	TITLE	"#%d @ %dMHz - %dC"
 #define	HDSIZE	".1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0"
-#define	FREQ	" #%-2d%5d MHz "
-#define	BCLOCK	"Clock[%3d MHz]"
+#define	APP_TITLE	"#%d @ %dMHz - %dC"
+
+typedef enum {MENU, CORE, PROC, RAM, BIOS, _COP_} PAGES;
+
+#define	MENU_TITLE	"X-Freq"
+#define	MENU_FORMAT	"[F1]     Help             [ESC]    Quit\n" \
+			"[F2]     Core             [F3]     Processor\n"   \
+			"[F3]     RAM              [F4]     BIOS\n"        \
+			"[PgDw]   Previous page    [PgUp]   Next page\n"   \
+			"[Pause]  Suspend          [Return] Redraw\n"      \
+			"[Home]   Keep on top      [End]    Keep below\n"  \
+			"[P][p]   Activity pulse   [C][c]   Center page\n" \
+			"                                 [Up]\n"          \
+			"  Scrolling page          [Left]      [Right]\n"  \
+			"                                [Down]\n"
+#define	CORE_FREQ	" #%-2d%5d MHz "
+#define	EXTCLK		"Clock[%3d MHz]"
+
+#define	PROC_TITLE	"Processor"
+#define	PROC_FORMAT	"[%s]\n\n" \
+			"Family      Model    Stepping     Max# of\n" \
+			" Code        No.        ID        Threads\n" \
+			"[%6d]  [%6d]   [%6d]    [%6d]\n"
+
+#define	RAM_TITLE	"RAM"
+#define	CHA_FORMAT	"Channel   tCL   tRCD  tRP   tRAS  tRRD  tRFC  tWR   tRTPr tWTPr tFAW  B2B\n"
+#define	CAS_FORMAT	"   #%1i   |%4d%6d%6d%6d%6d%6d%6d%6d%6d%6d%6d\n"
+
+#define	BIOS_TITLE	"BIOS"
+#define	BIOS_FORMAT	"Base Clock [%3d]\n"
 
 typedef struct {
+	int	cols,
+		rows;
+} XMAXPRINT;
+
+typedef struct {
+	int		currentPage;
+	struct	{
+		bool	pageable;
+		char	*title;
+		XMAXPRINT max;
+		int	hScroll,
+			vScroll;
+	} Page[_COP_];
 	char		string[sizeof(HDSIZE)];
-	char		bclock[sizeof(BCLOCK)];
+	char		bclock[sizeof(EXTCLK)];
 	char		ratios[2+2+2+1];
 	XRectangle	*usage;
 	XSegment	*axes;
@@ -272,6 +338,7 @@ typedef struct {
 	bool		LOOP,
 			PAUSE;
 	PROCESSOR	P;
+	struct IMCINFO	*M;
 	XWINDOW		W;
 	DESKTOP		D;
 	LAYOUT		L;
