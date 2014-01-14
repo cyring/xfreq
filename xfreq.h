@@ -1,7 +1,7 @@
 /*
- * XFreq.c #0.11 by CyrIng
+ * XFreq.c #0.12 by CyrIng
  *
- * Copyright (C) 2013 CYRIL INGENIERIE
+ * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
@@ -11,7 +11,7 @@ typedef struct
 {
 	struct
 	{
-		struct
+		struct SIGNATURE
 		{
 		unsigned
 			Stepping	:  4-0,
@@ -132,9 +132,6 @@ typedef struct
 	char		BrandString[48+1];
 } FEATURES;
 
-#define PCI_CONFIG_ADDRESS(bus, dev, fn, reg) \
-	(0x80000000 | (bus << 16) | (dev << 11) | (fn << 8) | (reg & ~3))
-
 struct IMCINFO
 {
 	unsigned ChannelCount;
@@ -163,6 +160,10 @@ struct IMCINFO
 #define IA32_THERM_STATUS		0x19c
 #define MSR_TEMPERATURE_TARGET		0x1a2
 #define	MSR_TURBO_RATIO_LIMIT		0x1ad
+#define	MSR_PERF_FIXED_CTR1		0x30a
+#define	MSR_PERF_FIXED_CTR2		0x30b
+#define	MSR_PERF_FIXED_CTR_CTRL		0x38d
+#define	MSR_PERF_GLOBAL_CTRL		0x38f
 
 #define	SMBIOS_PROCINFO_STRUCTURE	4
 #define	SMBIOS_PROCINFO_INSTANCE	0
@@ -188,8 +189,39 @@ typedef struct {
 		MaxRatio_2C	: 16-8,
 		MaxRatio_3C	: 24-16,
 		MaxRatio_4C	: 32-24,
-		ReservedBits1	: 64-32;
+		MaxRatio_5C	: 40-32,
+		MaxRatio_6C	: 48-40,
+		MaxRatio_7C	: 56-48,
+		MaxRatio_8C	: 64-56;
 } TURBO;
+
+typedef struct {
+	unsigned long long
+		EN_PMC0		:  1-0,
+		EN_PMC1		:  2-1,
+		ReservedBits1	: 32-2,
+		EN_FIXED_CTR0	: 33-32,
+		EN_FIXED_CTR1	: 34-33,
+		EN_FIXED_CTR2	: 35-34,
+		ReservedBits2	: 64-35;
+} GLOBAL_PERF_COUNTER;
+
+typedef struct {
+	unsigned long long
+		EN0_OS		:  1-0,
+		EN0_Usr		:  2-1,
+		AnyThread_EN0	:  3-2,
+		EN0_PMI		:  4-3,
+		EN1_OS		:  5-4,
+		EN1_Usr		:  6-5,
+		AnyThread_EN1	:  7-6,
+		EN1_PMI		:  8-7,
+		EN2_OS		:  9-8,
+		EN2_Usr		: 10-9,
+		AnyThread_EN2	: 11-10,
+		EN2_PMI		: 12-11,
+		ReservedBits	: 64-12;
+} FIXED_PERF_COUNTER;
 
 typedef struct {
 	unsigned long long
@@ -220,24 +252,54 @@ typedef struct {
 		ReservedBits2	: 64-24;
 } TJMAX;
 
-#define	Read_MSR(FD, offset, msr) pread(FD, msr, sizeof(*msr), offset)
+#define	ARCHITECTURES 5
+//	[Nehalem]
+#define	Nehalem_CPUID_SIGNATURE		{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xA}
+#define	Nehalem_BASE_CLOCK		133
+//	[Sandy Bridge]
+#define	Sandy_1G_CPUID_SIGNATURE	{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xD}
+#define	Sandy_2G_CPUID_SIGNATURE	{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xA}
+#define	Sandy_BASE_CLOCK		100
+//	[Ivy Bridge]
+#define	Ivy_CPUID_SIGNATURE		{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xA}
+#define	Ivy_BASE_CLOCK			100
+//	[Haswell]
+#define	Haswell_CPUID_SIGNATURE		{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xC}
+#define	Haswell_BASE_CLOCK		100
+
+const struct {
+	struct	SIGNATURE	Signature;
+		unsigned int	ClockSpeed;;
+} DEFAULT[ARCHITECTURES]={
+				{ Nehalem_CPUID_SIGNATURE,  Nehalem_BASE_CLOCK },
+				{ Sandy_1G_CPUID_SIGNATURE, Sandy_BASE_CLOCK   },
+				{ Sandy_2G_CPUID_SIGNATURE, Sandy_BASE_CLOCK   },
+				{ Ivy_CPUID_SIGNATURE,      Ivy_BASE_CLOCK     },
+				{ Haswell_CPUID_SIGNATURE,  Haswell_BASE_CLOCK },
+			};
 
 typedef struct {
-		FEATURES Features;
-		PLATFORM Platform;
-		TURBO	Turbo;
-		short int ThreadCount;
+		FEATURES			Features;
+		PLATFORM			Platform;
+		TURBO				Turbo;
+		unsigned int			Top;
+		signed int			ArchID;
+		unsigned int			ClockSpeed;
+		short int			ThreadCount;
 		struct THREADS {
-			int	FD,
-				Ratio,
-				Freq;
+			signed int		FD;
+			unsigned int		OperatingRatio,
+						OperatingFreq;
+			GLOBAL_PERF_COUNTER	GlobalPerfCounter;
+			FIXED_PERF_COUNTER	FixedPerfCounter;
+			unsigned long long	UnhaltedCoreCycles[2],
+						UnhaltedRefCycles[2];
+			unsigned int		UnhaltedFreq;
 			TJMAX	TjMax;
 			THERM	Therm;
 		} *Core;
-		int	Top;
-		int	ClockSpeed;
-		useconds_t IdleTime;
-}	PROCESSOR;
+		useconds_t			IdleTime;
+} PROCESSOR;
 
 typedef struct {
 	Display		*display;
@@ -287,7 +349,7 @@ typedef struct {
 typedef enum {MENU, CORE, PROC, RAM, BIOS, _COP_} PAGES;
 
 #define	MENU_TITLE	"X-Freq"
-#define	MENU_FORMAT	"[F1]     Help             [ESC]    Quit\n" \
+#define	MENU_FORMAT	"[F1]     Help             [ESC]    Quit\n"        \
 			"[F2]     Core             [F3]     Processor\n"   \
 			"[F3]     RAM              [F4]     BIOS\n"        \
 			"[PgDw]   Previous page    [PgUp]   Next page\n"   \
@@ -301,17 +363,61 @@ typedef enum {MENU, CORE, PROC, RAM, BIOS, _COP_} PAGES;
 #define	EXTCLK		"Clock[%3d MHz]"
 
 #define	PROC_TITLE	"Processor"
-#define	PROC_FORMAT	"[%s]\n\n" \
-			"Family      Model    Stepping     Max# of\n" \
-			" Code        No.        ID        Threads\n" \
-			"[%6d]  [%6d]   [%6d]    [%6d]\n"
+#define	PROC_FORMAT	"[%s]\n\n"                                             \
+			" Family       Model     Stepping     Max# of\n"       \
+			"  Code         No.         ID        Threads\n"       \
+			"[%6X]    [%6X]    [%6d]    [%6d]\n\n"                 \
+			"Virtual Mode Extension                 VME [%c]\n" \
+			"Debugging Extension                     DE [%c]\n" \
+			"Page Size Extension                    PSE [%c]\n" \
+			"Time Stamp Counter                     TSC [%c]\n" \
+			"Model Specific Registers               MSR [%c]\n" \
+			"Physical Address Extension             PAE [%c]\n" \
+			"Advanced Programmable Interrupt Ctrl. APIC [%c]\n" \
+			"Memory Type Range Registers           MTRR [%c]\n" \
+			"Page Global Enable                     PGE [%c]\n" \
+			"Machine-Check Architecture             MCA [%c]\n" \
+			"Page Attribute Table                   PAT [%c]\n" \
+			"36-bit Page Size Extension           PSE36 [%c]\n" \
+			"Processor Serial Number                PSN [%c]\n" \
+			"Debug Store                             DS [%c]\n" \
+			"Advanced Configuration & Power Intrf. ACPI [%c]\n" \
+			"Self-Snoop                              SS [%c]\n" \
+			"Hyper-Threading                        HTT [%c]\n" \
+			"Thermal Monitor               TM1 [%c]  TM2 [%c]\n" \
+			"Pending Break Enable                   PBE [%c]\n" \
+			"64-Bit Debug Store                  DTES64 [%c]\n" \
+			"CPL Qualified Debug Store           DS-CPL [%c]\n" \
+			"Virtual Machine Extensions             VMX [%c]\n" \
+			"Safer Mode Extensions                  SMX [%c]\n" \
+			"SpeedStep                             EIST [%c]\n" \
+			"L1 Data Cache Context ID           CNXT-ID [%c]\n" \
+			"Fused Multiply Add                     FMA [%c]\n" \
+			"xTPR Update Control                   xTPR [%c]\n" \
+			"Perfmon and Debug Capability          PDCM [%c]\n" \
+			"Process Context Identifiers           PCID [%c]\n" \
+			"Direct Cache Access                    DCA [%c]\n" \
+			"Extended xAPIC Support              x2APIC [%c]\n" \
+			"Time Stamp Counter Deadline   TSC-DEADLINE [%c]\n" \
+			"XSAVE/XSTOR States                   XSAVE [%c]\n" \
+			"OS-Enabled Ext. State Management   OSXSAVE [%c]\n" \
+			"Execution Disable Bit Support       XD-Bit [%c]\n" \
+			"1 GB Pages Support               1GB-PAGES [%c]\n" \
+			"\nInstruction set:\n"                              \
+			"FPU[%c]    CX8[%c]   SEP[%c]   CMOV[%c]   CLFSH[%c]\n" \
+			"MMX[%c]   FXSR[%c]   SSE[%c]   SSE2[%c]    SSE3[%c]\n" \
+			"SSSE3[%c]    SSE4.1[%c]   SSE4.2[%c]  PCLMULDQ[%c]\n" \
+			"MONITOR[%c]    CX16[%c]    MOVBE[%c]    POPCNT[%c]\n" \
+			"AES[%c]         AVX[%c]     F16C[%c]    RDRAND[%c]\n" \
+			"LAHF/SAHF[%c]   SYSCALL[%c]   RDTSCP[%c]  IA64[%c]\n"
+
 
 #define	RAM_TITLE	"RAM"
 #define	CHA_FORMAT	"Channel   tCL   tRCD  tRP   tRAS  tRRD  tRFC  tWR   tRTPr tWTPr tFAW  B2B\n"
 #define	CAS_FORMAT	"   #%1i   |%4d%6d%6d%6d%6d%6d%6d%6d%6d%6d%6d\n"
 
 #define	BIOS_TITLE	"BIOS"
-#define	BIOS_FORMAT	"Base Clock [%3d]\n"
+#define	BIOS_FORMAT	"Base Clock [%3d MHz]\n"
 
 typedef struct {
 	int	cols,
@@ -329,7 +435,7 @@ typedef struct {
 	} Page[_COP_];
 	char		string[sizeof(HDSIZE)];
 	char		bclock[sizeof(EXTCLK)];
-	char		ratios[2+2+2+1];
+	char		bump[2+2+2+1];
 	XRectangle	*usage;
 	XSegment	*axes;
 } LAYOUT;

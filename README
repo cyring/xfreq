@@ -56,10 +56,15 @@
  *
  *   Issues
  * ----------
- * + Why Cores never reach Turbo ratios : which MSR to program ?
+ * + Cores rarely reach Turbo ratios : working on the Performance Counters.
  *
  *
  * [HISTORY]
+ *
+ * R 0.12 : 01/14 2014
+ *        - Use the MSR performance counters to provide a better computation accuracy of the Cores frequency multiplier.
+ *        - Intel Core Architecture detected.
+ *        - Blink yellow when in pause mode.
  *
  * R 0.11 : 01/09 2014
  *        - add specifications pages for Processor (features), RAM (timings & channels count) and BIOS (BCLK).
