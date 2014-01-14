@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.12 by CyrIng
+ * XFreq.c #0.13-1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -288,13 +288,13 @@ typedef struct {
 		short int			ThreadCount;
 		struct THREADS {
 			signed int		FD;
-			unsigned int		OperatingRatio,
-						OperatingFreq;
+			unsigned int		OperatingRatio;
 			GLOBAL_PERF_COUNTER	GlobalPerfCounter;
 			FIXED_PERF_COUNTER	FixedPerfCounter;
 			unsigned long long	UnhaltedCoreCycles[2],
 						UnhaltedRefCycles[2];
-			unsigned int		UnhaltedFreq;
+			unsigned int		UnhaltedRatio,
+						UnhaltedFreq;
 			TJMAX	TjMax;
 			THERM	Therm;
 		} *Core;

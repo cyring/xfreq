@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.12 by CyrIng
+ * XFreq.c #0.13-1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -80,6 +80,48 @@ void	Close_MSR(uARG *A) {
 		if(A->P.Core[cpu].FD != -1)
 			close(A->P.Core[cpu].FD);
 	}
+}
+
+// The Processor thread which updates the Core values.
+static void *uCycle(void *uArg) {
+	uARG *A=(uARG *) uArg;
+
+	register int cpu=0;
+	register unsigned int maxFreq=0;
+	while(A->LOOP) {
+		for(cpu=0, maxFreq=0; cpu < A->P.ThreadCount; cpu++) {
+			// Update the Base Operating Ratio.
+			Read_MSR(A->P.Core[cpu].FD, IA32_PERF_STATUS, (unsigned long long *) &A->P.Core[cpu].OperatingRatio);
+			// Update the Unhalted Core & the Reference Cycles.
+			Read_MSR(A->P.Core[cpu].FD, MSR_PERF_FIXED_CTR1, &A->P.Core[cpu].UnhaltedCoreCycles[1]);
+			Read_MSR(A->P.Core[cpu].FD, MSR_PERF_FIXED_CTR2, &A->P.Core[cpu].UnhaltedRefCycles[1]);
+			// Compute Delta of Unhalted (Core & Ref) Cycles = Current[1] - Previous[0]
+			register unsigned long long	UnhaltedCoreCycles	= A->P.Core[cpu].UnhaltedCoreCycles[1]
+										- A->P.Core[cpu].UnhaltedCoreCycles[0],
+							UnhaltedRefCycles	= A->P.Core[cpu].UnhaltedRefCycles[1]
+										- A->P.Core[cpu].UnhaltedRefCycles[0];
+			// Compute the Current Core Ratio per Cycles Delta. Set with the Operating value to protect against a division by zero.
+			A->P.Core[cpu].UnhaltedRatio	= (UnhaltedRefCycles != 0) ?
+							 (A->P.Core[cpu].OperatingRatio * UnhaltedCoreCycles) / UnhaltedRefCycles
+							: A->P.Core[cpu].OperatingRatio;
+			// Actual Frequency = Current Ratio x Bus Clock Frequency
+			A->P.Core[cpu].UnhaltedFreq=A->P.Core[cpu].UnhaltedRatio * A->P.ClockSpeed;
+			// Save the Unhalted Core & Reference Cycles for next iteration.
+			A->P.Core[cpu].UnhaltedCoreCycles[0]=A->P.Core[cpu].UnhaltedCoreCycles[1];
+			A->P.Core[cpu].UnhaltedRefCycles[0] =A->P.Core[cpu].UnhaltedRefCycles[1];
+			// Index the Top CPU speed.
+			if(maxFreq < A->P.Core[cpu].UnhaltedFreq) {
+				maxFreq=A->P.Core[cpu].UnhaltedFreq;
+				A->P.Top=cpu;
+			}
+			// Update the Digital Thermal Sensor.
+			if( (Read_MSR(A->P.Core[cpu].FD, IA32_THERM_STATUS, (THERM *) &A->P.Core[cpu].Therm)) == -1)
+				A->P.Core[cpu].Therm.DTS=0;
+		}
+		// Settle down some microseconds as specified by the command argument.
+		usleep(A->P.IdleTime);
+	}
+	return(NULL);
 }
 
 // Read any data from the SMBIOS.
@@ -692,21 +734,18 @@ void	DrawLayout(uARG *A) {
 		case CORE: {
 			int cpu=0;
 			for(cpu=0; cpu < A->P.ThreadCount; cpu++) {
-				// Compute the Ratio from to the Unhalted Frequency.
-				int Ratio=A->P.Core[cpu].UnhaltedFreq / A->P.ClockSpeed;
-
 				A->L.usage[cpu].x=A->W.margin.width;
 				A->L.usage[cpu].y=3 + A->W.margin.height + ( A->W.extents.charHeight * (cpu + 1) );
-				A->L.usage[cpu].width=(A->W.extents.overall.width * Ratio) / A->P.Turbo.MaxRatio_1C;
+				A->L.usage[cpu].width=(A->W.extents.overall.width * A->P.Core[cpu].UnhaltedRatio) / A->P.Turbo.MaxRatio_1C;
 				A->L.usage[cpu].height=A->W.extents.charHeight - 3;
 
-				if(Ratio <= A->P.Platform.MinimumRatio)
+				if(A->P.Core[cpu].UnhaltedRatio <= A->P.Platform.MinimumRatio)
 					XSetForeground(A->W.display, A->W.gc, A->W.foreground);
-				if(Ratio >  A->P.Platform.MinimumRatio)
+				if(A->P.Core[cpu].UnhaltedRatio >  A->P.Platform.MinimumRatio)
 					XSetForeground(A->W.display, A->W.gc, 0x009966);
-				if(Ratio >= A->P.Platform.MaxNonTurboRatio)
+				if(A->P.Core[cpu].UnhaltedRatio >= A->P.Platform.MaxNonTurboRatio)
 					XSetForeground(A->W.display, A->W.gc, 0xffa500);
-				if(Ratio >= A->P.Turbo.MaxRatio_4C)
+				if(A->P.Core[cpu].UnhaltedRatio >= A->P.Turbo.MaxRatio_4C)
 					XSetForeground(A->W.display, A->W.gc, 0xff0000);
 
 				XFillRectangle(A->W.display, A->W.pixmap.F, A->W.gc,
@@ -744,43 +783,11 @@ void	UpdateTitle(uARG *A) {
 	XSetIconName(A->W.display, A->W.window, A->L.string);
 }
 
-// The Processor thread which updates the Core values.
-static void *uExec(void *uArg) {
+// The drawing thread which paints the foreground.
+static void *uDraw(void *uArg) {
 	uARG *A=(uARG *) uArg;
 
-	int cpu=0;
-	unsigned int maxFreq=0;
 	while(A->LOOP) {
-		for(cpu=0, maxFreq=0; cpu < A->P.ThreadCount; cpu++) {
-			// Update the Base Operating Ratio.
-			Read_MSR(A->P.Core[cpu].FD, IA32_PERF_STATUS, (unsigned long long *) &A->P.Core[cpu].OperatingRatio);
-			A->P.Core[cpu].OperatingFreq=A->P.Core[cpu].OperatingRatio * A->P.ClockSpeed;
-			// Update the Unhalted Core & the Reference Cycles.
-			Read_MSR(A->P.Core[cpu].FD, MSR_PERF_FIXED_CTR1, &A->P.Core[cpu].UnhaltedCoreCycles[1]);
-			Read_MSR(A->P.Core[cpu].FD, MSR_PERF_FIXED_CTR2, &A->P.Core[cpu].UnhaltedRefCycles[1]);
-			// Compute Delta of Unhalted (Core & Ref) Cycles = Current[1] - Previous[0]
-			unsigned long long	UnhaltedCoreCycles	= A->P.Core[cpu].UnhaltedCoreCycles[1]
-									- A->P.Core[cpu].UnhaltedCoreCycles[0],
-						UnhaltedRefCycles	= A->P.Core[cpu].UnhaltedRefCycles[1]
-									- A->P.Core[cpu].UnhaltedRefCycles[0];
-			// Compute the Core Frequency per Delta. Set it with the base frequency to protect against a division by zero.
-			A->P.Core[cpu].UnhaltedFreq	= (UnhaltedRefCycles != 0) ?
-							 (A->P.Core[cpu].OperatingFreq * UnhaltedCoreCycles) / UnhaltedRefCycles
-							: A->P.Core[cpu].OperatingFreq;
-			// Save the Unhalted Core & Reference Cycles for next iteration.
-			A->P.Core[cpu].UnhaltedCoreCycles[0]=A->P.Core[cpu].UnhaltedCoreCycles[1];
-			A->P.Core[cpu].UnhaltedRefCycles[0] =A->P.Core[cpu].UnhaltedRefCycles[1];
-
-			// Index the Top CPU speed.
-			if(maxFreq < A->P.Core[cpu].UnhaltedFreq) {
-				maxFreq=A->P.Core[cpu].UnhaltedFreq;
-				A->P.Top=cpu;
-			}
-
-			// Update the Digital Thermal Sensor.
-			if( (Read_MSR(A->P.Core[cpu].FD, IA32_THERM_STATUS, (THERM *) &A->P.Core[cpu].Therm)) == -1)
-				A->P.Core[cpu].Therm.DTS=0;
-		}
 		if(!A->PAUSE) {
 			MapLayout(A);
 			DrawLayout(A);
@@ -1133,10 +1140,12 @@ int main(int argc, char *argv[]) {
 				FlushLayout(&A);
 				XMapWindow(A.W.display, A.W.window);
 
-				pthread_t TID_Exec=0;
-				if(!pthread_create(&TID_Exec, NULL, uExec, &A)) {
+				pthread_t TID_Cycle=0, TID_Draw=0;
+				if(!pthread_create(&TID_Cycle, NULL, uCycle, &A)
+				&& !pthread_create(&TID_Draw, NULL, uDraw, &A)) {
 					uLoop((void*) &A);
-					pthread_join(TID_Exec, NULL);
+					pthread_join(TID_Draw, NULL);
+					pthread_join(TID_Cycle, NULL);
 				}
 				else rc=2;
 

@@ -61,6 +61,14 @@
  *
  * [HISTORY]
  *
+ * R 0.13 : 01/14 2014 SR-1
+ *        - The program is changeds from 2 to 3 threads:
+ *            uCycle to compute the actual frequency.
+ *            uDraw to paint the foreground.
+ *            uLoop to handle X events. (called by the main thread)
+ *        - The calculation of the Cores frequency is now as follow :
+ *            (Base Operating Ratio) x (Delta of Unhalted Cycles) x (Bus CLOCK frequency)
+ *
  * R 0.12 : 01/14 2014
  *        - Use the MSR performance counters to provide a better computation accuracy of the Cores frequency multiplier.
  *        - Intel Core Architecture detected.
