@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.13-1 by CyrIng
+ * XFreq.c #0.14 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -155,19 +155,20 @@ struct IMCINFO
 	}	*Channel;
 };
 
-#define	MSR_PLATFORM_INFO		0xce
 #define	IA32_PERF_STATUS		0x198
 #define IA32_THERM_STATUS		0x19c
-#define MSR_TEMPERATURE_TARGET		0x1a2
+#define	IA32_FIXED_CTR1			0x30a
+#define	IA32_FIXED_CTR2			0x30b
+#define	IA32_FIXED_CTR_CTRL		0x38d
+#define	IA32_PERF_GLOBAL_CTRL		0x38f
+#define	MSR_PLATFORM_INFO		0xce
 #define	MSR_TURBO_RATIO_LIMIT		0x1ad
-#define	MSR_PERF_FIXED_CTR1		0x30a
-#define	MSR_PERF_FIXED_CTR2		0x30b
-#define	MSR_PERF_FIXED_CTR_CTRL		0x38d
-#define	MSR_PERF_GLOBAL_CTRL		0x38f
+#define MSR_TEMPERATURE_TARGET		0x1a2
 
 #define	SMBIOS_PROCINFO_STRUCTURE	4
 #define	SMBIOS_PROCINFO_INSTANCE	0
 #define	SMBIOS_PROCINFO_EXTCLK		0x12
+#define	SMBIOS_PROCINFO_CORES		0x23
 #define	SMBIOS_PROCINFO_THREADS		0x25
 
 typedef struct
@@ -252,52 +253,73 @@ typedef struct {
 		ReservedBits2	: 64-24;
 } TJMAX;
 
-#define	ARCHITECTURES 5
+#define	ARCHITECTURES 12
 //	[Nehalem]
-#define	Nehalem_CPUID_SIGNATURE		{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xA}
-#define	Nehalem_BASE_CLOCK		133
+#define	Nehalem_Bloomfield		{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xA}
+#define	Nehalem_Lynnfield		{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xE}
+#define	Nehalem_NehalemEP		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xE}
+//	[Westmere]
+#define	Westmere_Arrandale		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0x5}
+#define	Westmere_Gulftown		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xC}
+#define	Westmere_WestmereEP		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xF}
 //	[Sandy Bridge]
-#define	Sandy_1G_CPUID_SIGNATURE	{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xD}
-#define	Sandy_2G_CPUID_SIGNATURE	{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xA}
-#define	Sandy_BASE_CLOCK		100
+#define	SandyBridge_1G			{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xD}
+#define	SandyBridge_Bromolow		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xA}
 //	[Ivy Bridge]
-#define	Ivy_CPUID_SIGNATURE		{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xA}
-#define	Ivy_BASE_CLOCK			100
+#define	IvyBridge			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xA}
 //	[Haswell]
-#define	Haswell_CPUID_SIGNATURE		{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xC}
-#define	Haswell_BASE_CLOCK		100
+#define	Haswell_3C			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xC}
+#define	Haswell_45			{ExtFamily:0x0, Family:0x6, ExtModel:0x4, Model:0x5}
+#define	Haswell_46			{ExtFamily:0x0, Family:0x6, ExtModel:0x4, Model:0x6}
 
 const struct {
 	struct	SIGNATURE	Signature;
-		unsigned int	ClockSpeed;;
-} DEFAULT[ARCHITECTURES]={
-				{ Nehalem_CPUID_SIGNATURE,  Nehalem_BASE_CLOCK },
-				{ Sandy_1G_CPUID_SIGNATURE, Sandy_BASE_CLOCK   },
-				{ Sandy_2G_CPUID_SIGNATURE, Sandy_BASE_CLOCK   },
-				{ Ivy_CPUID_SIGNATURE,      Ivy_BASE_CLOCK     },
-				{ Haswell_CPUID_SIGNATURE,  Haswell_BASE_CLOCK },
+		unsigned int	MaxOfCores,
+				ClockSpeed;;
+} ARCH[ARCHITECTURES]={
+				{ Nehalem_Bloomfield,    4, 133 },
+				{ Nehalem_Lynnfield,     4, 133 },
+				{ Nehalem_NehalemEP,     4, 133 },
+				{ Westmere_Arrandale,    4, 133 },
+				{ Westmere_Gulftown,     6, 133 },
+				{ Westmere_WestmereEP,   6, 133 },
+				{ SandyBridge_1G,        6, 100 },
+				{ SandyBridge_Bromolow,  4, 100 },
+				{ IvyBridge,             6 ,100 },
+				{ Haswell_3C,            4, 100 },
+				{ Haswell_45,            4, 100 },
+				{ Haswell_46,            4, 100 },
 			};
 
 typedef struct {
+		signed int			ArchID;
 		FEATURES			Features;
 		PLATFORM			Platform;
 		TURBO				Turbo;
-		unsigned int			Top;
-		signed int			ArchID;
+		unsigned long long		TSC[2];
 		unsigned int			ClockSpeed;
 		short int			ThreadCount;
 		struct THREADS {
 			signed int		FD;
-			unsigned int		OperatingRatio;
+			unsigned int		OperatingRatio,
+						OperatingFreq;
 			GLOBAL_PERF_COUNTER	GlobalPerfCounter;
 			FIXED_PERF_COUNTER	FixedPerfCounter;
 			unsigned long long	UnhaltedCoreCycles[2],
 						UnhaltedRefCycles[2];
 			unsigned int		UnhaltedRatio,
 						UnhaltedFreq;
+			struct {
+				double		C0,
+						C1,
+						C3,
+						C6;
+			} State;
 			TJMAX	TjMax;
 			THERM	Therm;
 		} *Core;
+		unsigned int			Top,
+						PerCore;
 		useconds_t			IdleTime;
 } PROCESSOR;
 
@@ -318,7 +340,7 @@ typedef struct {
 		int	width,
 			height;
 	} margin;
-	bool		alwaysOnTop,
+	unsigned int	alwaysOnTop,
 			activity,
 			pulse;
 	struct	{
@@ -343,7 +365,7 @@ typedef struct {
 	Window		child;
 } DESKTOP;
 
-#define	HDSIZE	".1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0"
+#define	HDSIZE		".1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0"
 #define	APP_TITLE	"#%d @ %dMHz - %dC"
 
 typedef enum {MENU, CORE, PROC, RAM, BIOS, _COP_} PAGES;
@@ -359,8 +381,10 @@ typedef enum {MENU, CORE, PROC, RAM, BIOS, _COP_} PAGES;
 			"                                 [Up]\n"          \
 			"  Scrolling page          [Left]      [Right]\n"  \
 			"                                [Down]\n"
-#define	CORE_FREQ	" #%-2d%5d MHz "
-#define	EXTCLK		"Clock[%3d MHz]"
+
+#define	CORE_NUM	"#%-2d"
+#define	CORE_FREQ	"%5d MHz"
+#define	OVERCLOCK	"%s [%4d MHz]"
 
 #define	PROC_TITLE	"Processor"
 #define	PROC_FORMAT	"[%s]\n\n"                                             \
@@ -434,7 +458,9 @@ typedef struct {
 			vScroll;
 	} Page[_COP_];
 	char		string[sizeof(HDSIZE)];
-	char		bclock[sizeof(EXTCLK)];
+	int		wbScroll,
+			wbLength;
+	char		*wallboard;
 	char		bump[2+2+2+1];
 	XRectangle	*usage;
 	XSegment	*axes;

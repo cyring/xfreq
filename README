@@ -61,6 +61,10 @@
  *
  * [HISTORY]
  *
+ * R 0.14 : 01/19 2014
+ *        - Add option '-c' to monitor the processor per threads or per cores.
+ *        - Core load is now based on the C0 perf. counter relatively to the TSC.
+ *
  * R 0.13 : 01/14 2014 SR-1
  *        - The program is changeds from 2 to 3 threads:
  *            uCycle to compute the actual frequency.

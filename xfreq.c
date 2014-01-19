@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.13-1 by CyrIng
+ * XFreq.c #0.14 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -22,6 +22,9 @@
 #define	Read_MSR(FD, offset, msr)  pread(FD, msr, sizeof(*msr), offset)
 #define	Write_MSR(FD, offset, msr) pwrite(FD, msr, sizeof(*msr), offset)
 
+// The drawing thread.
+static void *uDraw(void *uArg);
+
 //	Open one MSR handle per Processor Core.
 int	Open_MSR(uARG *A) {
 	ssize_t	retval=0;
@@ -40,20 +43,25 @@ int	Open_MSR(uARG *A) {
 		if( (rc=((A->P.Core[cpu].FD=open(pathname, O_RDWR)) != -1)) )
 			// Enable the Performance Counters 1 and 2 :
 			// - Set the global counter bits
-			rc=((retval=Read_MSR(A->P.Core[cpu].FD, MSR_PERF_GLOBAL_CTRL, &A->P.Core[cpu].GlobalPerfCounter)) != -1);
+			rc=((retval=Read_MSR(A->P.Core[cpu].FD, IA32_PERF_GLOBAL_CTRL, &A->P.Core[cpu].GlobalPerfCounter)) != -1);
 			A->P.Core[cpu].GlobalPerfCounter.EN_FIXED_CTR1=1;
 			A->P.Core[cpu].GlobalPerfCounter.EN_FIXED_CTR2=1;
-			rc=((retval=Write_MSR(A->P.Core[cpu].FD, MSR_PERF_GLOBAL_CTRL, &A->P.Core[cpu].GlobalPerfCounter)) != -1);
+			rc=((retval=Write_MSR(A->P.Core[cpu].FD, IA32_PERF_GLOBAL_CTRL, &A->P.Core[cpu].GlobalPerfCounter)) != -1);
 			// - Set the fixed counter bits
-			rc=((retval=Read_MSR(A->P.Core[cpu].FD, MSR_PERF_FIXED_CTR_CTRL, &A->P.Core[cpu].FixedPerfCounter)) != -1);
+			rc=((retval=Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR_CTRL, &A->P.Core[cpu].FixedPerfCounter)) != -1);
 			A->P.Core[cpu].FixedPerfCounter.EN1_OS=1;
 			A->P.Core[cpu].FixedPerfCounter.EN2_OS=1;
 			A->P.Core[cpu].FixedPerfCounter.EN1_Usr=1;
 			A->P.Core[cpu].FixedPerfCounter.EN2_Usr=1;
-			rc=((retval=Write_MSR(A->P.Core[cpu].FD, MSR_PERF_FIXED_CTR_CTRL, &A->P.Core[cpu].FixedPerfCounter)) != -1);
-			// First reading of the Unhalted Core & Reference Cycles.
-			rc=((retval=Read_MSR(A->P.Core[cpu].FD, MSR_PERF_FIXED_CTR1, &A->P.Core[cpu].UnhaltedCoreCycles[0])) != -1);
-			rc=((retval=Read_MSR(A->P.Core[cpu].FD, MSR_PERF_FIXED_CTR2, &A->P.Core[cpu].UnhaltedRefCycles[0] )) != -1);
+			if(A->P.PerCore) {
+				A->P.Core[cpu].FixedPerfCounter.AnyThread_EN1=1;
+				A->P.Core[cpu].FixedPerfCounter.AnyThread_EN2=1;
+			}
+			else {
+				A->P.Core[cpu].FixedPerfCounter.AnyThread_EN1=0;
+				A->P.Core[cpu].FixedPerfCounter.AnyThread_EN2=0;
+			}
+			rc=((retval=Write_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR_CTRL, &A->P.Core[cpu].FixedPerfCounter)) != -1);
 			// Retreive the Thermal Junction Max. Fallback to 100°C if not available.
 			rc=((retval=Read_MSR(A->P.Core[cpu].FD, MSR_TEMPERATURE_TARGET, (TJMAX *) &A->P.Core[cpu].TjMax)) != -1);
 			if(A->P.Core[cpu].TjMax.Target == 0)
@@ -71,35 +79,71 @@ void	Close_MSR(uARG *A) {
 		A->P.Core[cpu].FixedPerfCounter.EN2_Usr=0;
 		A->P.Core[cpu].FixedPerfCounter.EN1_OS=0;
 		A->P.Core[cpu].FixedPerfCounter.EN2_OS=0;
-		Write_MSR(A->P.Core[cpu].FD, MSR_PERF_FIXED_CTR_CTRL, &A->P.Core[cpu].FixedPerfCounter);
+		A->P.Core[cpu].FixedPerfCounter.AnyThread_EN1=0;
+		A->P.Core[cpu].FixedPerfCounter.AnyThread_EN2=0;
+		Write_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR_CTRL, &A->P.Core[cpu].FixedPerfCounter);
 		// Reset the global counters.
 		A->P.Core[cpu].GlobalPerfCounter.EN_FIXED_CTR1=0;
 		A->P.Core[cpu].GlobalPerfCounter.EN_FIXED_CTR2=0;
-		Write_MSR(A->P.Core[cpu].FD, MSR_PERF_GLOBAL_CTRL, &A->P.Core[cpu].GlobalPerfCounter);
+		Write_MSR(A->P.Core[cpu].FD, IA32_PERF_GLOBAL_CTRL, &A->P.Core[cpu].GlobalPerfCounter);
 		// Release the MSR handle associated to the Core.
 		if(A->P.Core[cpu].FD != -1)
 			close(A->P.Core[cpu].FD);
 	}
 }
 
+static __inline__ unsigned long long RDTSC(void)
+{
+	unsigned Hi, Lo;
+
+	__asm__ volatile
+	(
+		"rdtsc;"
+		:"=a" (Lo),
+		 "=d" (Hi)
+	);
+	return ((unsigned long long) Lo) | (((unsigned long long) Hi) << 32);
+}
+
 // The Processor thread which updates the Core values.
 static void *uCycle(void *uArg) {
 	uARG *A=(uARG *) uArg;
+	pthread_t TID_Draw=0;
 
-	register int cpu=0;
-	register unsigned int maxFreq=0;
+	// Initial read of the TSC.
+	A->P.TSC[0]=RDTSC();
+
+	register unsigned int cpu=0;
+	for(cpu=0; cpu < A->P.ThreadCount; cpu++) {
+		// Initial read of the Unhalted Core & Reference Cycles.
+		Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR1, &A->P.Core[cpu].UnhaltedCoreCycles[0]);
+		Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, &A->P.Core[cpu].UnhaltedRefCycles[0] );
+	}
 	while(A->LOOP) {
+		// Settle down some microseconds as specified by the command argument.
+		usleep(A->P.IdleTime);
+		// Update the TSC.
+		A->P.TSC[1]=RDTSC();
+		register unsigned long long DeltaTSC=A->P.TSC[1] - A->P.TSC[0];
+		// Save TSC.
+		A->P.TSC[0]=A->P.TSC[1];
+
+		unsigned int maxFreq=0;
 		for(cpu=0, maxFreq=0; cpu < A->P.ThreadCount; cpu++) {
 			// Update the Base Operating Ratio.
 			Read_MSR(A->P.Core[cpu].FD, IA32_PERF_STATUS, (unsigned long long *) &A->P.Core[cpu].OperatingRatio);
 			// Update the Unhalted Core & the Reference Cycles.
-			Read_MSR(A->P.Core[cpu].FD, MSR_PERF_FIXED_CTR1, &A->P.Core[cpu].UnhaltedCoreCycles[1]);
-			Read_MSR(A->P.Core[cpu].FD, MSR_PERF_FIXED_CTR2, &A->P.Core[cpu].UnhaltedRefCycles[1]);
-			// Compute Delta of Unhalted (Core & Ref) Cycles = Current[1] - Previous[0]
+			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR1, &A->P.Core[cpu].UnhaltedCoreCycles[1]);
+			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, &A->P.Core[cpu].UnhaltedRefCycles[1]);
+			// Compute the Operating Frequency.
+			A->P.Core[cpu].OperatingFreq=A->P.Core[cpu].OperatingRatio * A->P.ClockSpeed;
+			// Compute the Delta of Unhalted (Core & Ref) Cycles = Current[1] - Previous[0]
 			register unsigned long long	UnhaltedCoreCycles	= A->P.Core[cpu].UnhaltedCoreCycles[1]
 										- A->P.Core[cpu].UnhaltedCoreCycles[0],
 							UnhaltedRefCycles	= A->P.Core[cpu].UnhaltedRefCycles[1]
 										- A->P.Core[cpu].UnhaltedRefCycles[0];
+			// Compute C-State.
+			A->P.Core[cpu].State.C0=(double) (UnhaltedRefCycles) / (double) (DeltaTSC);
 			// Compute the Current Core Ratio per Cycles Delta. Set with the Operating value to protect against a division by zero.
 			A->P.Core[cpu].UnhaltedRatio	= (UnhaltedRefCycles != 0) ?
 							 (A->P.Core[cpu].OperatingRatio * UnhaltedCoreCycles) / UnhaltedRefCycles
@@ -118,9 +162,9 @@ static void *uCycle(void *uArg) {
 			if( (Read_MSR(A->P.Core[cpu].FD, IA32_THERM_STATUS, (THERM *) &A->P.Core[cpu].Therm)) == -1)
 				A->P.Core[cpu].Therm.DTS=0;
 		}
-		// Settle down some microseconds as specified by the command argument.
-		usleep(A->P.IdleTime);
+		pthread_create(&TID_Draw, NULL, uDraw, A);
 	}
+	pthread_join(TID_Draw, NULL);
 	return(NULL);
 }
 
@@ -139,19 +183,6 @@ int	Read_SMBIOS(int structure, int instance, off_t offset, void *buf, size_t nby
 	return(rc);
 }
 
-static __inline__ unsigned long long rdtsc (void)
-{
-	unsigned hi, lo;
-
-	__asm__ volatile
-	(
-		"rdtsc;"
-		:"=a" (lo),
-		 "=d" (hi)
-	);
-	return ((unsigned long long) lo) | (((unsigned long long) hi) << 32);
-}
-
 // Old fashion style to compute the processor frequency based on TSC.
 unsigned long long int FallBack_Freq()
 {
@@ -163,12 +194,12 @@ unsigned long long int FallBack_Freq()
 	memset(&tz, 0, sizeof(tz));
 
 	gettimeofday(&tvstart, &tz);
-	cycles[0] = rdtsc();
+	cycles[0] = RDTSC();
 	gettimeofday(&tvstart, &tz);
 
 	usleep(10000);
 
-	cycles[1] = rdtsc();
+	cycles[1] = RDTSC();
 	gettimeofday(&tvstop, &tz);
 	microseconds = ( (tvstop.tv_sec - tvstart.tv_sec) * 10000) + (tvstop.tv_usec - tvstart.tv_usec);
 
@@ -187,7 +218,7 @@ int	Get_ExternalClock() {
 		return(0);
 }
 
-// Read the number of activated logical Cores set in the BIOS.
+// Read the number of logical Cores activated in the BIOS.
 int	Get_ThreadCount() {
 	short int ThreadCount=0;
 
@@ -195,6 +226,18 @@ int	Get_ThreadCount() {
 			SMBIOS_PROCINFO_INSTANCE,
 			SMBIOS_PROCINFO_THREADS, &ThreadCount, 1) != -1)
 		return(ThreadCount);
+	else
+		return(0);
+}
+
+// Read the number of physicial Cores activated in the BIOS.
+int	Get_CoreCount() {
+	short int CoreCount=0;
+
+	if( Read_SMBIOS(SMBIOS_PROCINFO_STRUCTURE,
+			SMBIOS_PROCINFO_INSTANCE,
+			SMBIOS_PROCINFO_CORES, &CoreCount, 1) != -1)
+		return(CoreCount);
 	else
 		return(0);
 }
@@ -373,6 +416,7 @@ int	OpenLayout(uARG *A) {
 						A->W.x, A->W.y, A->W.width, A->W.height,
 						0, CopyFromParent, InputOutput, CopyFromParent, CWOverrideRedirect, &swa)) )
 		{
+			// Try to load the requested font and compute scaling.
 			if((tmpGC=XCreateGC(A->W.display, A->W.window, 0, NULL))) {
 				if((A->W.extents.font = XLoadQueryFont(A->W.display, A->W.extents.fname)))
 				{
@@ -385,10 +429,10 @@ int	OpenLayout(uARG *A) {
 					A->W.extents.charWidth=A->W.extents.font->max_bounds.rbearing - A->W.extents.font->min_bounds.lbearing;
 					A->W.extents.charHeight=A->W.extents.ascent + A->W.extents.descent;
 
-					A->W.margin.width=(A->W.extents.charWidth >> 1);
+					A->W.margin.width=(A->W.extents.charWidth << 2);
 					A->W.margin.height=(A->W.extents.charHeight >> 2);
 
-					A->W.width=(A->W.margin.width << 1) + A->W.extents.overall.width + (A->W.extents.charWidth * 5);
+					A->W.width=(A->W.margin.width << 1) + A->W.extents.overall.width + (A->W.extents.charWidth << 1);
 					A->W.height=(A->W.margin.height << 1) + A->W.extents.charHeight * (A->P.ThreadCount + 1 + 1);
 
 					XUnloadFont(A->W.display, A->W.extents.font->fid);
@@ -407,9 +451,11 @@ int	OpenLayout(uARG *A) {
 				A->W.extents.font = XLoadQueryFont(A->W.display, A->W.extents.fname);
 				XSetFont(A->W.display, A->W.gc, A->W.extents.font->fid);
 
+				// Allocate memory for chart elements.
 				A->L.usage=malloc(A->P.ThreadCount * sizeof(XRectangle));
 				A->L.axes=malloc(A->P.Turbo.MaxRatio_1C * sizeof(XSegment));
 
+				// Seek root or DE window.
 				if(A->D.window != (XID)-1) {
 					if(A->D.window == 0x0)
 						A->D.window=DefaultRootWindow(A->W.display);
@@ -423,6 +469,7 @@ int	OpenLayout(uARG *A) {
 						}
 					}
 				}
+				// Adjust window size & inform WM about requirements.
 				if((A->W.hints=XAllocSizeHints()) != NULL) {
 					A->W.hints->min_width= A->W.hints->max_width= A->W.width;
 					A->W.hints->min_height=A->W.hints->max_height=A->W.height;
@@ -434,6 +481,26 @@ int	OpenLayout(uARG *A) {
 				XGetWindowAttributes(A->W.display, A->W.window, &xwa);
 				if((xwa.width != A->W.width) || (xwa.height != A->W.height))
 					XResizeWindow(A->W.display, A->W.window, A->W.width, A->W.height);
+
+				// Prepare a Wallboard string with the Processor information.
+				sprintf(A->L.string, OVERCLOCK, A->P.Features.BrandString, A->P.Platform.MaxNonTurboRatio * A->P.ClockSpeed);
+				A->L.wbLength=strlen(A->L.string) + (A->P.Platform.MaxNonTurboRatio << 2);
+				A->L.wallboard=calloc(A->L.wbLength, 1);
+				memset(A->L.wallboard, 0x20, A->L.wbLength);
+				memcpy(&A->L.wallboard[A->P.Platform.MaxNonTurboRatio << 1], A->L.string, strlen(A->L.string));
+				A->L.wbLength=strlen(A->L.string) + (A->P.Platform.MaxNonTurboRatio << 1);
+				// Store some Ratios into a string for future chart drawing.
+				sprintf(A->L.bump, "%02d%02d%02d",	A->P.Platform.MinimumRatio,
+									A->P.Platform.MaxNonTurboRatio,
+									A->P.Turbo.MaxRatio_1C);
+				// Prepare the chart.
+				int i=0, j=A->W.extents.overall.width / A->P.Turbo.MaxRatio_1C;
+				for(i=1; i <= A->P.Turbo.MaxRatio_1C; i++) {
+					A->L.axes[i].x1 = A->W.margin.width + (j * i) + (A->W.extents.charWidth >> 1);
+					A->L.axes[i].y1 = 3 + A->W.margin.height + A->W.extents.charHeight;
+					A->L.axes[i].x2 = A->L.axes[i].x1;
+					A->L.axes[i].y2 = A->W.margin.height + ((A->P.ThreadCount + 1) * A->W.extents.charHeight) - 3;
+				}
 			}
 			else	noerr=false;
 
@@ -456,22 +523,10 @@ void	BuildLayout(uARG *A) {
 	XSetBackground(A->W.display, A->W.gc, A->W.background);
 
 	if(A->L.currentPage == CORE) {
-		sprintf(A->L.bclock, EXTCLK, A->P.ClockSpeed);
-		sprintf(A->L.bump, "%02d%02d%02d",	A->P.Platform.MinimumRatio,
-							A->P.Platform.MaxNonTurboRatio,
-							A->P.Turbo.MaxRatio_1C);
-
-		int i=0, j=A->W.extents.overall.width / A->P.Turbo.MaxRatio_1C;
-		for(i=1; i <= A->P.Turbo.MaxRatio_1C; i++) {
-			A->L.axes[i].x1 = A->W.margin.width + (j * i) + (A->W.extents.charWidth >> 1);
-			A->L.axes[i].y1 = 3 + A->W.margin.height + A->W.extents.charHeight;
-			A->L.axes[i].x2 = A->L.axes[i].x1;
-			A->L.axes[i].y2 = A->W.margin.height + ((A->P.ThreadCount + 1) * A->W.extents.charHeight) - 3;
-		}
-
+		// Clear entirely the background.
 		XSetForeground(A->W.display, A->W.gc, A->W.background);
 		XFillRectangle(A->W.display, A->W.pixmap.B, A->W.gc, 0, 0, A->W.width, A->W.height);
-
+		// Draw the axes.
 		XSetForeground(A->W.display, A->W.gc, 0x666666);
 		XDrawSegments(	A->W.display,
 				A->W.pixmap.B,
@@ -479,35 +534,43 @@ void	BuildLayout(uARG *A) {
 				A->L.axes,
 				A->P.Turbo.MaxRatio_1C + 1);
 
+		// Draw the Core identifiers, the header, and the footer on the chart.
 		XSetForeground(A->W.display, A->W.gc, A->W.foreground);
-
+		int cpu=0;
+		for(cpu=0; cpu < A->P.ThreadCount; cpu++) {
+			sprintf(A->L.string, CORE_NUM, cpu);
+			XDrawString(	A->W.display, A->W.pixmap.B, A->W.gc,
+					A->W.extents.charWidth >> 1,
+					A->W.margin.height + ( A->W.extents.charHeight * (cpu + 1 + 1) ),
+					A->L.string, strlen(A->L.string) );
+		}
 		XDrawString(	A->W.display,
 				A->W.pixmap.B,
 				A->W.gc,
-				A->W.margin.width,
+				A->W.extents.charWidth >> 2,
 				A->W.margin.height + A->W.extents.charHeight,
 				"Core", 4);
 
 		XDrawString(	A->W.display,
 				A->W.pixmap.B,
 				A->W.gc,
-				A->W.margin.width + ( A->W.extents.charWidth * (A->P.Turbo.MaxRatio_1C >> 1) ),
+				A->W.margin.width + A->W.extents.overall.width + (A->W.extents.charWidth << 1),
 				A->W.margin.height + A->W.extents.charHeight,
-				A->L.bclock, strlen(A->L.bclock));
+				"T.C", 3);
 
 		XDrawString(	A->W.display,
 				A->W.pixmap.B,
 				A->W.gc,
-				A->W.margin.width + A->W.extents.overall.width,
-				A->W.margin.height + A->W.extents.charHeight,
-				"Temps", 5);
-
-		XDrawString(	A->W.display,
-				A->W.pixmap.B,
-				A->W.gc,
-				A->W.margin.width,
+				A->W.extents.charWidth >> 2,
 				A->W.margin.height + ( A->W.extents.charHeight * (A->P.ThreadCount + 1 + 1) ),
 				"Ratio", 5);
+
+		XDrawString(	A->W.display,
+				A->W.pixmap.B,
+				A->W.gc,
+				A->W.margin.width + ( A->W.extents.charWidth * (5 << 1) ),
+				A->W.margin.height + ( A->W.extents.charHeight * (A->P.ThreadCount + 1 + 1) ),
+				"5", 1);
 
 		XDrawString(	A->W.display,
 				A->W.pixmap.B,
@@ -529,7 +592,9 @@ void	BuildLayout(uARG *A) {
 				A->W.margin.width + ( A->W.extents.charWidth * (A->P.Turbo.MaxRatio_1C << 1) ),
 				A->W.margin.height + ( A->W.extents.charHeight * (A->P.ThreadCount + 1 + 1) ),
 				&A->L.bump[4], 2);
-	} else {
+	}
+	else // Deal with other pages.
+		{
 		char items[4096]={0};
 		int spacing=A->W.extents.charHeight;
 
@@ -685,6 +750,7 @@ void	BuildLayout(uARG *A) {
 
 // Release the Widget ressources.
 void	CloseLayout(uARG *A) {
+	free(A->L.wallboard);
 	free(A->L.axes);
 	free(A->L.usage);
 
@@ -732,11 +798,31 @@ void	DrawPulse(uARG *A) {
 void	DrawLayout(uARG *A) {
 	switch(A->L.currentPage) {
 		case CORE: {
+			XSetForeground(A->W.display, A->W.gc, A->W.foreground);
+			// Scroll the wallboard.
+			if(A->L.wbScroll < A->L.wbLength)
+				A->L.wbScroll++;
+			else
+				A->L.wbScroll=0;
+			XDrawString(	A->W.display, A->W.pixmap.F, A->W.gc,
+					A->W.margin.width + (A->W.extents.charWidth << 1),
+					A->W.extents.charHeight,
+					&A->L.wallboard[A->L.wbScroll], (A->P.Platform.MaxNonTurboRatio << 1));
+			// Draw the Core activity when C-State is C0
 			int cpu=0;
 			for(cpu=0; cpu < A->P.ThreadCount; cpu++) {
+				XSetForeground(A->W.display, A->W.gc, A->W.foreground);
+				XDrawLine(	A->W.display, A->W.pixmap.F, A->W.gc,
+						A->W.margin.width + (A->W.extents.overall.width * (1.0f - A->P.Core[cpu].State.C0)),
+						3 + A->W.margin.height + ( A->W.extents.charHeight * (cpu + 1) ),
+						A->W.margin.width + (A->W.extents.overall.width * (1.0f - A->P.Core[cpu].State.C0)),
+						A->W.margin.height + ( A->W.extents.charHeight * (cpu + 2) ) - 3 );
+
 				A->L.usage[cpu].x=A->W.margin.width;
 				A->L.usage[cpu].y=3 + A->W.margin.height + ( A->W.extents.charHeight * (cpu + 1) );
-				A->L.usage[cpu].width=(A->W.extents.overall.width * A->P.Core[cpu].UnhaltedRatio) / A->P.Turbo.MaxRatio_1C;
+				A->L.usage[cpu].width	= (A->W.extents.overall.width
+							* (unsigned long long) (A->P.Core[cpu].UnhaltedRatio * A->P.Core[cpu].State.C0))
+							/ A->P.Turbo.MaxRatio_1C;
 				A->L.usage[cpu].height=A->W.extents.charHeight - 3;
 
 				if(A->P.Core[cpu].UnhaltedRatio <= A->P.Platform.MinimumRatio)
@@ -754,13 +840,14 @@ void	DrawLayout(uARG *A) {
 						A->L.usage[cpu].width,
 						A->L.usage[cpu].height);
 
-				XSetForeground(A->W.display, A->W.gc, A->W.foreground);
-				sprintf(A->L.string, CORE_FREQ, cpu, A->P.Core[cpu].UnhaltedFreq);
-				XDrawImageString(A->W.display, A->W.pixmap.F, A->W.gc,
-						A->W.margin.width,
+				XSetForeground(A->W.display, A->W.gc, 0xffffff);
+				sprintf(A->L.string, CORE_FREQ, A->P.Core[cpu].OperatingFreq);
+				XDrawString(A->W.display, A->W.pixmap.F, A->W.gc,
+						A->W.margin.width + (A->W.extents.charWidth >> 2),
 						A->W.margin.height + ( A->W.extents.charHeight * (cpu + 1 + 1) ),
 						A->L.string, strlen(A->L.string));
 
+				XSetForeground(A->W.display, A->W.gc, A->W.foreground);
 				sprintf(A->L.string, "%3d", A->P.Core[cpu].TjMax.Target - A->P.Core[cpu].Therm.DTS);
 				XDrawString(A->W.display, A->W.pixmap.F, A->W.gc,
 						A->W.margin.width + A->W.extents.overall.width + (A->W.extents.charWidth << 1),
@@ -787,20 +874,16 @@ void	UpdateTitle(uARG *A) {
 static void *uDraw(void *uArg) {
 	uARG *A=(uARG *) uArg;
 
-	while(A->LOOP) {
-		if(!A->PAUSE) {
-			MapLayout(A);
-			DrawLayout(A);
-			if(A->W.activity)
-				DrawPulse(A);
-			UpdateTitle(A);
-		} else
+	if(!A->PAUSE) {
+		MapLayout(A);
+		DrawLayout(A);
+		if(A->W.activity)
 			DrawPulse(A);
-		FlushLayout(A);
+		UpdateTitle(A);
+	} else
+		DrawPulse(A);
+	FlushLayout(A);
 
-		// Settle down some microseconds as specified by the command argument.
-		usleep(A->P.IdleTime);
-	}
 	return(NULL);
 }
 
@@ -905,6 +988,25 @@ static void *uLoop(void *uArg) {
 							FlushLayout(A);
 						}
 						break;
+					case XK_KP_Add: {
+						if(A->P.IdleTime > 50000)
+							A->P.IdleTime-=25000;
+						XSetForeground(A->W.display, A->W.gc, 0xffff00);
+						sprintf(A->L.string, "[%d usecs]", A->P.IdleTime);
+						XDrawImageString(A->W.display, A->W.window, A->W.gc,
+								 A->W.width >> 1, A->W.height >> 1,
+								 A->L.string, strlen(A->L.string) );
+						}
+						break;
+					case XK_KP_Subtract: {
+						A->P.IdleTime+=25000;
+						sprintf(A->L.string, "[%d usecs]", A->P.IdleTime);
+						XSetForeground(A->W.display, A->W.gc, 0xffff00);
+						XDrawImageString(A->W.display, A->W.window, A->W.gc,
+								 A->W.width >> 1, A->W.height >> 1,
+								 A->L.string, strlen(A->L.string) );
+						}
+						break;
 					case XK_F1:
 					case XK_F2:
 					case XK_F3:
@@ -950,9 +1052,10 @@ int	Help(uARG *A, int argc, char *argv[]) {
 				{"-y", "%d", &A->W.y,             "Top position"        },
 				{"-b", "%x", &A->W.background,    "Background color"    },
 				{"-f", "%x", &A->W.foreground,    "Foreground color"    },
+				{"-c", "%ud",&A->P.PerCore,       "Monitor per Thread/Core (0/1)"},
 				{"-s", "%ld",&A->P.IdleTime,      "Idle time (usec)"    },
-				{"-a", "%ld",&A->W.activity,      "Pulse activity (0/1)"},
-				{"-t", "%ld",&A->W.alwaysOnTop,   "Always On Top (0/1)" },
+				{"-a", "%ud",&A->W.activity,      "Pulse activity (0/1)"},
+				{"-t", "%ud",&A->W.alwaysOnTop,   "Always On Top (0/1)" },
 				{"-D", "%lx",&A->D.window,        "Desktop Window id"   },
 				{"-F", "%s", &A->W.extents.fname, "Font name"           },
 		};
@@ -996,6 +1099,7 @@ int main(int argc, char *argv[]) {
 				ClockSpeed:0,
 				ThreadCount:0,
 				Core:NULL,
+				PerCore:false,
 				IdleTime:750000,
 			},
 			W: {
@@ -1093,7 +1197,9 @@ int main(int argc, char *argv[]) {
 					},
 				},
 				string:{0},
-				bclock:{0},
+				wbScroll:0,
+				wbLength:0,
+				wallboard:NULL,
 				bump:{0},
 				usage:NULL,
 				axes:NULL,
@@ -1107,14 +1213,19 @@ int main(int argc, char *argv[]) {
 		CPUID(&A.P.Features);
 		// Find the Processor Architecture.
 		for(A.P.ArchID=ARCHITECTURES; A.P.ArchID >=0 ; A.P.ArchID--)
-				if(!(DEFAULT[A.P.ArchID].Signature.ExtFamily ^ A.P.Features.Std.EAX.ExtFamily)
-				&& !(DEFAULT[A.P.ArchID].Signature.Family ^ A.P.Features.Std.EAX.Family)
-				&& !(DEFAULT[A.P.ArchID].Signature.ExtModel ^ A.P.Features.Std.EAX.ExtModel)
-				&& !(DEFAULT[A.P.ArchID].Signature.Model ^ A.P.Features.Std.EAX.Model))
+				if(!(ARCH[A.P.ArchID].Signature.ExtFamily ^ A.P.Features.Std.EAX.ExtFamily)
+				&& !(ARCH[A.P.ArchID].Signature.Family ^ A.P.Features.Std.EAX.Family)
+				&& !(ARCH[A.P.ArchID].Signature.ExtModel ^ A.P.Features.Std.EAX.ExtModel)
+				&& !(ARCH[A.P.ArchID].Signature.Model ^ A.P.Features.Std.EAX.Model))
 					break;
-		// Fallback to the CPUID fixed count of threads if unavailable from BIOS.
-		if( (A.P.ThreadCount=Get_ThreadCount()) == 0)
-			A.P.ThreadCount=A.P.Features.ThreadCount;
+		if(!A.P.PerCore) {
+			if( (A.P.ThreadCount=Get_ThreadCount()) == 0)
+				// Fallback to the CPUID fixed count of threads if unavailable from BIOS.
+				A.P.ThreadCount=A.P.Features.ThreadCount;
+		}
+		else
+			if( (A.P.ThreadCount=Get_CoreCount()) == 0)
+				A.P.ThreadCount=ARCH[A.P.ArchID].MaxOfCores;
 		// Allocate the Cores working structure.
 		A.P.Core=malloc(A.P.ThreadCount * sizeof(struct THREADS));
 		// Open once the MSR gate.
@@ -1126,7 +1237,7 @@ int main(int argc, char *argv[]) {
 				if((A.P.ClockSpeed=FallBack_Freq() / A.P.Platform.MaxNonTurboRatio) == 0)
 					// Fallback at least to the default clock.
 					if(A.P.ArchID != -1)
-						A.P.ClockSpeed=DEFAULT[A.P.ArchID].ClockSpeed;
+						A.P.ClockSpeed=ARCH[A.P.ArchID].ClockSpeed;
 
 			// Read the Integrated Memory Controler information.
 			A.M=IMC_Read_Info();
@@ -1140,11 +1251,9 @@ int main(int argc, char *argv[]) {
 				FlushLayout(&A);
 				XMapWindow(A.W.display, A.W.window);
 
-				pthread_t TID_Cycle=0, TID_Draw=0;
-				if(!pthread_create(&TID_Cycle, NULL, uCycle, &A)
-				&& !pthread_create(&TID_Draw, NULL, uDraw, &A)) {
+				pthread_t TID_Cycle=0/*, TID_Draw=0*/;
+				if(!pthread_create(&TID_Cycle, NULL, uCycle, &A)) {
 					uLoop((void*) &A);
-					pthread_join(TID_Draw, NULL);
 					pthread_join(TID_Cycle, NULL);
 				}
 				else rc=2;
