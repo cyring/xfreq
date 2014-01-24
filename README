@@ -27,6 +27,7 @@
  *
  * + other processors ...
  *
+ * + procstat
  *
  *  Graphical
  * -----------
@@ -38,13 +39,13 @@
  * + handle skins :
  *     second layout should provide processor usage history.
  *     compute which core have the longest usage (displayed as the App title name).
- * + provide mutex : between the uExec & uLoop threads.
  * + manage others XEvent : close, move, resize, etc.
  * + compatibilty with Xsession & any DE greeters.
  * + keep above others.
  * + gradiant coloring.
  * + screenshot key.
  * + mouse handling.
+ * + multiple document interface
  *
  *
  *  Source code
@@ -61,12 +62,27 @@
  *
  * [HISTORY]
  *
+ * R 0.15 : 01/24 2014
+ *        - Added an architecture table with default processors values.
+ *        - Implemented the C3 and C6 C-States counters.
+ *        - Create 2 new Widgets:
+ *            C-States per Core and in Processor average.
+ *            Temperature per Core and hottest.
+ *        - Protect the drawing thread with a mutex.
+ *        - Scroll the Processor brand name (Wallboard).
+ *        - Changed the action associated with [Page Down] & [Page Up] keys.
+ *        - The [+] and [-] keys of the NumPad allow to decrase or increase the idle time.
+ *        - In the Core Widget :
+ *            the [H] key hide / unhide the frequencies.
+ *            the [P] key hide / unhide the C-States counters.
+ *        - The System Information Widget now gathers all detail about Processor, RAM and BIOS.
+ *
  * R 0.14 : 01/19 2014
- *        - Add option '-c' to monitor the processor per threads or per cores.
- *        - Core load is now based on the C0 perf. counter relatively to the TSC.
+ *        - Added the option '-c' to monitor the processor either per threads, either per cores.
+ *        - The Cores load is now based on the C0 performance counter and relatively to the TSC.
  *
  * R 0.13 : 01/14 2014 SR-1
- *        - The program is changeds from 2 to 3 threads:
+ *        - The program is changed from 2 to 3 threads:
  *            uCycle to compute the actual frequency.
  *            uDraw to paint the foreground.
  *            uLoop to handle X events. (called by the main thread)

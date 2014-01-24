@@ -1,9 +1,15 @@
 /*
- * XFreq.c #0.14 by CyrIng
+ * XFreq.c #0.15 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  */
+
+#define _MAJOR   "0"
+#define _MINOR   "15"
+#define _NIGHTLY "0"
+#define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__
+static  char    version[] = AutoDate;
 
 typedef enum {false=0, true=1} bool;
 
@@ -161,9 +167,11 @@ struct IMCINFO
 #define	IA32_FIXED_CTR2			0x30b
 #define	IA32_FIXED_CTR_CTRL		0x38d
 #define	IA32_PERF_GLOBAL_CTRL		0x38f
+#define	MSR_CORE_C3_RESIDENCY		0x3fc
+#define	MSR_CORE_C6_RESIDENCY		0x3fd
 #define	MSR_PLATFORM_INFO		0xce
 #define	MSR_TURBO_RATIO_LIMIT		0x1ad
-#define MSR_TEMPERATURE_TARGET		0x1a2
+#define	MSR_TEMPERATURE_TARGET		0x1a2
 
 #define	SMBIOS_PROCINFO_STRUCTURE	4
 #define	SMBIOS_PROCINFO_INSTANCE	0
@@ -274,21 +282,22 @@ typedef struct {
 
 const struct {
 	struct	SIGNATURE	Signature;
-		unsigned int	MaxOfCores,
-				ClockSpeed;;
+	const	unsigned int	MaxOfCores,
+				ClockSpeed;
+	const	char		*Architecture;
 } ARCH[ARCHITECTURES]={
-				{ Nehalem_Bloomfield,    4, 133 },
-				{ Nehalem_Lynnfield,     4, 133 },
-				{ Nehalem_NehalemEP,     4, 133 },
-				{ Westmere_Arrandale,    4, 133 },
-				{ Westmere_Gulftown,     6, 133 },
-				{ Westmere_WestmereEP,   6, 133 },
-				{ SandyBridge_1G,        6, 100 },
-				{ SandyBridge_Bromolow,  4, 100 },
-				{ IvyBridge,             6 ,100 },
-				{ Haswell_3C,            4, 100 },
-				{ Haswell_45,            4, 100 },
-				{ Haswell_46,            4, 100 },
+				{ Nehalem_Bloomfield,    4, 133, "Nehalem" },
+				{ Nehalem_Lynnfield,     4, 133, "Nehalem" },
+				{ Nehalem_NehalemEP,     4, 133, "Nehalem" },
+				{ Westmere_Arrandale,    4, 133, "Westmere" },
+				{ Westmere_Gulftown,     6, 133, "Westmere" },
+				{ Westmere_WestmereEP,   6, 133, "Westmere" },
+				{ SandyBridge_1G,        6, 100, "SandyBridge" },
+				{ SandyBridge_Bromolow,  4, 100, "SandyBridge" },
+				{ IvyBridge,             6 ,100, "IvyBridge" },
+				{ Haswell_3C,            4, 100, "Haswell" },
+				{ Haswell_45,            4, 100, "Haswell" },
+				{ Haswell_46,            4, 100, "Haswell" },
 			};
 
 typedef struct {
@@ -298,7 +307,7 @@ typedef struct {
 		TURBO				Turbo;
 		unsigned long long		TSC[2];
 		unsigned int			ClockSpeed;
-		short int			ThreadCount;
+		unsigned int			CPU;
 		struct THREADS {
 			signed int		FD;
 			unsigned int		OperatingRatio,
@@ -310,23 +319,30 @@ typedef struct {
 			unsigned int		UnhaltedRatio,
 						UnhaltedFreq;
 			struct {
+				unsigned long long	C3[2],
+							C6[2];
+			} RefCycles;
+			struct {
 				double		C0,
-						C1,
 						C3,
 						C6;
 			} State;
 			TJMAX	TjMax;
 			THERM	Therm;
 		} *Core;
+		struct {
+			double		C0,
+					C3,
+					C6;
+		} Avg;
 		unsigned int			Top,
+						Hot,
 						PerCore;
 		useconds_t			IdleTime;
 } PROCESSOR;
 
 typedef struct {
-	Display		*display;
 	Window		window;
-	Screen		*screen;
 	struct {
 		Pixmap	B,
 			F;
@@ -337,15 +353,6 @@ typedef struct {
 	int		width,
 			height;
 	struct	{
-		int	width,
-			height;
-	} margin;
-	unsigned int	alwaysOnTop,
-			activity,
-			pulse;
-	struct	{
-		char	fname[256];
-	    XFontStruct	*font;
 	    XCharStruct	overall;
 		int	dir,
 			ascent,
@@ -355,7 +362,6 @@ typedef struct {
 	} extents;
 	unsigned long	background,
 			foreground;
-	XSizeHints	*hints;
 	XWindowAttributes attribs;
 } XWINDOW;
 
@@ -366,81 +372,83 @@ typedef struct {
 } DESKTOP;
 
 #define	HDSIZE		".1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0"
-#define	APP_TITLE	"#%d @ %dMHz - %dC"
 
-typedef enum {MENU, CORE, PROC, RAM, BIOS, _COP_} PAGES;
+typedef enum {MENU, CORE, CSTATES, TEMP, SYSINFO, _COP_} PAGES;
 
-#define	MENU_TITLE	"X-Freq"
+#define	WIDGETS	_COP_
+
 #define	MENU_FORMAT	"[F1]     Help             [ESC]    Quit\n"        \
-			"[F2]     Core             [F3]     Processor\n"   \
-			"[F3]     RAM              [F4]     BIOS\n"        \
-			"[PgDw]   Previous page    [PgUp]   Next page\n"   \
-			"[Pause]  Suspend          [Return] Redraw\n"      \
-			"[Home]   Keep on top      [End]    Keep below\n"  \
-			"[P][p]   Activity pulse   [C][c]   Center page\n" \
+			"[F2]     Core             [F3]     C-States\n"    \
+			"[F3]     Temps            [F4]     System Info\n"        \
+			"[A][a]   Activity pulse   [C][c]   Center page\n" \
+			"[H][h]   Frequency Hz     [P][p]   Counters %\n"  \
+			"[W][w]   Wallboard                         ...\n" \
 			"                                 [Up]\n"          \
 			"  Scrolling page          [Left]      [Right]\n"  \
-			"                                [Down]\n"
+			"                                [Down]\n\n"       \
+			"[PgDw]   Page Down        [PgUp]   Page Up\n"     \
+			"[Pause]  Suspend          [Return] Redraw\n"      \
+			"[Home]   Keep on top      [End]    Keep below\n"  \
+			"KPad [+] Faster           KPad [-] Slower\n"
 
 #define	CORE_NUM	"#%-2d"
 #define	CORE_FREQ	"%5d MHz"
+#define	CORE_STATE	"%6.2f%% %6.2f%% %6.2f%%"
 #define	OVERCLOCK	"%s [%4d MHz]"
 
-#define	PROC_TITLE	"Processor"
-#define	PROC_FORMAT	"[%s]\n\n"                                             \
-			" Family       Model     Stepping     Max# of\n"       \
-			"  Code         No.         ID        Threads\n"       \
-			"[%6X]    [%6X]    [%6d]    [%6d]\n\n"                 \
-			"Virtual Mode Extension                 VME [%c]\n" \
-			"Debugging Extension                     DE [%c]\n" \
-			"Page Size Extension                    PSE [%c]\n" \
-			"Time Stamp Counter                     TSC [%c]\n" \
-			"Model Specific Registers               MSR [%c]\n" \
-			"Physical Address Extension             PAE [%c]\n" \
-			"Advanced Programmable Interrupt Ctrl. APIC [%c]\n" \
-			"Memory Type Range Registers           MTRR [%c]\n" \
-			"Page Global Enable                     PGE [%c]\n" \
-			"Machine-Check Architecture             MCA [%c]\n" \
-			"Page Attribute Table                   PAT [%c]\n" \
-			"36-bit Page Size Extension           PSE36 [%c]\n" \
-			"Processor Serial Number                PSN [%c]\n" \
-			"Debug Store                             DS [%c]\n" \
-			"Advanced Configuration & Power Intrf. ACPI [%c]\n" \
-			"Self-Snoop                              SS [%c]\n" \
-			"Hyper-Threading                        HTT [%c]\n" \
-			"Thermal Monitor               TM1 [%c]  TM2 [%c]\n" \
-			"Pending Break Enable                   PBE [%c]\n" \
-			"64-Bit Debug Store                  DTES64 [%c]\n" \
-			"CPL Qualified Debug Store           DS-CPL [%c]\n" \
-			"Virtual Machine Extensions             VMX [%c]\n" \
-			"Safer Mode Extensions                  SMX [%c]\n" \
-			"SpeedStep                             EIST [%c]\n" \
-			"L1 Data Cache Context ID           CNXT-ID [%c]\n" \
-			"Fused Multiply Add                     FMA [%c]\n" \
-			"xTPR Update Control                   xTPR [%c]\n" \
-			"Perfmon and Debug Capability          PDCM [%c]\n" \
-			"Process Context Identifiers           PCID [%c]\n" \
-			"Direct Cache Access                    DCA [%c]\n" \
-			"Extended xAPIC Support              x2APIC [%c]\n" \
-			"Time Stamp Counter Deadline   TSC-DEADLINE [%c]\n" \
-			"XSAVE/XSTOR States                   XSAVE [%c]\n" \
-			"OS-Enabled Ext. State Management   OSXSAVE [%c]\n" \
-			"Execution Disable Bit Support       XD-Bit [%c]\n" \
-			"1 GB Pages Support               1GB-PAGES [%c]\n" \
+#define	PROC_FORMAT	"Processor [%s]\n"                                                       \
+			"Architecture [%s]\n\n"                                                  \
+			" Family               Model             Stepping             Max# of\n" \
+			"  Code                 No.                 ID                Threads\n" \
+			"[%6X]            [%6X]            [%6d]            [%6d]\n\n"           \
+			"Virtual Mode Extension                                         VME [%c]\n" \
+			"Debugging Extension                                             DE [%c]\n" \
+			"Page Size Extension                                            PSE [%c]\n" \
+			"Time Stamp Counter                                             TSC [%c]\n" \
+			"Model Specific Registers                                       MSR [%c]\n" \
+			"Physical Address Extension                                     PAE [%c]\n" \
+			"Advanced Programmable Interrupt Controller                    APIC [%c]\n" \
+			"Memory Type Range Registers                                   MTRR [%c]\n" \
+			"Page Global Enable                                             PGE [%c]\n" \
+			"Machine-Check Architecture                                     MCA [%c]\n" \
+			"Page Attribute Table                                           PAT [%c]\n" \
+			"36-bit Page Size Extension                                   PSE36 [%c]\n" \
+			"Processor Serial Number                                        PSN [%c]\n" \
+			"Debug Store                                                     DS [%c]\n" \
+			"Advanced Configuration & Power Interface                      ACPI [%c]\n" \
+			"Self-Snoop                                                      SS [%c]\n" \
+			"Hyper-Threading                                                HTT [%c]\n" \
+			"Thermal Monitor                                 TM1 [%c]        TM2 [%c]\n" \
+			"Pending Break Enable                                           PBE [%c]\n" \
+			"64-Bit Debug Store                                          DTES64 [%c]\n" \
+			"CPL Qualified Debug Store                                   DS-CPL [%c]\n" \
+			"Virtual Machine Extensions                                     VMX [%c]\n" \
+			"Safer Mode Extensions                                          SMX [%c]\n" \
+			"SpeedStep                                                     EIST [%c]\n" \
+			"L1 Data Cache Context ID                                   CNXT-ID [%c]\n" \
+			"Fused Multiply Add                                             FMA [%c]\n" \
+			"xTPR Update Control                                           xTPR [%c]\n" \
+			"Perfmon and Debug Capability                                  PDCM [%c]\n" \
+			"Process Context Identifiers                                   PCID [%c]\n" \
+			"Direct Cache Access                                            DCA [%c]\n" \
+			"Extended xAPIC Support                                      x2APIC [%c]\n" \
+			"Time Stamp Counter Deadline                           TSC-DEADLINE [%c]\n" \
+			"XSAVE/XSTOR States                                           XSAVE [%c]\n" \
+			"OS-Enabled Ext. State Management                           OSXSAVE [%c]\n" \
+			"Execution Disable Bit Support                               XD-Bit [%c]\n" \
+			"1 GB Pages Support                                       1GB-PAGES [%c]\n" \
 			"\nInstruction set:\n"                              \
-			"FPU[%c]    CX8[%c]   SEP[%c]   CMOV[%c]   CLFSH[%c]\n" \
-			"MMX[%c]   FXSR[%c]   SSE[%c]   SSE2[%c]    SSE3[%c]\n" \
-			"SSSE3[%c]    SSE4.1[%c]   SSE4.2[%c]  PCLMULDQ[%c]\n" \
-			"MONITOR[%c]    CX16[%c]    MOVBE[%c]    POPCNT[%c]\n" \
-			"AES[%c]         AVX[%c]     F16C[%c]    RDRAND[%c]\n" \
-			"LAHF/SAHF[%c]   SYSCALL[%c]   RDTSCP[%c]  IA64[%c]\n"
+			"FPU[%c]           CX8[%c]          SEP[%c]          CMOV[%c]      CLFSH[%c]\n" \
+			"MMX[%c]          FXSR[%c]          SSE[%c]          SSE2[%c]       SSE3[%c]\n" \
+			"SSSE3[%c]           SSE4.1[%c]          SSE4.2[%c]            PCLMULDQ[%c]\n" \
+			"MONITOR[%c]           CX16[%c]           MOVBE[%c]              POPCNT[%c]\n" \
+			"AES[%c]                AVX[%c]            F16C[%c]              RDRAND[%c]\n" \
+			"LAHF/SAHF[%c]      SYSCALL[%c]          RDTSCP[%c]                IA64[%c]\n"
 
 
-#define	RAM_TITLE	"RAM"
 #define	CHA_FORMAT	"Channel   tCL   tRCD  tRP   tRAS  tRRD  tRFC  tWR   tRTPr tWTPr tFAW  B2B\n"
 #define	CAS_FORMAT	"   #%1i   |%4d%6d%6d%6d%6d%6d%6d%6d%6d%6d%6d\n"
 
-#define	BIOS_TITLE	"BIOS"
 #define	BIOS_FORMAT	"Base Clock [%3d MHz]\n"
 
 typedef struct {
@@ -449,7 +457,6 @@ typedef struct {
 } XMAXPRINT;
 
 typedef struct {
-	int		currentPage;
 	struct	{
 		bool	pageable;
 		char	*title;
@@ -458,22 +465,37 @@ typedef struct {
 			vScroll;
 	} Page[_COP_];
 	char		string[sizeof(HDSIZE)];
+	unsigned int	activity,
+			hertz,
+			cstatePC,
+			alwaysOnTop,
+			pulse,
+			wallboard;
 	int		wbScroll,
 			wbLength;
-	char		*wallboard;
+	char		*wbString;
 	char		bump[2+2+2+1];
-	XRectangle	*usage;
-	XSegment	*axes;
+	struct {
+		XRectangle	*C0,
+				*C3,
+				*C6;
+	} usage;
+	XSegment	*axes[WIDGETS];
 } LAYOUT;
 
 typedef struct {
-	bool		LOOP,
-			PAUSE;
 	PROCESSOR	P;
 	struct IMCINFO	*M;
-	XWINDOW		W;
+	Display		*display;
+	Screen		*screen;
+	char		*fontName;
+	XFontStruct	*xfont;
+	XWINDOW		W[WIDGETS];
 	DESKTOP		D;
 	LAYOUT		L;
+	bool		LOOP,
+			PAUSE;
+	pthread_t	TID_Draw;
 } uARG;
 
 typedef struct {
