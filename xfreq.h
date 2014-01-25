@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.15 SR1 by CyrIng
+ * XFreq.c #0.15 SR2 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,7 +7,7 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "15"
-#define _NIGHTLY "1"
+#define _NIGHTLY "2"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__
 static  char    version[] = AutoDate;
 
@@ -458,7 +458,6 @@ typedef struct {
 		int	hScroll,
 			vScroll;
 	} Page[_COP_];
-	char		string[sizeof(HDSIZE)];
 	unsigned int	activity,
 			hertz,
 			cstatePC,
@@ -488,7 +487,7 @@ typedef struct {
 	XWINDOW		D;
 	LAYOUT		L;
 	bool		LOOP,
-			PAUSE;
+			PAUSE[WIDGETS];
 	pthread_t	TID_Draw;
 } uARG;
 

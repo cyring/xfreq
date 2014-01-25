@@ -61,7 +61,9 @@
  *
  * [HISTORY]
  *
- * R 0.15 : 01/24 2014 SR-1
+ * R 0.15 : 01/24 2014 SR-2
+ *        - Cosmetic changes with the MDI window.
+ *        - Minimizing or unmapping a widget stops its drawing.
  *        - The command argument '-D' enables the Multiple Document Interface management mode.
  *        - The Widgets are now gracefully disposed.
  *        - Added an architecture table with default processors values.

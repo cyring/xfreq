@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.15 SR1 by CyrIng
+ * XFreq.c #0.15 SR2 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -437,6 +437,7 @@ XMAXPRINT XPrint(Display *display, Drawable drawable, GC gc, int x, int y, char 
 // Create the X-Window Widget.
 int	OpenLayout(uARG *A) {
 	int noerr=true;
+	char str[sizeof(HDSIZE)];
 
 	// Allocate memory for chart elements.
 	A->L.usage.C0=malloc(A->P.CPU * sizeof(XRectangle));
@@ -469,27 +470,41 @@ int	OpenLayout(uARG *A) {
 		if((A->xfont=XLoadQueryFont(A->display, A->fontName)) == NULL)
 			noerr=false;
 
-		// Find root or Desktop window.
+		// Start the MDI window (if asked by user).
 		if(A->D.window != (XID)-1) {
 			if((A->D.window=XCreateWindow(A->display, DefaultRootWindow(A->display),
 							A->D.x, A->D.y, A->D.width, A->D.height,
 							0, CopyFromParent, InputOutput, CopyFromParent, CWOverrideRedirect, &swa)))
 			{
-				sprintf(A->L.string, "X-Freq %s.%s-%s", _MAJOR, _MINOR, _NIGHTLY);
-				XStoreName(A->display, A->D.window, A->L.string);
-				XSetIconName(A->display, A->D.window, A->L.string);
+				sprintf(str, "X-Freq %s.%s-%s", _MAJOR, _MINOR, _NIGHTLY);
+				XStoreName(A->display, A->D.window, str);
+				XSetIconName(A->display, A->D.window, str);
 
-				A->D.gc=XCreateGC(A->display, A->D.window, 0, NULL);
+				if((A->D.gc=XCreateGC(A->display, A->D.window, 0, NULL)))
+					{
+					XSetFont(A->display, A->D.gc, A->xfont->fid);
+					XTextExtents(	A->xfont, HDSIZE, sizeof(HDSIZE),
+							&A->D.extents.dir, &A->D.extents.ascent,
+							&A->D.extents.descent, &A->D.extents.overall);
 
-				XSelectInput(A->display, A->D.window	, VisibilityChangeMask
-									| ExposureMask
-									| KeyPressMask
-									| StructureNotifyMask);
+					A->D.pixmap.B=XCreatePixmap(A->display, A->D.window,
+										A->D.width, A->D.height,
+										DefaultDepthOfScreen(A->screen));
+					A->D.pixmap.F=XCreatePixmap(A->display, A->D.window,
+										A->D.width, A->D.height,
+										DefaultDepthOfScreen(A->screen));
+
+					XSelectInput(A->display, A->D.window,	VisibilityChangeMask
+										| ExposureMask
+										| KeyPressMask
+										| StructureNotifyMask);
+					}
+				else	noerr=false;
 			}
 			else
 				A->D.window=(XID)-1;
 		}
-
+		// Start the Widgets.
 		int G=0;
 		for(G=0; noerr && (G < WIDGETS); G++) {
 			if((A->W[G].window=XCreateWindow(A->display, (A->D.window == (XID)-1) ? DefaultRootWindow(A->display) : A->D.window,
@@ -497,6 +512,7 @@ int	OpenLayout(uARG *A) {
 							(A->D.window == (XID)-1) ? 0 : 1,
 							CopyFromParent, InputOutput, CopyFromParent, CWOverrideRedirect, &swa)) )
 				{
+				XSetWindowBorder(A->display, A->W[G].window, A->D.foreground);
 				if((A->W[G].gc=XCreateGC(A->display, A->W[G].window, 0, NULL)))
 					{
 					XSetFont(A->display, A->W[G].gc, A->xfont->fid);
@@ -665,13 +681,13 @@ int	OpenLayout(uARG *A) {
 	else	noerr=false;
 
 	// Prepare a Wallboard string with the Processor information.
-	sprintf(A->L.string, OVERCLOCK, A->P.Features.BrandString, A->P.Platform.MaxNonTurboRatio * A->P.ClockSpeed);
-	A->L.wbLength=strlen(A->L.string) + (A->P.Platform.MaxNonTurboRatio << 2);
+	sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Platform.MaxNonTurboRatio * A->P.ClockSpeed);
+	A->L.wbLength=strlen(str) + (A->P.Platform.MaxNonTurboRatio << 2);
 	A->L.wbString=calloc(A->L.wbLength, 1);
 	memset(A->L.wbString, 0x20, A->L.wbLength);
-	memcpy(&A->L.wbString[A->P.Platform.MaxNonTurboRatio << 1], A->L.string, strlen(A->L.string));
+	memcpy(&A->L.wbString[A->P.Platform.MaxNonTurboRatio << 1], str, strlen(str));
 	A->L.wbScroll=(A->P.Platform.MaxNonTurboRatio << 1);
-	A->L.wbLength=strlen(A->L.string) + A->L.wbScroll;
+	A->L.wbLength=strlen(str) + A->L.wbScroll;
 
 	// Store some Ratios into a string for future chart drawing.
 	sprintf(A->L.bump, "%02d%02d%02d",	A->P.Platform.MinimumRatio,
@@ -735,6 +751,7 @@ void	BuildLayout(uARG *A, int G) {
 		}
 			break;
 		case CORE: {
+			char str[sizeof(CORE_NUM)];
 			// Draw the axes.
 			XSetForeground(A->display, A->W[G].gc, 0x404040);
 			XDrawSegments(A->display, A->W[G].pixmap.B, A->W[G].gc, A->L.axes[G], A->P.Turbo.MaxRatio_1C + 1);
@@ -743,11 +760,11 @@ void	BuildLayout(uARG *A, int G) {
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++) {
-				sprintf(A->L.string, CORE_NUM, cpu);
+				sprintf(str, CORE_NUM, cpu);
 				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 						A->W[G].extents.charWidth >> 1,
 						( A->W[G].extents.charHeight * (cpu + 1 + 1) ),
-						A->L.string, strlen(A->L.string) );
+						str, strlen(str) );
 			}
 			XSetForeground(A->display, A->W[G].gc, 0xc0c0c0);
 			XDrawString(	A->display,
@@ -790,6 +807,7 @@ void	BuildLayout(uARG *A, int G) {
 			break;
 		case CSTATES:
 		{
+			char str[sizeof(CORE_NUM)];
 			// Draw the axes.
 			XSetForeground(A->display, A->W[G].gc, 0x404040);
 			XDrawSegments(A->display, A->W[G].pixmap.B, A->W[G].gc, A->L.axes[G], 10 + 1);
@@ -834,18 +852,19 @@ void	BuildLayout(uARG *A, int G) {
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++) {
-				sprintf(A->L.string, CORE_NUM, cpu);
+				sprintf(str, CORE_NUM, cpu);
 				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 						(A->W[G].extents.charWidth << 1)
 						+ ((cpu * 3) * (A->W[G].extents.charWidth << 1)),
 						A->W[G].extents.charHeight,
-						A->L.string, strlen(A->L.string) );
+						str, strlen(str) );
 			}
 		}
 			break;
 		case TEMP:
 		{
-			int	amplitude=A->P.Features.ThreadCount;
+			char str[sizeof(CORE_NUM)];
+			int amplitude=A->P.Features.ThreadCount;
 
 			XSetForeground(A->display, A->W[G].gc, 0xc0c0c0);
 			XDrawLine(A->display, A->W[G].pixmap.B, A->W[G].gc,
@@ -869,13 +888,13 @@ void	BuildLayout(uARG *A, int G) {
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++) {
-				sprintf(A->L.string, CORE_NUM, cpu);
+				sprintf(str, CORE_NUM, cpu);
 				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 						(A->W[G].extents.charWidth * 5)
 						+ (A->W[G].extents.charWidth >> 1)
 						+ (cpu << 1) * (A->W[G].extents.charWidth << 1),
 						A->W[G].extents.charHeight,
-						A->L.string, strlen(A->L.string) );
+						str, strlen(str) );
 			}
 		}
 			break;
@@ -995,13 +1014,15 @@ void	CloseLayout(uARG *A)
 
 	int G=0;
 	for(G=0; G < WIDGETS; G++) {
-		XFreeGC(A->display, A->W[G].gc);
 		XFreePixmap(A->display, A->W[G].pixmap.B);
 		XFreePixmap(A->display, A->W[G].pixmap.F);
+		XFreeGC(A->display, A->W[G].gc);
 		XDestroyWindow(A->display, A->W[G].window);
 		free(A->L.axes[G]);
 	}
 	if(A->D.window != (XID)-1) {
+		XFreePixmap(A->display, A->D.pixmap.B);
+		XFreePixmap(A->display, A->D.pixmap.F);
 		XFreeGC(A->display, A->D.gc);
 		XDestroyWindow(A->display, A->D.window);
 	}
@@ -1025,14 +1046,28 @@ void	FlushLayout(uARG *A, int G) {
 	XFlush(A->display);
 }
 
+void	BuildMDI(uARG *A) {
+	XSetForeground(A->display, A->D.gc, A->D.background);
+	XFillRectangle(A->display, A->D.pixmap.B, A->D.gc, 0, 0, A->D.width, A->D.height);
+}
+
+void	MapMDI(uARG *A) {
+	XCopyArea(A->display, A->D.pixmap.B, A->D.pixmap.F, A->D.gc, 0, 0, A->D.width, A->D.height, 0, 0);
+}
+
+void	FlushMDI(uARG *A) {
+	XCopyArea(A->display,A->D.pixmap.F, A->D.window, A->D.gc, 0, 0, A->D.width, A->D.height, 0, 0);
+	XFlush(A->display);
+}
+
 // An activity pulse blinks during the calculation (red) or when in pause (yellow).
-void	DrawPulse(uARG *A, int G) {
-	XSetForeground(A->display, A->W[G].gc, (A->L.pulse=!A->L.pulse) ? (A->PAUSE) ? 0xffff00 : 0xff0000 : A->W[G].foreground);
-	XDrawArc(A->display, A->W[G].pixmap.F, A->W[G].gc,
-		A->W[G].width - A->W[G].extents.charWidth - (A->W[G].extents.charWidth >> 1),
-		A->W[G].extents.charWidth >> 1,
-		A->W[G].extents.charWidth,
-		A->W[G].extents.charWidth,
+void	DrawPulse(uARG *A) {
+	XSetForeground(A->display, A->D.gc, (A->L.pulse=!A->L.pulse) ? 0xff0000 : A->D.foreground);
+	XDrawArc(A->display, A->D.pixmap.F, A->D.gc,
+		A->D.width - A->D.extents.charWidth - (A->D.extents.charWidth >> 1),
+		A->D.extents.charWidth >> 1,
+		A->D.extents.charWidth,
+		A->D.extents.charWidth,
 		0, 360 << 8);
 }
 
@@ -1041,6 +1076,7 @@ void	DrawLayout(uARG *A, int G) {
 	switch(G) {
 		case CORE:
 		{
+			char str[16];
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++) {
 				// Select a color based ratio.
@@ -1064,21 +1100,21 @@ void	DrawLayout(uARG *A, int G) {
 				// Display Core frequency & C-STATE
 				if(A->L.hertz) {
 					XSetForeground(A->display, A->W[G].gc, 0xdddddd);
-					sprintf(A->L.string, CORE_FREQ, A->P.Core[cpu].UnhaltedFreq);
+					sprintf(str, CORE_FREQ, A->P.Core[cpu].UnhaltedFreq);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							(A->W[G].extents.charWidth * 5),
 							( A->W[G].extents.charHeight * (cpu + 1 + 1) ),
-							A->L.string, strlen(A->L.string) );
+							str, strlen(str) );
 				}
 				if(A->L.cstatePC) {
 					XSetForeground(A->display, A->W[G].gc, 0x737373);
-					sprintf(A->L.string, CORE_STATE,100 * A->P.Core[cpu].State.C0,
+					sprintf(str, CORE_STATE,100 * A->P.Core[cpu].State.C0,
 									100 * A->P.Core[cpu].State.C3,
 									100 * A->P.Core[cpu].State.C6);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							(A->W[G].extents.charWidth * 18),
 							A->W[G].extents.charHeight * (cpu + 1 + 1),
-							A->L.string, strlen(A->L.string) );
+							str, strlen(str) );
 				}
 			}
 			// Scroll the wallboard.
@@ -1098,6 +1134,7 @@ void	DrawLayout(uARG *A, int G) {
 			break;
 		case CSTATES:
 		{
+			char str[32];
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++) {
@@ -1124,7 +1161,7 @@ void	DrawLayout(uARG *A, int G) {
 							+ (A->W[G].extents.charHeight * (10 - 1)) * A->P.Core[cpu].State.C6;
 			}
 			// Display the C-State averages.
-			sprintf(A->L.string, CORE_STATE,
+			sprintf(str, CORE_STATE,
 						100 * A->P.Avg.C0,
 						100 * A->P.Avg.C3,
 						100 * A->P.Avg.C6);
@@ -1132,7 +1169,7 @@ void	DrawLayout(uARG *A, int G) {
 						(A->W[G].extents.charWidth),
 						A->W[G].extents.charHeight
 						+ (A->W[G].extents.charHeight * (10 + 1)),
-						A->L.string, strlen(A->L.string) );
+						str, strlen(str) );
 
 			// Draw C0, C3 & C6 states.
 			XSetForeground(A->display, A->W[G].gc, 0x6666f0);
@@ -1145,6 +1182,7 @@ void	DrawLayout(uARG *A, int G) {
 			break;
 		case TEMP:
 		{
+			char str[16];
 			// Update & draw the temperature histogram.
 			int	amplitude=A->P.Features.ThreadCount,
 				history=amplitude << 2;
@@ -1170,23 +1208,23 @@ void	DrawLayout(uARG *A, int G) {
 			for(cpu=0; cpu < A->P.CPU; cpu++) {
 				// Display Core temperature.
 				XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
-				sprintf(A->L.string, "%3d", A->P.Core[cpu].TjMax.Target - A->P.Core[cpu].Therm.DTS);
+				sprintf(str, "%3d", A->P.Core[cpu].TjMax.Target - A->P.Core[cpu].Therm.DTS);
 				XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 						(A->W[G].extents.charWidth * 5)
 						+ (A->W[G].extents.charWidth >> 1)
 						+ (cpu << 1) * (A->W[G].extents.charWidth << 1),
 						A->W[G].extents.charHeight * (amplitude + 1 + 1),
-						A->L.string, strlen(A->L.string));
+						str, strlen(str));
 			}
 			// Display hottest temperature.
 			XSetForeground(A->display, A->W[G].gc, 0xffa500);
-			sprintf(A->L.string, "%2d", A->P.Core[A->P.Hot].TjMax.Target - A->P.Core[A->P.Hot].Therm.DTS);
+			sprintf(str, "%2d", A->P.Core[A->P.Hot].TjMax.Target - A->P.Core[A->P.Hot].Therm.DTS);
 			XDrawImageString(A->display,
 					A->W[G].pixmap.F,
 					A->W[G].gc,
 					A->W[G].extents.charWidth >> 1,
 					U->y2,
-					A->L.string, 2);
+					str, 2);
 		}
 			break;
 	}
@@ -1194,45 +1232,47 @@ void	DrawLayout(uARG *A, int G) {
 
 // Update the Widget name with the Top Core frequency and its temperature.
 void	UpdateTitle(uARG *A, int G) {
+	char str[32];
 	switch(G) {
 		case MENU:
-			sprintf(A->L.string, "X-Freq %s.%s-%s",
+			sprintf(str, "X-Freq %s.%s-%s",
 				_MAJOR, _MINOR, _NIGHTLY);
 			break;
 		case CORE:
-			sprintf(A->L.string, "Core#%d @ %dMHz",
+			sprintf(str, "Core#%d @ %dMHz",
 				A->P.Top, A->P.Core[A->P.Top].UnhaltedFreq);
 			break;
 		case CSTATES:
-			sprintf(A->L.string, "C-States [%.2f%%] [%.2f%%]", 100 * A->P.Avg.C0, 100 * (A->P.Avg.C3 + A->P.Avg.C6));
+			sprintf(str, "C-States [%.2f%%] [%.2f%%]", 100 * A->P.Avg.C0, 100 * (A->P.Avg.C3 + A->P.Avg.C6));
 			break;
 		case TEMP:
-			sprintf(A->L.string, "Core#%d @ %dC",
+			sprintf(str, "Core#%d @ %dC",
 				A->P.Top, A->P.Core[A->P.Hot].TjMax.Target - A->P.Core[A->P.Hot].Therm.DTS);
 			break;
 		case SYSINFO:
-			sprintf(A->L.string, "Clock @ %dMHz",
+			sprintf(str, "Clock @ %dMHz",
 				A->P.ClockSpeed);
 			break;
 	}
-	XStoreName(A->display, A->W[G].window, A->L.string);
-	XSetIconName(A->display, A->W[G].window, A->L.string);
+	XStoreName(A->display, A->W[G].window, str);
+	XSetIconName(A->display, A->W[G].window, str);
 }
 
 // The far drawing procedure which paints the foreground.
 static void *uDraw(void *uArg) {
 	uARG *A=(uARG *) uArg;
 	int G=0;
-	for(G=0; G < WIDGETS; G++) {
-		if(!A->PAUSE) {
+	for(G=0; G < WIDGETS; G++)
+		if(!A->PAUSE[G]) {
 			MapLayout(A, G);
 			DrawLayout(A, G);
-			if(A->L.activity)
-				DrawPulse(A, CORE);
 			UpdateTitle(A, G);
-		} else
-			DrawPulse(A, CORE);
-		FlushLayout(A, G);
+			FlushLayout(A, G);
+		}
+	if(A->L.activity && A->D.window != (XID)-1) {
+		MapMDI(A);
+		DrawPulse(A);
+		FlushMDI(A);
 	}
 	// Drawing is done.
 	pthread_mutex_unlock(&uDraw_mutex);
@@ -1259,8 +1299,7 @@ static void *uLoop(uARG *A) {
 						FlushLayout(A, G);
 				}
 				if(E.xany.window == A->D.window) {
-						XSetForeground(A->display, A->D.gc, A->D.background);
-						XFillRectangle(A->display, A->D.window, A->D.gc, 0, 0, A->D.width, A->D.height);
+						FlushMDI(A);
 				}
 			}
 				break;
@@ -1270,26 +1309,43 @@ static void *uLoop(uARG *A) {
 						A->LOOP=false;
 						break;
 					case XK_Pause:
-						A->PAUSE=!A->PAUSE;
+						for(G=0; G < WIDGETS; G++)
+							A->PAUSE[G]=!A->PAUSE[G];
 						break;
-					case XK_Return: {
-						MapLayout(A, G);
-						DrawLayout(A, G);
-						FlushLayout(A, G);
+					case XK_Return:
+						// Fire the drawing thread.
+						if(pthread_mutex_trylock(&uDraw_mutex) == 0)
+							pthread_create(&A->TID_Draw, NULL, uDraw, A);
+						break;
+					case XK_Home: {
+						if(A->L.alwaysOnTop == false) {
+							if(A->D.window != (XID)-1)
+								XRaiseWindow(A->display, A->D.window);
+							else if(G < WIDGETS)
+								XRaiseWindow(A->display, A->W[G].window);
+							A->L.alwaysOnTop=true;
+						}
 					}
 						break;
-					case XK_Home:
-						A->L.alwaysOnTop=true;
-						break;
-					case XK_End: if(G < WIDGETS) {
-						if(A->L.alwaysOnTop)
-							XLowerWindow(A->display, A->W[G].window);
-						A->L.alwaysOnTop=false;
+					case XK_End: {
+						if(A->L.alwaysOnTop == true) {
+							if(A->D.window != (XID)-1)
+								XLowerWindow(A->display, A->D.window);
+							else if(G < WIDGETS)
+								XLowerWindow(A->display, A->W[G].window);
+							A->L.alwaysOnTop=false;
+						}
 					}
 						break;
 					case XK_a:
-					case XK_A:
+					case XK_A: {
 						A->L.activity=!A->L.activity;
+						if(A->D.window != (XID)-1) {
+							BuildMDI(A);
+							MapMDI(A);
+							FlushMDI(A);
+						}
+					}
 						break;
 					case XK_h:
 					case XK_H:
@@ -1309,7 +1365,7 @@ static void *uLoop(uARG *A) {
 							BuildLayout(A, G);
 							MapLayout(A, G);
 							FlushLayout(A, G);
-						}
+					}
 						break;
 					case XK_Left: if(G < WIDGETS && A->L.Page[G].pageable
 						      && A->L.Page[G].hScroll < A->L.Page[G].max.cols) {
@@ -1317,7 +1373,7 @@ static void *uLoop(uARG *A) {
 								BuildLayout(A, G);
 								MapLayout(A, G);
 								FlushLayout(A, G);
-						}
+					}
 						break;
 					case XK_Right: if(G < WIDGETS && A->L.Page[G].pageable
 						       && A->L.Page[G].hScroll > -A->L.Page[G].max.cols) {
@@ -1325,7 +1381,7 @@ static void *uLoop(uARG *A) {
 								BuildLayout(A, G);
 								MapLayout(A, G);
 								FlushLayout(A, G);
-						}
+					}
 						break;
 					case XK_Up: if(G < WIDGETS && A->L.Page[G].pageable
 						    && A->L.Page[G].vScroll < A->L.Page[G].max.rows) {
@@ -1333,7 +1389,7 @@ static void *uLoop(uARG *A) {
 								BuildLayout(A, G);
 								MapLayout(A, G);
 								FlushLayout(A, G);
-						}
+					}
 						break;
 					case XK_Down: if(G < WIDGETS && A->L.Page[G].pageable
 						      && A->L.Page[G].vScroll > -A->L.Page[G].max.rows) {
@@ -1341,7 +1397,7 @@ static void *uLoop(uARG *A) {
 								BuildLayout(A, G);
 								MapLayout(A, G);
 								FlushLayout(A, G);
-						}
+					}
 						break;
 					case XK_Page_Up: if(G < WIDGETS && A->L.Page[G].pageable
 							&& A->L.Page[G].vScroll < A->L.Page[G].max.rows) {
@@ -1349,7 +1405,7 @@ static void *uLoop(uARG *A) {
 								BuildLayout(A, G);
 								MapLayout(A, G);
 								FlushLayout(A, G);
-						}
+					}
 						break;
 					case XK_Page_Down: if(G < WIDGETS && A->L.Page[G].pageable
 							&& A->L.Page[G].vScroll > -A->L.Page[G].max.rows) {
@@ -1357,49 +1413,76 @@ static void *uLoop(uARG *A) {
 								BuildLayout(A, G);
 								MapLayout(A, G);
 								FlushLayout(A, G);
-						}
+					}
 						break;
-					case XK_KP_Add: if(G < WIDGETS) {
+					case XK_KP_Add: {
+						char str[32];
 						if(A->P.IdleTime > 50000)
 							A->P.IdleTime-=25000;
-						XSetForeground(A->display, A->W[G].gc, 0xffff00);
-						sprintf(A->L.string, "[%d usecs]", A->P.IdleTime);
-						XDrawImageString(A->display, A->W[G].window, A->W[G].gc,
-								 A->W[G].width >> 1, A->W[G].height >> 1,
-								 A->L.string, strlen(A->L.string) );
+						sprintf(str, "[%d usecs]", A->P.IdleTime);
+						if(A->D.window != (XID)-1) {
+							XSetForeground(A->display, A->D.gc, 0xffff00);
+							XDrawImageString(A->display, A->D.window, A->D.gc,
+									A->D.width >> 1, A->D.height >> 1,
+									str, strlen(str) );
 						}
+						else if(G < WIDGETS) {
+							XSetForeground(A->display, A->W[G].gc, 0xffff00);
+							XDrawImageString(A->display, A->W[G].window, A->W[G].gc,
+									A->W[G].width >> 1, A->W[G].height >> 1,
+									str, strlen(str) );
+						}
+					}
 						break;
 					case XK_KP_Subtract: if(G < WIDGETS) {
+						char str[32];
 						A->P.IdleTime+=25000;
-						sprintf(A->L.string, "[%d usecs]", A->P.IdleTime);
-						XSetForeground(A->display, A->W[G].gc, 0xffff00);
-						XDrawImageString(A->display, A->W[G].window, A->W[G].gc,
-								 A->W[G].width >> 1, A->W[G].height >> 1,
-								 A->L.string, strlen(A->L.string) );
+						sprintf(str, "[%d usecs]", A->P.IdleTime);
+						if(A->D.window != (XID)-1) {
+							XSetForeground(A->display, A->D.gc, 0xffff00);
+							XDrawImageString(A->display, A->D.window, A->D.gc,
+									A->D.width >> 1, A->D.height >> 1,
+									str, strlen(str) );
 						}
-						break;
-/*					case XK_F1:
+						else if(G < WIDGETS) {
+							XSetForeground(A->display, A->W[G].gc, 0xffff00);
+							XDrawImageString(A->display, A->W[G].window, A->W[G].gc,
+									A->W[G].width >> 1, A->W[G].height >> 1,
+									str, strlen(str) );
+						}
+					}
+					break;
+					case XK_F1:
 					case XK_F2:
 					case XK_F3:
 					case XK_F4:
 					case XK_F5: {
+						// Convert the function key number into a Widget index.
 						G=XLookupKeysym(&E.xkey, 0) - XK_F1;
-						CenterLayout(A, G);
-						BuildLayout(A, G);
-						MapLayout(A, G);
-						FlushLayout(A, G);
+						// Get Map status.
+						XWindowAttributes xwa={0};
+						XGetWindowAttributes(A->display, A->W[G].window, &xwa);
+						// Hide or unhide the Widget.
+						if(xwa.map_state == IsUnmapped)
+							XMapWindow(A->display, A->W[G].window);
+						else if(A->D.window != (XID)-1)
+								XUnmapWindow(A->display, A->W[G].window);
+							else
+								XIconifyWindow(A->display, A->W[G].window, DefaultScreen(A->display));
 					}
-						break;*/
+						break;
 				}
 				break;
 			case DestroyNotify:
 				A->LOOP=false;
 				break;
 			case UnmapNotify:
-				A->PAUSE=true;
+				if(G < WIDGETS)
+					A->PAUSE[G]=true;
 				break;
 			case MapNotify:
-				A->PAUSE=false;
+				if(G < WIDGETS)
+					A->PAUSE[G]=false;
 				break;
 			case VisibilityNotify:
 				switch (E.xvisibility.state) {
@@ -1681,9 +1764,8 @@ int main(int argc, char *argv[]) {
 						vScroll:1,
 					},
 				},
-				string:{0},
 				activity:false,
-				hertz:false,
+				hertz:true,
 				cstatePC:false,
 				alwaysOnTop: false,
 				pulse:false,
@@ -1696,7 +1778,7 @@ int main(int argc, char *argv[]) {
 				axes:{NULL},
 			},
 			LOOP: true,
-			PAUSE: true,
+			PAUSE: {false},
 			TID_Draw: 0,
 		};
 	int	rc=0;
@@ -1750,8 +1832,12 @@ int main(int argc, char *argv[]) {
 					DrawLayout(&A, G);
 					FlushLayout(&A, G);
 					XMapWindow(A.display, A.W[G].window);
-					if(A.D.window != (XID)-1)
+					if(A.D.window != (XID)-1) {
+						BuildMDI(&A);
+						MapMDI(&A);
+						FlushMDI(&A);
 						XMapWindow(A.display, A.D.window);
+					}
 				}
 				pthread_t TID_Cycle=0;
 				if(!pthread_create(&TID_Cycle, NULL, uCycle, &A)) {
