@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.15 SR0 by CyrIng
+ * XFreq.c #0.15 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,7 +7,7 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "15"
-#define _NIGHTLY "0"
+#define _NIGHTLY "1"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__
 static  char    version[] = AutoDate;
 
@@ -365,12 +365,6 @@ typedef struct {
 	XWindowAttributes attribs;
 } XWINDOW;
 
-typedef struct {
-	Window		window;
-	char		name[32];
-	Window		child;
-} DESKTOP;
-
 #define	HDSIZE		".1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0"
 
 typedef enum {MENU, CORE, CSTATES, TEMP, SYSINFO, _COP_} PAGES;
@@ -491,7 +485,7 @@ typedef struct {
 	char		*fontName;
 	XFontStruct	*xfont;
 	XWINDOW		W[WIDGETS];
-	DESKTOP		D;
+	XWINDOW		D;
 	LAYOUT		L;
 	bool		LOOP,
 			PAUSE;

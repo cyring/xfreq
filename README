@@ -45,7 +45,6 @@
  * + gradiant coloring.
  * + screenshot key.
  * + mouse handling.
- * + multiple document interface
  *
  *
  *  Source code
@@ -62,7 +61,9 @@
  *
  * [HISTORY]
  *
- * R 0.15 : 01/24 2014
+ * R 0.15 : 01/24 2014 SR-1
+ *        - The command argument '-D' enables the Multiple Document Interface management mode.
+ *        - The Widgets are now gracefully disposed.
  *        - Added an architecture table with default processors values.
  *        - Implemented the C3 and C6 C-States counters.
  *        - Create 2 new Widgets:

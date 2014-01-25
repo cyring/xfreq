@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.15 SR0 by CyrIng
+ * XFreq.c #0.15 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -469,11 +469,33 @@ int	OpenLayout(uARG *A) {
 		if((A->xfont=XLoadQueryFont(A->display, A->fontName)) == NULL)
 			noerr=false;
 
+		// Find root or Desktop window.
+		if(A->D.window != (XID)-1) {
+			if((A->D.window=XCreateWindow(A->display, DefaultRootWindow(A->display),
+							A->D.x, A->D.y, A->D.width, A->D.height,
+							0, CopyFromParent, InputOutput, CopyFromParent, CWOverrideRedirect, &swa)))
+			{
+				sprintf(A->L.string, "X-Freq %s.%s-%s", _MAJOR, _MINOR, _NIGHTLY);
+				XStoreName(A->display, A->D.window, A->L.string);
+				XSetIconName(A->display, A->D.window, A->L.string);
+
+				A->D.gc=XCreateGC(A->display, A->D.window, 0, NULL);
+
+				XSelectInput(A->display, A->D.window	, VisibilityChangeMask
+									| ExposureMask
+									| KeyPressMask
+									| StructureNotifyMask);
+			}
+			else
+				A->D.window=(XID)-1;
+		}
+
 		int G=0;
 		for(G=0; noerr && (G < WIDGETS); G++) {
-			if((A->W[G].window=XCreateWindow(A->display, DefaultRootWindow(A->display),
+			if((A->W[G].window=XCreateWindow(A->display, (A->D.window == (XID)-1) ? DefaultRootWindow(A->display) : A->D.window,
 							A->W[G].x, A->W[G].y, A->W[G].width, A->W[G].height,
-							0, CopyFromParent, InputOutput, CopyFromParent, CWOverrideRedirect, &swa)) )
+							(A->D.window == (XID)-1) ? 0 : 1,
+							CopyFromParent, InputOutput, CopyFromParent, CWOverrideRedirect, &swa)) )
 				{
 				if((A->W[G].gc=XCreateGC(A->display, A->W[G].window, 0, NULL)))
 					{
@@ -638,20 +660,6 @@ int	OpenLayout(uARG *A) {
 				else	noerr=false;
 				}
 			else	noerr=false;
-		}
-		// Seek root or DE window.
-		if(A->D.window != (XID)-1) {
-			if(A->D.window == 0x0)
-				A->D.window=DefaultRootWindow(A->display);
-			else {
-				char *tmpDesktop=NULL;
-				if(XFetchName(A->display, A->D.window, &tmpDesktop) == 0)
-					A->D.window=(XID)-1;
-				else {
-					strcpy(A->D.name, tmpDesktop);
-					XFree(tmpDesktop);
-				}
-			}
 		}
 	}
 	else	noerr=false;
@@ -993,6 +1001,10 @@ void	CloseLayout(uARG *A)
 		XDestroyWindow(A->display, A->W[G].window);
 		free(A->L.axes[G]);
 	}
+	if(A->D.window != (XID)-1) {
+		XFreeGC(A->display, A->D.gc);
+		XDestroyWindow(A->display, A->D.window);
+	}
 	XCloseDisplay(A->display);
 
 	free(A->L.wbString);
@@ -1004,16 +1016,6 @@ void	CloseLayout(uARG *A)
 
 // Fusion in one map the background and the foreground layouts.
 void	MapLayout(uARG *A, int G) {
-	if((A->D.window != (XID)-1)
-	&& XGetWindowAttributes(A->display, A->W[G].window, &A->W[G].attribs)
-	&& XTranslateCoordinates(A->display, A->W[G].window, A->D.window,
-				0, 0, &A->W[G].x, &A->W[G].y, &A->D.child) )
-	{
-		XCopyArea(A->display, A->D.window, A->W[G].pixmap.B, A->W[G].gc,
-				A->W[G].x, A->W[G].y,
-				A->W[G].attribs.width, A->W[G].attribs.height,
-				0, 0);
-	}
 	XCopyArea(A->display, A->W[G].pixmap.B, A->W[G].pixmap.F, A->W[G].gc, 0, 0, A->W[G].width, A->W[G].height, 0, 0);
 }
 
@@ -1244,16 +1246,21 @@ static void *uLoop(uARG *A) {
 		XNextEvent(A->display, &E);
 
 		int G=0;
-		for(G=0; G < WIDGETS; G++)
-			if(E.xany.window == A->W[G].window)
-				break;
-		if(G < WIDGETS)
-		    switch(E.type) {
+		if(E.xany.window != A->D.window)
+			for(G=0; G < WIDGETS; G++)
+				if(E.xany.window == A->W[G].window)
+					break;
+
+		switch(E.type) {
 			case Expose: {
 				if(!E.xexpose.count) {
 					while(XCheckTypedEvent(A->display, Expose, &E)) ;
-
-					FlushLayout(A, G);
+					if(G < WIDGETS)
+						FlushLayout(A, G);
+				}
+				if(E.xany.window == A->D.window) {
+						XSetForeground(A->display, A->D.gc, A->D.background);
+						XFillRectangle(A->display, A->D.window, A->D.gc, 0, 0, A->D.width, A->D.height);
 				}
 			}
 				break;
@@ -1274,7 +1281,7 @@ static void *uLoop(uARG *A) {
 					case XK_Home:
 						A->L.alwaysOnTop=true;
 						break;
-					case XK_End: {
+					case XK_End: if(G < WIDGETS) {
 						if(A->L.alwaysOnTop)
 							XLowerWindow(A->display, A->W[G].window);
 						A->L.alwaysOnTop=false;
@@ -1297,14 +1304,14 @@ static void *uLoop(uARG *A) {
 						A->L.wallboard=!A->L.wallboard;
 						break;
 					case XK_c:
-					case XK_C: if(A->L.Page[G].pageable) {
+					case XK_C: if(G < WIDGETS && A->L.Page[G].pageable) {
 							CenterLayout(A, G);
 							BuildLayout(A, G);
 							MapLayout(A, G);
 							FlushLayout(A, G);
 						}
 						break;
-					case XK_Left: if(A->L.Page[G].pageable
+					case XK_Left: if(G < WIDGETS && A->L.Page[G].pageable
 						      && A->L.Page[G].hScroll < A->L.Page[G].max.cols) {
 								A->L.Page[G].hScroll++ ;
 								BuildLayout(A, G);
@@ -1312,7 +1319,7 @@ static void *uLoop(uARG *A) {
 								FlushLayout(A, G);
 						}
 						break;
-					case XK_Right: if(A->L.Page[G].pageable
+					case XK_Right: if(G < WIDGETS && A->L.Page[G].pageable
 						       && A->L.Page[G].hScroll > -A->L.Page[G].max.cols) {
 								A->L.Page[G].hScroll-- ;
 								BuildLayout(A, G);
@@ -1320,7 +1327,7 @@ static void *uLoop(uARG *A) {
 								FlushLayout(A, G);
 						}
 						break;
-					case XK_Up: if(A->L.Page[G].pageable
+					case XK_Up: if(G < WIDGETS && A->L.Page[G].pageable
 						    && A->L.Page[G].vScroll < A->L.Page[G].max.rows) {
 								A->L.Page[G].vScroll++ ;
 								BuildLayout(A, G);
@@ -1328,7 +1335,7 @@ static void *uLoop(uARG *A) {
 								FlushLayout(A, G);
 						}
 						break;
-					case XK_Down: if(A->L.Page[G].pageable
+					case XK_Down: if(G < WIDGETS && A->L.Page[G].pageable
 						      && A->L.Page[G].vScroll > -A->L.Page[G].max.rows) {
 								A->L.Page[G].vScroll-- ;
 								BuildLayout(A, G);
@@ -1336,7 +1343,7 @@ static void *uLoop(uARG *A) {
 								FlushLayout(A, G);
 						}
 						break;
-					case XK_Page_Up: if(A->L.Page[G].pageable
+					case XK_Page_Up: if(G < WIDGETS && A->L.Page[G].pageable
 							&& A->L.Page[G].vScroll < A->L.Page[G].max.rows) {
 								A->L.Page[G].vScroll+=10 ;
 								BuildLayout(A, G);
@@ -1344,7 +1351,7 @@ static void *uLoop(uARG *A) {
 								FlushLayout(A, G);
 						}
 						break;
-					case XK_Page_Down: if(A->L.Page[G].pageable
+					case XK_Page_Down: if(G < WIDGETS && A->L.Page[G].pageable
 							&& A->L.Page[G].vScroll > -A->L.Page[G].max.rows) {
 								A->L.Page[G].vScroll-=10;
 								BuildLayout(A, G);
@@ -1352,7 +1359,7 @@ static void *uLoop(uARG *A) {
 								FlushLayout(A, G);
 						}
 						break;
-					case XK_KP_Add: {
+					case XK_KP_Add: if(G < WIDGETS) {
 						if(A->P.IdleTime > 50000)
 							A->P.IdleTime-=25000;
 						XSetForeground(A->display, A->W[G].gc, 0xffff00);
@@ -1362,7 +1369,7 @@ static void *uLoop(uARG *A) {
 								 A->L.string, strlen(A->L.string) );
 						}
 						break;
-					case XK_KP_Subtract: {
+					case XK_KP_Subtract: if(G < WIDGETS) {
 						A->P.IdleTime+=25000;
 						sprintf(A->L.string, "[%d usecs]", A->P.IdleTime);
 						XSetForeground(A->display, A->W[G].gc, 0xffff00);
@@ -1400,7 +1407,7 @@ static void *uLoop(uARG *A) {
 						break;
 					case VisibilityPartiallyObscured:
 					case VisibilityFullyObscured:
-						if(A->L.alwaysOnTop)
+						if(G < WIDGETS && A->L.alwaysOnTop)
 							XRaiseWindow(A->display, A->W[G].window);
 						break;
 				}
@@ -1412,10 +1419,10 @@ static void *uLoop(uARG *A) {
 
 // Apply the command line arguments.
 int	Help(uARG *A, int argc, char *argv[]) {
-	OPTION	options[] = {	{"-x", "%d", &A->W[0].x,             "Left position"       },
-				{"-y", "%d", &A->W[0].y,             "Top position"        },
-				{"-b", "%x", &A->W[0].background,    "Background color"    },
-				{"-f", "%x", &A->W[0].foreground,    "Foreground color"    },
+	OPTION	options[] = {	{"-x", "%d", &A->D.x,             "Left position"       },
+				{"-y", "%d", &A->D.y,             "Top position"        },
+				{"-b", "%x", &A->D.background,    "Background color"    },
+				{"-f", "%x", &A->D.foreground,    "Foreground color"    },
 				{"-c", "%ud",&A->P.PerCore,       "Monitor per Thread/Core (0/1)"},
 				{"-s", "%ld",&A->P.IdleTime,      "Idle time (usec)"    },
 				{"-a", "%ud",&A->L.activity,      "Pulse activity (0/1)"},
@@ -1423,7 +1430,7 @@ int	Help(uARG *A, int argc, char *argv[]) {
 				{"-p", "%ud",&A->L.cstatePC,      "C-STATE percentage (0/1)"},
 				{"-t", "%ud",&A->L.alwaysOnTop,   "Always On Top (0/1)" },
 				{"-w", "%ud",&A->L.wallboard,     "Scroll wallboard (0/1)" },
-				{"-D", "%lx",&A->D.window,        "Desktop Window id"   },
+				{"-D", "%lx",&A->D.window,        "MDI Window (-1/1)"   },
 				{"-F", "%s", A->fontName,         "Font name"           },
 		};
 	const int s=sizeof(options)/sizeof(OPTION);
@@ -1480,8 +1487,8 @@ int main(int argc, char *argv[]) {
 					F:0,
 				},
 				gc:0,
-				x:0,
-				y:0,
+				x:10,
+				y:25,
 				width:300,
 				height:150,
 				extents: {
@@ -1504,8 +1511,8 @@ int main(int argc, char *argv[]) {
 					F:0,
 				},
 				gc:0,
-				x:0,
-				y:0,
+				x:350,
+				y:25,
 				width:300,
 				height:150,
 				extents: {
@@ -1528,8 +1535,8 @@ int main(int argc, char *argv[]) {
 					F:0,
 				},
 				gc:0,
-				x:0,
-				y:0,
+				x:10,
+				y:200,
 				width:200,
 				height:150,
 				extents: {
@@ -1552,8 +1559,8 @@ int main(int argc, char *argv[]) {
 					F:0,
 				},
 				gc:0,
-				x:0,
-				y:0,
+				x:350,
+				y:200,
 				width:150,
 				height:150,
 				extents: {
@@ -1576,8 +1583,8 @@ int main(int argc, char *argv[]) {
 					F:0,
 				},
 				gc:0,
-				x:0,
-				y:0,
+				x:10,
+				y:400,
 				width:400,
 				height:400,
 				extents: {
@@ -1595,8 +1602,26 @@ int main(int argc, char *argv[]) {
 			},
 			D: {
 				window:(XID)-1,
-				name:{0},
-				child:0,
+				pixmap: {
+					B:0,
+					F:0,
+				},
+				gc:0,
+				x:0,
+				y:0,
+				width:650,
+				height:700,
+				extents: {
+					overall:{0},
+					dir:0,
+					ascent:11,
+					descent:2,
+					charWidth:6,
+					charHeight:13,
+				},
+				background:0x333333,
+				foreground:0x8fcefa,
+				attribs:{0},
 			},
 			L: {
 				Page: {
@@ -1725,6 +1750,8 @@ int main(int argc, char *argv[]) {
 					DrawLayout(&A, G);
 					FlushLayout(&A, G);
 					XMapWindow(A.display, A.W[G].window);
+					if(A.D.window != (XID)-1)
+						XMapWindow(A.display, A.D.window);
 				}
 				pthread_t TID_Cycle=0;
 				if(!pthread_create(&TID_Cycle, NULL, uCycle, &A)) {
