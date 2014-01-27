@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.15 SR2 by CyrIng
+ * XFreq.c #0.15 SR3 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,7 +7,7 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "15"
-#define _NIGHTLY "2"
+#define _NIGHTLY "3"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__
 static  char    version[] = AutoDate;
 
@@ -362,14 +362,18 @@ typedef struct {
 	} extents;
 	unsigned long	background,
 			foreground;
-	XWindowAttributes attribs;
 } XWINDOW;
 
 #define	HDSIZE		".1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0"
 
-typedef enum {MENU, CORE, CSTATES, TEMP, SYSINFO, _COP_} PAGES;
-
-#define	WIDGETS	_COP_
+typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, LAST_WIDGET} LAYOUTS;
+#define	FIRST_WIDGET	(MAIN + 1)
+#define	WIDGETS		LAST_WIDGET
+#define	MAIN_WIDTH	48
+#define	MAIN_HEIGHT	10
+#define	CSTATES_HEIGHT	10
+#define	SYSINFO_WIDTH	80
+#define	SYSINFO_HEIGHT	20
 
 #define	MENU_FORMAT	"[F1]     Help             [ESC]    Quit\n"        \
 			"[F2]     Core             [F3]     C-States\n"    \
@@ -452,13 +456,18 @@ typedef struct {
 
 typedef struct {
 	struct	{
+		int	H,
+			V;
+	} margin;
+	struct	{
 		bool	pageable;
 		char	*title;
 		XMAXPRINT max;
 		int	hScroll,
 			vScroll;
-	} Page[_COP_];
-	unsigned int	activity,
+	} Page[LAST_WIDGET];
+	unsigned int	MDI,
+			activity,
 			hertz,
 			cstatePC,
 			alwaysOnTop,
@@ -484,7 +493,6 @@ typedef struct {
 	char		*fontName;
 	XFontStruct	*xfont;
 	XWINDOW		W[WIDGETS];
-	XWINDOW		D;
 	LAYOUT		L;
 	bool		LOOP,
 			PAUSE[WIDGETS];

@@ -61,8 +61,8 @@
  *
  * [HISTORY]
  *
- * R 0.15 : 01/24 2014 SR-2
- *        - Cosmetic changes with the MDI window.
+ * R 0.15 : 01/24 2014 SR-3
+ *        - Cosmetic changes with the MDI window. Use '-D 1' to enable the MDI.
  *        - Minimizing or unmapping a widget stops its drawing.
  *        - The command argument '-D' enables the Multiple Document Interface management mode.
  *        - The Widgets are now gracefully disposed.

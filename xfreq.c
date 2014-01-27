@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.15 SR2 by CyrIng
+ * XFreq.c #0.15 SR3 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -417,6 +417,8 @@ void IMC_Free_Info(struct IMCINFO *imc)
 	}
 }
 
+#define	_IS_MDI_ (A->L.MDI != 0)
+
 // All-in-One function to print a string filled with some New Line terminated texts.
 XMAXPRINT XPrint(Display *display, Drawable drawable, GC gc, int x, int y, char *NewLineStr, int spacing) {
 	char *pStartLine=NewLineStr, *pNewLine=NULL;
@@ -434,8 +436,39 @@ XMAXPRINT XPrint(Display *display, Drawable drawable, GC gc, int x, int y, char 
 	return(max);
 }
 
+// Adjust window size & inform WM.
+void	SizeWidget(uARG *A, int G) {
+	XSizeHints *hints=NULL;
+	if((hints=XAllocSizeHints()) != NULL) {
+		hints->min_width= hints->max_width= A->W[G].width;
+		hints->min_height=hints->max_height=A->W[G].height;
+		hints->flags=PMinSize|PMaxSize;
+		XSetWMNormalHints(A->display, A->W[G].window, hints);
+		XFree(hints);
+	}
+	XWindowAttributes xwa={0};
+	XGetWindowAttributes(A->display, A->W[G].window, &xwa);
+	if((xwa.width != A->W[G].width) || (xwa.height != A->W[G].height))
+		XResizeWindow(A->display, A->W[G].window, A->W[G].width, A->W[G].height);
+}
+
+// Scale the MDI window.
+void	ScaleMDI(uARG *A) {
+	int G=0, RightMost=0, BottomMost=0;
+	for(G=FIRST_WIDGET; G < LAST_WIDGET; G++) {
+		if((A->W[RightMost].x + A->W[RightMost].width) < (A->W[G].x + A->W[G].width))
+			RightMost=G;
+		if((A->W[BottomMost].y + A->W[BottomMost].height) < (A->W[G].y + A->W[G].height))
+			BottomMost=G;
+	}
+	A->W[MAIN].width=A->W[RightMost].x + A->W[RightMost].width + A->L.margin.H;
+	A->W[MAIN].height=A->W[BottomMost].y + A->W[BottomMost].height + A->L.margin.V;
+	// Adjust the axes with the refreshed width.
+	A->L.axes[MAIN][0].x2=A->W[MAIN].width;
+}
+
 // Create the X-Window Widget.
-int	OpenLayout(uARG *A) {
+int	OpenWidgets(uARG *A) {
 	int noerr=true;
 	char str[sizeof(HDSIZE)];
 
@@ -470,57 +503,30 @@ int	OpenLayout(uARG *A) {
 		if((A->xfont=XLoadQueryFont(A->display, A->fontName)) == NULL)
 			noerr=false;
 
-		// Start the MDI window (if asked by user).
-		if(A->D.window != (XID)-1) {
-			if((A->D.window=XCreateWindow(A->display, DefaultRootWindow(A->display),
-							A->D.x, A->D.y, A->D.width, A->D.height,
-							0, CopyFromParent, InputOutput, CopyFromParent, CWOverrideRedirect, &swa)))
-			{
-				sprintf(str, "X-Freq %s.%s-%s", _MAJOR, _MINOR, _NIGHTLY);
-				XStoreName(A->display, A->D.window, str);
-				XSetIconName(A->display, A->D.window, str);
-
-				if((A->D.gc=XCreateGC(A->display, A->D.window, 0, NULL)))
-					{
-					XSetFont(A->display, A->D.gc, A->xfont->fid);
-					XTextExtents(	A->xfont, HDSIZE, sizeof(HDSIZE),
-							&A->D.extents.dir, &A->D.extents.ascent,
-							&A->D.extents.descent, &A->D.extents.overall);
-
-					A->D.pixmap.B=XCreatePixmap(A->display, A->D.window,
-										A->D.width, A->D.height,
-										DefaultDepthOfScreen(A->screen));
-					A->D.pixmap.F=XCreatePixmap(A->display, A->D.window,
-										A->D.width, A->D.height,
-										DefaultDepthOfScreen(A->screen));
-
-					XSelectInput(A->display, A->D.window,	VisibilityChangeMask
-										| ExposureMask
-										| KeyPressMask
-										| StructureNotifyMask);
-					}
-				else	noerr=false;
-			}
-			else
-				A->D.window=(XID)-1;
-		}
-		// Start the Widgets.
 		int G=0;
-		for(G=0; noerr && (G < WIDGETS); G++) {
-			if((A->W[G].window=XCreateWindow(A->display, (A->D.window == (XID)-1) ? DefaultRootWindow(A->display) : A->D.window,
+		for(G=0; noerr && (G < LAST_WIDGET); G++) {
+			// Dispose Widgets from each other : [Right & Bottom + width & height] Or -[1,-1] = X,Y origin + Margins.
+			int U=A->W[G].x;
+			int V=A->W[G].y;
+			A->W[G].x=(U == -1) ? A->W[MAIN].x + A->L.margin.H : A->W[U].x + A->W[U].width + A->L.margin.H;
+			A->W[G].y=(V == -1) ? A->W[MAIN].y + A->L.margin.V : A->W[V].y + A->W[V].height + A->L.margin.V;
+			// Define the Widgets.
+			if((A->W[G].window=XCreateWindow(A->display,
+							_IS_MDI_ && (G != MAIN) ?
+							A->W[MAIN].window
+							: DefaultRootWindow(A->display),
 							A->W[G].x, A->W[G].y, A->W[G].width, A->W[G].height,
-							(A->D.window == (XID)-1) ? 0 : 1,
+							_IS_MDI_ ? 1 : 0,
 							CopyFromParent, InputOutput, CopyFromParent, CWOverrideRedirect, &swa)) )
 				{
-				XSetWindowBorder(A->display, A->W[G].window, A->D.foreground);
 				if((A->W[G].gc=XCreateGC(A->display, A->W[G].window, 0, NULL)))
 					{
 					XSetFont(A->display, A->W[G].gc, A->xfont->fid);
 
 					switch(G) {
-						case MENU: {
+						case MAIN: {
 							// Compute Window scaling.
-							XTextExtents(	A->xfont, HDSIZE, 48,
+							XTextExtents(	A->xfont, HDSIZE, MAIN_WIDTH,
 									&A->W[G].extents.dir, &A->W[G].extents.ascent,
 									&A->W[G].extents.descent, &A->W[G].extents.overall);
 
@@ -530,7 +536,7 @@ int	OpenLayout(uARG *A) {
 											+ A->W[G].extents.descent;
 							A->W[G].width=	A->W[G].extents.overall.width;
 							A->W[G].height=	(A->W[G].extents.charWidth >> 1)
-									+ A->W[G].extents.charHeight * 10;
+									+ A->W[G].extents.charHeight * MAIN_HEIGHT;
 
 							// Prepare the chart axes.
 							A->L.axes[G]=malloc(sizeof(XSegment));
@@ -538,9 +544,18 @@ int	OpenLayout(uARG *A) {
 							A->L.axes[G][0].y1=A->W[G].extents.charHeight + (A->W[G].extents.charHeight >> 1) - 1;
 							A->L.axes[G][0].x2=A->W[G].width;
 							A->L.axes[G][0].y2=A->W[G].extents.charHeight + (A->W[G].extents.charHeight >> 1) - 1;
+
+							// First run : if MAIN defined as the MDI then reset its position.
+							if(_IS_MDI_) {
+								A->W[G].x=0;
+								A->W[G].y=0;
+							}
+							// First run : adjust the global margins with the font size. Don't overlap axes.
+							A->L.margin.H=A->W[G].extents.charWidth << 1;
+							A->L.margin.V=A->W[G].extents.charHeight + (A->W[G].extents.charHeight >> 1) + 1;
 						}
 							break;
-						case CORE: {
+						case CORES: {
 							// Compute Window scaling.
 							XTextExtents(	A->xfont, HDSIZE, A->P.Turbo.MaxRatio_1C << 1,
 									&A->W[G].extents.dir, &A->W[G].extents.ascent,
@@ -581,7 +596,7 @@ int	OpenLayout(uARG *A) {
 									+ (A->W[G].extents.charWidth << 1);
 							A->W[G].height=	(A->W[G].extents.charWidth >> 1)
 									+ (A->W[G].extents.charHeight << 1)
-									+ (A->W[G].extents.charHeight * 10);
+									+ (A->W[G].extents.charHeight * CSTATES_HEIGHT);
 
 							// Prepare the chart axes.
 							A->L.axes[G]=malloc((10 + 1) * sizeof(XSegment));
@@ -594,7 +609,7 @@ int	OpenLayout(uARG *A) {
 							}
 						}
 							break;
-						case TEMP: {
+						case TEMPS: {
 							// Compute Window scaling.
 							int	amplitude=A->P.Features.ThreadCount,
 								history=amplitude << 2;
@@ -624,7 +639,7 @@ int	OpenLayout(uARG *A) {
 							break;
 						case SYSINFO: {
 							// Compute Window scaling.
-							XTextExtents(	A->xfont, HDSIZE, 80,
+							XTextExtents(	A->xfont, HDSIZE, SYSINFO_WIDTH,
 									&A->W[G].extents.dir, &A->W[G].extents.ascent,
 									&A->W[G].extents.descent, &A->W[G].extents.overall);
 
@@ -634,7 +649,7 @@ int	OpenLayout(uARG *A) {
 											+ A->W[G].extents.descent;
 							A->W[G].width=	A->W[G].extents.overall.width;
 							A->W[G].height=	(A->W[G].extents.charWidth >> 1)
-									+ A->W[G].extents.charHeight * 20;
+									+ A->W[G].extents.charHeight * SYSINFO_HEIGHT;
 
 							// Prepare the chart axes.
 							A->L.axes[G]=malloc(sizeof(XSegment));
@@ -645,38 +660,29 @@ int	OpenLayout(uARG *A) {
 						}
 							break;
 					}
-					if((A->W[G].pixmap.B=XCreatePixmap(A->display, A->W[G].window,
-										A->W[G].width, A->W[G].height,
-										DefaultDepthOfScreen(A->screen)))
-					&& (A->W[G].pixmap.F=XCreatePixmap(A->display, A->W[G].window,
-										A->W[G].width, A->W[G].height,
-										DefaultDepthOfScreen(A->screen))) )
-						{
-						// Adjust window size & inform WM about requirements.
-						XSizeHints *hints=NULL;
-						if((hints=XAllocSizeHints()) != NULL) {
-							hints->min_width= hints->max_width= A->W[G].width;
-							hints->min_height=hints->max_height=A->W[G].height;
-							hints->flags=PMinSize|PMaxSize;
-							XSetWMNormalHints(A->display, A->W[G].window, hints);
-							XFree(hints);
-						}
-						XWindowAttributes xwa={0};
-						XGetWindowAttributes(A->display, A->W[G].window, &xwa);
-						if((xwa.width != A->W[G].width) || (xwa.height != A->W[G].height))
-							XResizeWindow(A->display, A->W[G].window, A->W[G].width, A->W[G].height);
-
-						XSelectInput(A->display, A->W[G].window , VisibilityChangeMask
-											| ExposureMask
-											| KeyPressMask
-											| StructureNotifyMask);
-						}
-					else	noerr=false;
-					}
-				else	noerr=false;
+					SizeWidget(A, G);
+					XSetWindowBorder(A->display, A->W[G].window, A->W[G].foreground);
 				}
+				else	noerr=false;
+			}
 			else	noerr=false;
 		}
+		if(noerr && _IS_MDI_) {
+			ScaleMDI(A);
+			SizeWidget(A, MAIN);
+		}
+		for(G=0; noerr && (G < LAST_WIDGET); G++)
+			if((A->W[G].pixmap.B=XCreatePixmap(A->display, A->W[G].window,
+								A->W[G].width, A->W[G].height,
+								DefaultDepthOfScreen(A->screen)))
+			&& (A->W[G].pixmap.F=XCreatePixmap(A->display, A->W[G].window,
+								A->W[G].width, A->W[G].height,
+								DefaultDepthOfScreen(A->screen))) )
+				XSelectInput(A->display, A->W[G].window , VisibilityChangeMask
+									| ExposureMask
+									| KeyPressMask
+									| StructureNotifyMask);
+			else	noerr=false;
 	}
 	else	noerr=false;
 
@@ -702,8 +708,8 @@ void	CenterLayout(uARG *A, int G) {
 	A->L.Page[G].vScroll=1 ;
 }
 
-// display & allow to scroll content.
-void	ScrollLayout(uARG *A, int G, char *items, int spacing) {
+// Display & scroll content into the specified clip rectangle.
+void	ScrollLayout(uARG *A, int G, char *items, int spacing, XRectangle *R) {
 	XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 	XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 			A->W[G].extents.charWidth,
@@ -714,11 +720,6 @@ void	ScrollLayout(uARG *A, int G, char *items, int spacing) {
 	XSetForeground(A->display, A->W[G].gc, 0x666666);
 	XDrawSegments(A->display, A->W[G].pixmap.B, A->W[G].gc, A->L.axes[G], 1);
 
-	XRectangle R[]=	{      {0,
-				0,
-				A->W[G].width,
-				A->W[G].height - (A->W[G].extents.charHeight + (A->W[G].extents.charHeight >> 1))
-			}	};
 	XSetClipRectangles(	A->display, A->W[G].gc,
 				0,
 				A->W[G].extents.charHeight + (A->W[G].extents.charHeight >> 1),
@@ -743,14 +744,20 @@ void	BuildLayout(uARG *A, int G) {
 	XFillRectangle(A->display, A->W[G].pixmap.B, A->W[G].gc, 0, 0, A->W[G].width, A->W[G].height);
 
 	switch(G) {
-		case MENU:
+		case MAIN:
 		{
 			char items[4096]={0};
 			strcpy(items, MENU_FORMAT);
-			ScrollLayout(A, G, items, A->W[G].extents.charHeight  + (A->W[G].extents.charHeight >> 1));
+			XRectangle R[]=	{ {
+						x:0,
+						y:0,
+						width:A->W[G].extents.overall.width,
+						height:(A->W[G].extents.charWidth >> 1) + A->W[G].extents.charHeight * MAIN_HEIGHT,
+					} };
+			ScrollLayout(A, G, items, A->W[G].extents.charHeight  + (A->W[G].extents.charHeight >> 1), R);
 		}
 			break;
-		case CORE: {
+		case CORES: {
 			char str[sizeof(CORE_NUM)];
 			// Draw the axes.
 			XSetForeground(A->display, A->W[G].gc, 0x404040);
@@ -861,7 +868,7 @@ void	BuildLayout(uARG *A, int G) {
 			}
 		}
 			break;
-		case TEMP:
+		case TEMPS:
 		{
 			char str[sizeof(CORE_NUM)];
 			int amplitude=A->P.Features.ThreadCount;
@@ -1001,30 +1008,29 @@ void	BuildLayout(uARG *A, int G) {
 			strcat(items, "\nBIOS\n");
 			sprintf(str, BIOS_FORMAT, A->P.ClockSpeed);
 			strcat(items, str);
-			ScrollLayout(A, G, items, A->W[G].extents.charHeight);
+			XRectangle R[]=	{      {0,
+						0,
+						A->W[G].width,
+						A->W[G].height - (A->W[G].extents.charHeight + (A->W[G].extents.charHeight >> 1))
+					}	};
+			ScrollLayout(A, G, items, A->W[G].extents.charHeight, R);
 		}
 			break;
 	}
 }
 
 // Release the Widget ressources.
-void	CloseLayout(uARG *A)
+void	CloseWidgets(uARG *A)
 {
 	XUnloadFont(A->display, A->xfont->fid);
 
 	int G=0;
-	for(G=0; G < WIDGETS; G++) {
+	for(G=LAST_WIDGET - 1; G >= 0 ; G--) {
 		XFreePixmap(A->display, A->W[G].pixmap.B);
 		XFreePixmap(A->display, A->W[G].pixmap.F);
 		XFreeGC(A->display, A->W[G].gc);
 		XDestroyWindow(A->display, A->W[G].window);
 		free(A->L.axes[G]);
-	}
-	if(A->D.window != (XID)-1) {
-		XFreePixmap(A->display, A->D.pixmap.B);
-		XFreePixmap(A->display, A->D.pixmap.F);
-		XFreeGC(A->display, A->D.gc);
-		XDestroyWindow(A->display, A->D.window);
 	}
 	XCloseDisplay(A->display);
 
@@ -1046,35 +1052,39 @@ void	FlushLayout(uARG *A, int G) {
 	XFlush(A->display);
 }
 
-void	BuildMDI(uARG *A) {
-	XSetForeground(A->display, A->D.gc, A->D.background);
-	XFillRectangle(A->display, A->D.pixmap.B, A->D.gc, 0, 0, A->D.width, A->D.height);
-}
-
-void	MapMDI(uARG *A) {
-	XCopyArea(A->display, A->D.pixmap.B, A->D.pixmap.F, A->D.gc, 0, 0, A->D.width, A->D.height, 0, 0);
-}
-
-void	FlushMDI(uARG *A) {
-	XCopyArea(A->display,A->D.pixmap.F, A->D.window, A->D.gc, 0, 0, A->D.width, A->D.height, 0, 0);
-	XFlush(A->display);
-}
-
 // An activity pulse blinks during the calculation (red) or when in pause (yellow).
-void	DrawPulse(uARG *A) {
-	XSetForeground(A->display, A->D.gc, (A->L.pulse=!A->L.pulse) ? 0xff0000 : A->D.foreground);
-	XDrawArc(A->display, A->D.pixmap.F, A->D.gc,
-		A->D.width - A->D.extents.charWidth - (A->D.extents.charWidth >> 1),
-		A->D.extents.charWidth >> 1,
-		A->D.extents.charWidth,
-		A->D.extents.charWidth,
+void	DrawPulse(uARG *A, int G) {
+	XSetForeground(A->display, A->W[G].gc, (A->L.pulse=!A->L.pulse) ? 0xff0000 : A->W[G].foreground);
+	XDrawArc(A->display, A->W[G].pixmap.F, A->W[G].gc,
+		A->W[G].width - A->W[G].extents.charWidth - (A->W[G].extents.charWidth >> 1),
+		A->W[G].extents.charWidth >> 1,
+		A->W[G].extents.charWidth,
+		A->W[G].extents.charWidth,
 		0, 360 << 8);
+}
+
+// Scroll the wallboard.
+void	DrawWB(uARG *A, int G) {
+	if(A->L.wbScroll < A->L.wbLength)
+		A->L.wbScroll++;
+	else
+		A->L.wbScroll=0;
+	// Display the Wallboard.
+	XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+	XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+			(A->W[G].extents.charWidth * 6),
+			A->W[G].extents.charHeight,
+			&A->L.wbString[A->L.wbScroll], (A->P.Platform.MaxNonTurboRatio << 1));
 }
 
 // Draw the layout foreground.
 void	DrawLayout(uARG *A, int G) {
 	switch(G) {
-		case CORE:
+		case MAIN:
+			if(A->L.activity)
+				DrawPulse(A, G);
+		break;
+		case CORES:
 		{
 			char str[16];
 			int cpu=0;
@@ -1089,7 +1099,7 @@ void	DrawLayout(uARG *A, int G) {
 				if(A->P.Core[cpu].UnhaltedRatio >= A->P.Turbo.MaxRatio_4C)
 					XSetForeground(A->display, A->W[G].gc, 0xff0000);
 
-				// Draw Core frequency.
+				// Draw the Core frequency.
 				XFillRectangle(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 						A->W[G].extents.charWidth * 3,
 						3 + ( A->W[G].extents.charHeight * (cpu + 1) ),
@@ -1097,7 +1107,7 @@ void	DrawLayout(uARG *A, int G) {
 						* (unsigned long long) (A->P.Core[cpu].UnhaltedRatio * A->P.Core[cpu].State.C0))
 						/ A->P.Turbo.MaxRatio_1C,
 						A->W[G].extents.charHeight - 3);
-				// Display Core frequency & C-STATE
+				// Display the Core frequency & C-STATE
 				if(A->L.hertz) {
 					XSetForeground(A->display, A->W[G].gc, 0xdddddd);
 					sprintf(str, CORE_FREQ, A->P.Core[cpu].UnhaltedFreq);
@@ -1117,19 +1127,8 @@ void	DrawLayout(uARG *A, int G) {
 							str, strlen(str) );
 				}
 			}
-			// Scroll the wallboard.
-			if(A->L.wallboard) {
-				if(A->L.wbScroll < A->L.wbLength)
-					A->L.wbScroll++;
-				else
-					A->L.wbScroll=0;
-				// Display Wallboard.
-				XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
-				XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-						(A->W[G].extents.charWidth * 6),
-						A->W[G].extents.charHeight,
-						&A->L.wbString[A->L.wbScroll], (A->P.Platform.MaxNonTurboRatio << 1));
-			}
+			if(A->L.wallboard)
+				DrawWB(A, G);
 		}
 			break;
 		case CSTATES:
@@ -1180,7 +1179,7 @@ void	DrawLayout(uARG *A, int G) {
 			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.usage.C6, A->P.CPU);
 		}
 			break;
-		case TEMP:
+		case TEMPS:
 		{
 			char str[16];
 			// Update & draw the temperature histogram.
@@ -1206,7 +1205,7 @@ void	DrawLayout(uARG *A, int G) {
 
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++) {
-				// Display Core temperature.
+				// Display the Core temperature.
 				XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 				sprintf(str, "%3d", A->P.Core[cpu].TjMax.Target - A->P.Core[cpu].Therm.DTS);
 				XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
@@ -1216,7 +1215,7 @@ void	DrawLayout(uARG *A, int G) {
 						A->W[G].extents.charHeight * (amplitude + 1 + 1),
 						str, strlen(str));
 			}
-			// Display hottest temperature.
+			// Display the hottest temperature.
 			XSetForeground(A->display, A->W[G].gc, 0xffa500);
 			sprintf(str, "%2d", A->P.Core[A->P.Hot].TjMax.Target - A->P.Core[A->P.Hot].Therm.DTS);
 			XDrawImageString(A->display,
@@ -1234,18 +1233,18 @@ void	DrawLayout(uARG *A, int G) {
 void	UpdateTitle(uARG *A, int G) {
 	char str[32];
 	switch(G) {
-		case MENU:
+		case MAIN:
 			sprintf(str, "X-Freq %s.%s-%s",
 				_MAJOR, _MINOR, _NIGHTLY);
 			break;
-		case CORE:
+		case CORES:
 			sprintf(str, "Core#%d @ %dMHz",
 				A->P.Top, A->P.Core[A->P.Top].UnhaltedFreq);
 			break;
 		case CSTATES:
 			sprintf(str, "C-States [%.2f%%] [%.2f%%]", 100 * A->P.Avg.C0, 100 * (A->P.Avg.C3 + A->P.Avg.C6));
 			break;
-		case TEMP:
+		case TEMPS:
 			sprintf(str, "Core#%d @ %dC",
 				A->P.Top, A->P.Core[A->P.Hot].TjMax.Target - A->P.Core[A->P.Hot].Therm.DTS);
 			break;
@@ -1262,18 +1261,13 @@ void	UpdateTitle(uARG *A, int G) {
 static void *uDraw(void *uArg) {
 	uARG *A=(uARG *) uArg;
 	int G=0;
-	for(G=0; G < WIDGETS; G++)
+	for(G=0; G < LAST_WIDGET; G++)
 		if(!A->PAUSE[G]) {
 			MapLayout(A, G);
 			DrawLayout(A, G);
 			UpdateTitle(A, G);
 			FlushLayout(A, G);
 		}
-	if(A->L.activity && A->D.window != (XID)-1) {
-		MapMDI(A);
-		DrawPulse(A);
-		FlushMDI(A);
-	}
 	// Drawing is done.
 	pthread_mutex_unlock(&uDraw_mutex);
 	return(NULL);
@@ -1286,20 +1280,15 @@ static void *uLoop(uARG *A) {
 		XNextEvent(A->display, &E);
 
 		int G=0;
-		if(E.xany.window != A->D.window)
-			for(G=0; G < WIDGETS; G++)
-				if(E.xany.window == A->W[G].window)
-					break;
+		for(G=0; G < LAST_WIDGET; G++)
+			if(E.xany.window == A->W[G].window)
+				break;
 
 		switch(E.type) {
 			case Expose: {
 				if(!E.xexpose.count) {
 					while(XCheckTypedEvent(A->display, Expose, &E)) ;
-					if(G < WIDGETS)
-						FlushLayout(A, G);
-				}
-				if(E.xany.window == A->D.window) {
-						FlushMDI(A);
+					FlushLayout(A, G);
 				}
 			}
 				break;
@@ -1309,7 +1298,7 @@ static void *uLoop(uARG *A) {
 						A->LOOP=false;
 						break;
 					case XK_Pause:
-						for(G=0; G < WIDGETS; G++)
+						for(G=0; G < LAST_WIDGET; G++)
 							A->PAUSE[G]=!A->PAUSE[G];
 						break;
 					case XK_Return:
@@ -1319,33 +1308,21 @@ static void *uLoop(uARG *A) {
 						break;
 					case XK_Home: {
 						if(A->L.alwaysOnTop == false) {
-							if(A->D.window != (XID)-1)
-								XRaiseWindow(A->display, A->D.window);
-							else if(G < WIDGETS)
-								XRaiseWindow(A->display, A->W[G].window);
+							XRaiseWindow(A->display, A->W[G].window);
 							A->L.alwaysOnTop=true;
 						}
 					}
 						break;
 					case XK_End: {
 						if(A->L.alwaysOnTop == true) {
-							if(A->D.window != (XID)-1)
-								XLowerWindow(A->display, A->D.window);
-							else if(G < WIDGETS)
-								XLowerWindow(A->display, A->W[G].window);
+							XLowerWindow(A->display, A->W[G].window);
 							A->L.alwaysOnTop=false;
 						}
 					}
 						break;
 					case XK_a:
-					case XK_A: {
+					case XK_A:
 						A->L.activity=!A->L.activity;
-						if(A->D.window != (XID)-1) {
-							BuildMDI(A);
-							MapMDI(A);
-							FlushMDI(A);
-						}
-					}
 						break;
 					case XK_h:
 					case XK_H:
@@ -1360,14 +1337,14 @@ static void *uLoop(uARG *A) {
 						A->L.wallboard=!A->L.wallboard;
 						break;
 					case XK_c:
-					case XK_C: if(G < WIDGETS && A->L.Page[G].pageable) {
+					case XK_C: if(A->L.Page[G].pageable) {
 							CenterLayout(A, G);
 							BuildLayout(A, G);
 							MapLayout(A, G);
 							FlushLayout(A, G);
 					}
 						break;
-					case XK_Left: if(G < WIDGETS && A->L.Page[G].pageable
+					case XK_Left: if(A->L.Page[G].pageable
 						      && A->L.Page[G].hScroll < A->L.Page[G].max.cols) {
 								A->L.Page[G].hScroll++ ;
 								BuildLayout(A, G);
@@ -1375,7 +1352,7 @@ static void *uLoop(uARG *A) {
 								FlushLayout(A, G);
 					}
 						break;
-					case XK_Right: if(G < WIDGETS && A->L.Page[G].pageable
+					case XK_Right: if(A->L.Page[G].pageable
 						       && A->L.Page[G].hScroll > -A->L.Page[G].max.cols) {
 								A->L.Page[G].hScroll-- ;
 								BuildLayout(A, G);
@@ -1383,7 +1360,7 @@ static void *uLoop(uARG *A) {
 								FlushLayout(A, G);
 					}
 						break;
-					case XK_Up: if(G < WIDGETS && A->L.Page[G].pageable
+					case XK_Up: if(A->L.Page[G].pageable
 						    && A->L.Page[G].vScroll < A->L.Page[G].max.rows) {
 								A->L.Page[G].vScroll++ ;
 								BuildLayout(A, G);
@@ -1391,7 +1368,7 @@ static void *uLoop(uARG *A) {
 								FlushLayout(A, G);
 					}
 						break;
-					case XK_Down: if(G < WIDGETS && A->L.Page[G].pageable
+					case XK_Down: if(A->L.Page[G].pageable
 						      && A->L.Page[G].vScroll > -A->L.Page[G].max.rows) {
 								A->L.Page[G].vScroll-- ;
 								BuildLayout(A, G);
@@ -1399,7 +1376,7 @@ static void *uLoop(uARG *A) {
 								FlushLayout(A, G);
 					}
 						break;
-					case XK_Page_Up: if(G < WIDGETS && A->L.Page[G].pageable
+					case XK_Page_Up: if(A->L.Page[G].pageable
 							&& A->L.Page[G].vScroll < A->L.Page[G].max.rows) {
 								A->L.Page[G].vScroll+=10 ;
 								BuildLayout(A, G);
@@ -1407,7 +1384,7 @@ static void *uLoop(uARG *A) {
 								FlushLayout(A, G);
 					}
 						break;
-					case XK_Page_Down: if(G < WIDGETS && A->L.Page[G].pageable
+					case XK_Page_Down: if(/*G < WIDGETS &&*/ A->L.Page[G].pageable
 							&& A->L.Page[G].vScroll > -A->L.Page[G].max.rows) {
 								A->L.Page[G].vScroll-=10;
 								BuildLayout(A, G);
@@ -1420,36 +1397,20 @@ static void *uLoop(uARG *A) {
 						if(A->P.IdleTime > 50000)
 							A->P.IdleTime-=25000;
 						sprintf(str, "[%d usecs]", A->P.IdleTime);
-						if(A->D.window != (XID)-1) {
-							XSetForeground(A->display, A->D.gc, 0xffff00);
-							XDrawImageString(A->display, A->D.window, A->D.gc,
-									A->D.width >> 1, A->D.height >> 1,
-									str, strlen(str) );
-						}
-						else if(G < WIDGETS) {
-							XSetForeground(A->display, A->W[G].gc, 0xffff00);
-							XDrawImageString(A->display, A->W[G].window, A->W[G].gc,
+						XSetForeground(A->display, A->W[G].gc, 0xffff00);
+						XDrawImageString(A->display, A->W[G].window, A->W[G].gc,
 									A->W[G].width >> 1, A->W[G].height >> 1,
 									str, strlen(str) );
-						}
 					}
 						break;
 					case XK_KP_Subtract: if(G < WIDGETS) {
 						char str[32];
 						A->P.IdleTime+=25000;
 						sprintf(str, "[%d usecs]", A->P.IdleTime);
-						if(A->D.window != (XID)-1) {
-							XSetForeground(A->display, A->D.gc, 0xffff00);
-							XDrawImageString(A->display, A->D.window, A->D.gc,
-									A->D.width >> 1, A->D.height >> 1,
-									str, strlen(str) );
-						}
-						else if(G < WIDGETS) {
-							XSetForeground(A->display, A->W[G].gc, 0xffff00);
-							XDrawImageString(A->display, A->W[G].window, A->W[G].gc,
+						XSetForeground(A->display, A->W[G].gc, 0xffff00);
+						XDrawImageString(A->display, A->W[G].window, A->W[G].gc,
 									A->W[G].width >> 1, A->W[G].height >> 1,
 									str, strlen(str) );
-						}
 					}
 					break;
 					case XK_F1:
@@ -1465,8 +1426,10 @@ static void *uLoop(uARG *A) {
 						// Hide or unhide the Widget.
 						if(xwa.map_state == IsUnmapped)
 							XMapWindow(A->display, A->W[G].window);
-						else if(A->D.window != (XID)-1)
-								XUnmapWindow(A->display, A->W[G].window);
+						else if(_IS_MDI_) {
+								if(G != MAIN)
+									XUnmapWindow(A->display, A->W[G].window);
+							}
 							else
 								XIconifyWindow(A->display, A->W[G].window, DefaultScreen(A->display));
 					}
@@ -1477,12 +1440,10 @@ static void *uLoop(uARG *A) {
 				A->LOOP=false;
 				break;
 			case UnmapNotify:
-				if(G < WIDGETS)
-					A->PAUSE[G]=true;
+				A->PAUSE[G]=true;
 				break;
 			case MapNotify:
-				if(G < WIDGETS)
-					A->PAUSE[G]=false;
+				A->PAUSE[G]=false;
 				break;
 			case VisibilityNotify:
 				switch (E.xvisibility.state) {
@@ -1490,7 +1451,7 @@ static void *uLoop(uARG *A) {
 						break;
 					case VisibilityPartiallyObscured:
 					case VisibilityFullyObscured:
-						if(G < WIDGETS && A->L.alwaysOnTop)
+						if(A->L.alwaysOnTop)
 							XRaiseWindow(A->display, A->W[G].window);
 						break;
 				}
@@ -1502,19 +1463,19 @@ static void *uLoop(uARG *A) {
 
 // Apply the command line arguments.
 int	Help(uARG *A, int argc, char *argv[]) {
-	OPTION	options[] = {	{"-x", "%d", &A->D.x,             "Left position"       },
-				{"-y", "%d", &A->D.y,             "Top position"        },
-				{"-b", "%x", &A->D.background,    "Background color"    },
-				{"-f", "%x", &A->D.foreground,    "Foreground color"    },
+	OPTION	options[] = {	{"-x", "%d", &A->L.margin.H,      "Left position"                },
+				{"-y", "%d", &A->L.margin.V,      "Top position"                 },
+				{"-b", "%x", &A->W[MAIN].background, "Background color"          },
+				{"-f", "%x", &A->W[MAIN].foreground, "Foreground color"          },
 				{"-c", "%ud",&A->P.PerCore,       "Monitor per Thread/Core (0/1)"},
-				{"-s", "%ld",&A->P.IdleTime,      "Idle time (usec)"    },
-				{"-a", "%ud",&A->L.activity,      "Pulse activity (0/1)"},
-				{"-h", "%ud",&A->L.hertz,         "CPU frequency (0/1)"},
-				{"-p", "%ud",&A->L.cstatePC,      "C-STATE percentage (0/1)"},
-				{"-t", "%ud",&A->L.alwaysOnTop,   "Always On Top (0/1)" },
-				{"-w", "%ud",&A->L.wallboard,     "Scroll wallboard (0/1)" },
-				{"-D", "%lx",&A->D.window,        "MDI Window (-1/1)"   },
-				{"-F", "%s", A->fontName,         "Font name"           },
+				{"-s", "%ld",&A->P.IdleTime,      "Idle time (usec)"             },
+				{"-a", "%ud",&A->L.activity,      "Pulse activity (0/1)"         },
+				{"-h", "%ud",&A->L.hertz,         "CPU frequency (0/1)"          },
+				{"-p", "%ud",&A->L.cstatePC,      "C-STATE percentage (0/1)"     },
+				{"-t", "%ud",&A->L.alwaysOnTop,   "Always On Top (0/1)"          },
+				{"-w", "%ud",&A->L.wallboard,     "Scroll wallboard (0/1)"       },
+				{"-D", "%lx",&A->L.MDI,           "Enable MDI Window (0/1)"      },
+				{"-F", "%s", A->fontName,         "Font name"                    },
 		};
 	const int s=sizeof(options)/sizeof(OPTION);
 	int uid=geteuid(), i=0, j=0, noerr=true;
@@ -1562,7 +1523,7 @@ int main(int argc, char *argv[]) {
 				IdleTime:1000000,
 			},
 			W: {
-				// MENU
+				// MAIN
 				{
 				window:0,
 				pixmap: {
@@ -1570,8 +1531,8 @@ int main(int argc, char *argv[]) {
 					F:0,
 				},
 				gc:0,
-				x:10,
-				y:25,
+				x:-1,
+				y:-1,
 				width:300,
 				height:150,
 				extents: {
@@ -1584,9 +1545,8 @@ int main(int argc, char *argv[]) {
 				},
 				background:0x333333,
 				foreground:0x8fcefa,
-				attribs:{0},
 				},
-				// CORE
+				// CORES
 				{
 				window:0,
 				pixmap: {
@@ -1594,8 +1554,8 @@ int main(int argc, char *argv[]) {
 					F:0,
 				},
 				gc:0,
-				x:350,
-				y:25,
+				x:MAIN,
+				y:-1,
 				width:300,
 				height:150,
 				extents: {
@@ -1608,7 +1568,6 @@ int main(int argc, char *argv[]) {
 				},
 				background:0x333333,
 				foreground:0x8fcefa,
-				attribs:{0},
 				},
 				// CSTATES
 				{
@@ -1618,8 +1577,8 @@ int main(int argc, char *argv[]) {
 					F:0,
 				},
 				gc:0,
-				x:10,
-				y:200,
+				x:-1,
+				y:MAIN,
 				width:200,
 				height:150,
 				extents: {
@@ -1632,9 +1591,8 @@ int main(int argc, char *argv[]) {
 				},
 				background:0x333333,
 				foreground:0x8fcefa,
-				attribs:{0},
 				},
-				// TEMP
+				// TEMPS
 				{
 				window:0,
 				pixmap: {
@@ -1642,8 +1600,8 @@ int main(int argc, char *argv[]) {
 					F:0,
 				},
 				gc:0,
-				x:350,
-				y:200,
+				x:CSTATES,
+				y:CORES,
 				width:150,
 				height:150,
 				extents: {
@@ -1656,7 +1614,6 @@ int main(int argc, char *argv[]) {
 				},
 				background:0x333333,
 				foreground:0x8fcefa,
-				attribs:{0},
 				},
 				// SYSINFO
 				{
@@ -1666,8 +1623,8 @@ int main(int argc, char *argv[]) {
 					F:0,
 				},
 				gc:0,
-				x:10,
-				y:400,
+				x:-1,
+				y:CSTATES,
 				width:400,
 				height:400,
 				extents: {
@@ -1680,35 +1637,16 @@ int main(int argc, char *argv[]) {
 				},
 				background:0x333333,
 				foreground:0x8fcefa,
-				attribs:{0},
 				},
-			},
-			D: {
-				window:(XID)-1,
-				pixmap: {
-					B:0,
-					F:0,
-				},
-				gc:0,
-				x:0,
-				y:0,
-				width:650,
-				height:700,
-				extents: {
-					overall:{0},
-					dir:0,
-					ascent:11,
-					descent:2,
-					charWidth:6,
-					charHeight:13,
-				},
-				background:0x333333,
-				foreground:0x8fcefa,
-				attribs:{0},
 			},
 			L: {
+				// Margins must be initialized with a zero size.
+				margin: {
+					H:0,
+					V:0,
+				},
 				Page: {
-					// MENU
+					// MAIN
 					{
 						pageable: true,
 						title: version,
@@ -1719,7 +1657,7 @@ int main(int argc, char *argv[]) {
 						hScroll:1,
 						vScroll:1,
 					},
-					// CORE
+					// CORES
 					{
 						pageable: false,
 						title: NULL,
@@ -1741,7 +1679,7 @@ int main(int argc, char *argv[]) {
 						hScroll:1,
 						vScroll:1,
 					},
-					// TEMP
+					// TEMPS
 					{
 						pageable: false,
 						title: NULL,
@@ -1823,22 +1761,16 @@ int main(int argc, char *argv[]) {
 			A.M=IMC_Read_Info();
 
 			// Initialize & run the Widget.
-			if(XInitThreads() && OpenLayout(&A))
+			if(XInitThreads() && OpenWidgets(&A))
 			{
 				int G=0;
-				for(G=0; G < WIDGETS; G++) {
+				for(G=0; G < LAST_WIDGET; G++) {
 					BuildLayout(&A, G);
 					MapLayout(&A, G);
-					DrawLayout(&A, G);
 					FlushLayout(&A, G);
 					XMapWindow(A.display, A.W[G].window);
-					if(A.D.window != (XID)-1) {
-						BuildMDI(&A);
-						MapMDI(&A);
-						FlushMDI(&A);
-						XMapWindow(A.display, A.D.window);
-					}
 				}
+
 				pthread_t TID_Cycle=0;
 				if(!pthread_create(&TID_Cycle, NULL, uCycle, &A)) {
 					uLoop(&A);
@@ -1846,7 +1778,7 @@ int main(int argc, char *argv[]) {
 				}
 				else rc=2;
 
-				CloseLayout(&A);
+				CloseWidgets(&A);
 			}
 			else	rc=2;
 
