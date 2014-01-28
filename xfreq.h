@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.15 SR3 by CyrIng
+ * XFreq.c #0.15 SR4 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,7 +7,7 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "15"
-#define _NIGHTLY "3"
+#define _NIGHTLY "4"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__
 static  char    version[] = AutoDate;
 
@@ -370,23 +370,23 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, LAST_WIDGET} LAYOUTS;
 #define	FIRST_WIDGET	(MAIN + 1)
 #define	WIDGETS		LAST_WIDGET
 #define	MAIN_WIDTH	48
-#define	MAIN_HEIGHT	10
+#define	MAIN_HEIGHT	14
 #define	CSTATES_HEIGHT	10
 #define	SYSINFO_WIDTH	80
 #define	SYSINFO_HEIGHT	20
 
-#define	MENU_FORMAT	"[F1]     Help             [ESC]    Quit\n"        \
-			"[F2]     Core             [F3]     C-States\n"    \
-			"[F3]     Temps            [F4]     System Info\n"        \
-			"[A][a]   Activity pulse   [C][c]   Center page\n" \
-			"[H][h]   Frequency Hz     [P][p]   Counters %\n"  \
-			"[W][w]   Wallboard                         ...\n" \
-			"                                 [Up]\n"          \
-			"  Scrolling page          [Left]      [Right]\n"  \
-			"                                [Down]\n\n"       \
-			"[PgDw]   Page Down        [PgUp]   Page Up\n"     \
-			"[Pause]  Suspend          [Return] Redraw\n"      \
-			"[Home]   Keep on top      [End]    Keep below\n"  \
+#define	MENU_FORMAT	"[F1]     Help             [ESC]    Quit\n"          \
+			"[F2]     Core             [F3]     C-States\n"      \
+			"[F3]     Temps            [F4]     System Info\n"   \
+			"                                 [Up]\n"            \
+			"  Scrolling page          [Left]      [Right]\n"    \
+			"                                [Down]\n"   \
+			"[PgDw]   Page Down        [PgUp]   Page Up\n"       \
+			"[Pause]  Suspend          [Space]  Resume\n"        \
+			"[Return] Redraw           [C][c]   Center page\n"   \
+			"[H][h]   Frequency Hz     [P][p]   Counters %\n"    \
+			"[A][a]   Activity pulse   [W][w]   Wallboard\n"     \
+			"[Home]   Keep on top      [End]    Keep below\n"    \
 			"KPad [+] Faster           KPad [-] Slower\n"
 
 #define	CORE_NUM	"#%-2d"

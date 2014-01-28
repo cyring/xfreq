@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.15 SR3 by CyrIng
+ * XFreq.c #0.15 SR4 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -112,9 +112,6 @@ static __inline__ unsigned long long RDTSC(void)
 static void *uCycle(void *uArg) {
 	uARG *A=(uARG *) uArg;
 
-	// Initial read of the TSC.
-	A->P.TSC[0]=RDTSC();
-
 	register unsigned int cpu=0;
 	for(cpu=0; cpu < A->P.CPU; cpu++) {
 		// Initial read of the Unhalted Core & Reference Cycles.
@@ -124,14 +121,22 @@ static void *uCycle(void *uArg) {
 		Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C3_RESIDENCY, &A->P.Core[cpu].RefCycles.C3[0]);
 		Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C6_RESIDENCY, &A->P.Core[cpu].RefCycles.C6[0]);
 	}
+	// Initial read of the TSC.
+	A->P.TSC[0]=RDTSC();
+
 	while(A->LOOP) {
 		// Settle down some microseconds as specified by the command argument.
 		usleep(A->P.IdleTime);
 
-		// Reset C-States average.
-		A->P.Avg.C0=A->P.Avg.C3=A->P.Avg.C6=0;
-
+/* CRITICAL_IN  */
+		// Update the TSC.
+		A->P.TSC[1]=RDTSC();
+		register unsigned long long DeltaTSC=A->P.TSC[1] - A->P.TSC[0];
+		// Save TSC.
+		A->P.TSC[0]=A->P.TSC[1];
 		for(cpu=0; cpu < A->P.CPU; cpu++) {
+			// Update the Base Operating Ratio.
+			Read_MSR(A->P.Core[cpu].FD, IA32_PERF_STATUS, (unsigned long long *) &A->P.Core[cpu].OperatingRatio);
 			// Update the Unhalted Core & the Reference Cycles.
 			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR1, &A->P.Core[cpu].UnhaltedCoreCycles[1]);
 			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, &A->P.Core[cpu].UnhaltedRefCycles[1]);
@@ -139,17 +144,13 @@ static void *uCycle(void *uArg) {
 			Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C3_RESIDENCY, &A->P.Core[cpu].RefCycles.C3[1]);
 			Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C6_RESIDENCY, &A->P.Core[cpu].RefCycles.C6[1]);
 		}
+/* CRITICAL_OUT */
 
-		// Update the TSC.
-		A->P.TSC[1]=RDTSC();
-		register unsigned long long DeltaTSC=A->P.TSC[1] - A->P.TSC[0];
-		// Save TSC.
-		A->P.TSC[0]=A->P.TSC[1];
+		// Reset C-States average.
+		A->P.Avg.C0=A->P.Avg.C3=A->P.Avg.C6=0;
 
 		unsigned int maxFreq=0, maxTemp=A->P.Core[0].TjMax.Target;
 		for(cpu=0; cpu < A->P.CPU; cpu++) {
-			// Update the Base Operating Ratio.
-			Read_MSR(A->P.Core[cpu].FD, IA32_PERF_STATUS, (unsigned long long *) &A->P.Core[cpu].OperatingRatio);
 			// Compute the Operating Frequency.
 			A->P.Core[cpu].OperatingFreq=A->P.Core[cpu].OperatingRatio * A->P.ClockSpeed;
 			// Compute the Delta of Unhalted (Core & Ref) Cycles = Current[1] - Previous[0]
@@ -462,7 +463,7 @@ void	ScaleMDI(uARG *A) {
 			BottomMost=G;
 	}
 	A->W[MAIN].width=A->W[RightMost].x + A->W[RightMost].width + A->L.margin.H;
-	A->W[MAIN].height=A->W[BottomMost].y + A->W[BottomMost].height + A->L.margin.V;
+	A->W[MAIN].height=A->W[BottomMost].y + A->W[BottomMost].height + (A->L.margin.V >> 1);
 	// Adjust the axes with the refreshed width.
 	A->L.axes[MAIN][0].x2=A->W[MAIN].width;
 }
@@ -541,9 +542,9 @@ int	OpenWidgets(uARG *A) {
 							// Prepare the chart axes.
 							A->L.axes[G]=malloc(sizeof(XSegment));
 							A->L.axes[G][0].x1=0;
-							A->L.axes[G][0].y1=A->W[G].extents.charHeight + (A->W[G].extents.charHeight >> 1) - 1;
+							A->L.axes[G][0].y1=A->W[G].extents.charHeight + (A->W[G].extents.charHeight >> 1) - 2;
 							A->L.axes[G][0].x2=A->W[G].width;
-							A->L.axes[G][0].y2=A->W[G].extents.charHeight + (A->W[G].extents.charHeight >> 1) - 1;
+							A->L.axes[G][0].y2=A->L.axes[G][0].y1;
 
 							// First run : if MAIN defined as the MDI then reset its position.
 							if(_IS_MDI_) {
@@ -552,7 +553,7 @@ int	OpenWidgets(uARG *A) {
 							}
 							// First run : adjust the global margins with the font size. Don't overlap axes.
 							A->L.margin.H=A->W[G].extents.charWidth << 1;
-							A->L.margin.V=A->W[G].extents.charHeight + (A->W[G].extents.charHeight >> 1) + 1;
+							A->L.margin.V=A->W[G].extents.charHeight << 1;
 						}
 							break;
 						case CORES: {
@@ -1080,10 +1081,6 @@ void	DrawWB(uARG *A, int G) {
 // Draw the layout foreground.
 void	DrawLayout(uARG *A, int G) {
 	switch(G) {
-		case MAIN:
-			if(A->L.activity)
-				DrawPulse(A, G);
-		break;
 		case CORES:
 		{
 			char str[16];
@@ -1094,7 +1091,7 @@ void	DrawLayout(uARG *A, int G) {
 					XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 				if(A->P.Core[cpu].UnhaltedRatio >  A->P.Platform.MinimumRatio)
 					XSetForeground(A->display, A->W[G].gc, 0x009966);
-				if(A->P.Core[cpu].UnhaltedRatio >= A->P.Platform.MaxNonTurboRatio)
+				if(A->P.Core[cpu].UnhaltedRatio >  A->P.Platform.MaxNonTurboRatio)
 					XSetForeground(A->display, A->W[G].gc, 0xffa500);
 				if(A->P.Core[cpu].UnhaltedRatio >= A->P.Turbo.MaxRatio_4C)
 					XSetForeground(A->display, A->W[G].gc, 0xff0000);
@@ -1129,6 +1126,8 @@ void	DrawLayout(uARG *A, int G) {
 			}
 			if(A->L.wallboard)
 				DrawWB(A, G);
+			if(A->L.activity)
+				DrawPulse(A, G);
 		}
 			break;
 		case CSTATES:
@@ -1262,7 +1261,7 @@ static void *uDraw(void *uArg) {
 	uARG *A=(uARG *) uArg;
 	int G=0;
 	for(G=0; G < LAST_WIDGET; G++)
-		if(!A->PAUSE[G]) {
+		if(!A->PAUSE[G] && !A->L.Page[G].pageable) {
 			MapLayout(A, G);
 			DrawLayout(A, G);
 			UpdateTitle(A, G);
@@ -1285,12 +1284,9 @@ static void *uLoop(uARG *A) {
 				break;
 
 		switch(E.type) {
-			case Expose: {
-				if(!E.xexpose.count) {
-					while(XCheckTypedEvent(A->display, Expose, &E)) ;
+			case Expose:
+				if(!E.xexpose.count)
 					FlushLayout(A, G);
-				}
-			}
 				break;
 			case KeyPress:
 				switch(XLookupKeysym(&E.xkey, 0)) {
@@ -1299,26 +1295,28 @@ static void *uLoop(uARG *A) {
 						break;
 					case XK_Pause:
 						for(G=0; G < LAST_WIDGET; G++)
-							A->PAUSE[G]=!A->PAUSE[G];
+							A->PAUSE[G]=true;
+						break;
+					case XK_space:
+						for(G=0; G < LAST_WIDGET; G++)
+							A->PAUSE[G]=false;
 						break;
 					case XK_Return:
 						// Fire the drawing thread.
 						if(pthread_mutex_trylock(&uDraw_mutex) == 0)
 							pthread_create(&A->TID_Draw, NULL, uDraw, A);
 						break;
-					case XK_Home: {
+					case XK_Home:
 						if(A->L.alwaysOnTop == false) {
 							XRaiseWindow(A->display, A->W[G].window);
 							A->L.alwaysOnTop=true;
 						}
-					}
 						break;
-					case XK_End: {
+					case XK_End:
 						if(A->L.alwaysOnTop == true) {
 							XLowerWindow(A->display, A->W[G].window);
 							A->L.alwaysOnTop=false;
 						}
-					}
 						break;
 					case XK_a:
 					case XK_A:
@@ -1337,59 +1335,66 @@ static void *uLoop(uARG *A) {
 						A->L.wallboard=!A->L.wallboard;
 						break;
 					case XK_c:
-					case XK_C: if(A->L.Page[G].pageable) {
+					case XK_C:
+						if(A->L.Page[G].pageable) {
 							CenterLayout(A, G);
 							BuildLayout(A, G);
 							MapLayout(A, G);
 							FlushLayout(A, G);
 					}
 						break;
-					case XK_Left: if(A->L.Page[G].pageable
-						      && A->L.Page[G].hScroll < A->L.Page[G].max.cols) {
-								A->L.Page[G].hScroll++ ;
-								BuildLayout(A, G);
-								MapLayout(A, G);
-								FlushLayout(A, G);
+					case XK_Left:
+						if(A->L.Page[G].pageable
+						&& A->L.Page[G].hScroll < A->L.Page[G].max.cols) {
+							A->L.Page[G].hScroll++ ;
+							BuildLayout(A, G);
+							MapLayout(A, G);
+							FlushLayout(A, G);
 					}
 						break;
-					case XK_Right: if(A->L.Page[G].pageable
-						       && A->L.Page[G].hScroll > -A->L.Page[G].max.cols) {
-								A->L.Page[G].hScroll-- ;
-								BuildLayout(A, G);
-								MapLayout(A, G);
-								FlushLayout(A, G);
+					case XK_Right:
+						if(A->L.Page[G].pageable
+						&& A->L.Page[G].hScroll > -A->L.Page[G].max.cols) {
+							A->L.Page[G].hScroll-- ;
+							BuildLayout(A, G);
+							MapLayout(A, G);
+							FlushLayout(A, G);
 					}
 						break;
-					case XK_Up: if(A->L.Page[G].pageable
-						    && A->L.Page[G].vScroll < A->L.Page[G].max.rows) {
-								A->L.Page[G].vScroll++ ;
-								BuildLayout(A, G);
-								MapLayout(A, G);
-								FlushLayout(A, G);
+					case XK_Up:
+						if(A->L.Page[G].pageable
+						&& A->L.Page[G].vScroll < A->L.Page[G].max.rows) {
+							A->L.Page[G].vScroll++ ;
+							BuildLayout(A, G);
+							MapLayout(A, G);
+							FlushLayout(A, G);
 					}
 						break;
-					case XK_Down: if(A->L.Page[G].pageable
-						      && A->L.Page[G].vScroll > -A->L.Page[G].max.rows) {
-								A->L.Page[G].vScroll-- ;
-								BuildLayout(A, G);
-								MapLayout(A, G);
-								FlushLayout(A, G);
+					case XK_Down:
+						if(A->L.Page[G].pageable
+						&& A->L.Page[G].vScroll > -A->L.Page[G].max.rows) {
+							A->L.Page[G].vScroll-- ;
+							BuildLayout(A, G);
+							MapLayout(A, G);
+							FlushLayout(A, G);
 					}
 						break;
-					case XK_Page_Up: if(A->L.Page[G].pageable
-							&& A->L.Page[G].vScroll < A->L.Page[G].max.rows) {
-								A->L.Page[G].vScroll+=10 ;
-								BuildLayout(A, G);
-								MapLayout(A, G);
-								FlushLayout(A, G);
+					case XK_Page_Up:
+						if(A->L.Page[G].pageable
+						&& A->L.Page[G].vScroll < A->L.Page[G].max.rows) {
+							A->L.Page[G].vScroll+=10 ;
+							BuildLayout(A, G);
+							MapLayout(A, G);
+							FlushLayout(A, G);
 					}
 						break;
-					case XK_Page_Down: if(/*G < WIDGETS &&*/ A->L.Page[G].pageable
-							&& A->L.Page[G].vScroll > -A->L.Page[G].max.rows) {
-								A->L.Page[G].vScroll-=10;
-								BuildLayout(A, G);
-								MapLayout(A, G);
-								FlushLayout(A, G);
+					case XK_Page_Down:
+						if(A->L.Page[G].pageable
+						&& A->L.Page[G].vScroll > -A->L.Page[G].max.rows) {
+							A->L.Page[G].vScroll-=10;
+							BuildLayout(A, G);
+							MapLayout(A, G);
+							FlushLayout(A, G);
 					}
 						break;
 					case XK_KP_Add: {
@@ -1403,7 +1408,7 @@ static void *uLoop(uARG *A) {
 									str, strlen(str) );
 					}
 						break;
-					case XK_KP_Subtract: if(G < WIDGETS) {
+					case XK_KP_Subtract: {
 						char str[32];
 						A->P.IdleTime+=25000;
 						sprintf(str, "[%d usecs]", A->P.IdleTime);
@@ -1707,7 +1712,7 @@ int main(int argc, char *argv[]) {
 				cstatePC:false,
 				alwaysOnTop: false,
 				pulse:false,
-				wallboard:true,
+				wallboard:false,
 				wbScroll:0,
 				wbLength:0,
 				wbString:NULL,
@@ -1767,7 +1772,7 @@ int main(int argc, char *argv[]) {
 				for(G=0; G < LAST_WIDGET; G++) {
 					BuildLayout(&A, G);
 					MapLayout(&A, G);
-					FlushLayout(&A, G);
+					UpdateTitle(&A, G);
 					XMapWindow(A.display, A.W[G].window);
 				}
 

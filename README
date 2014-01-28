@@ -61,6 +61,10 @@
  *
  * [HISTORY]
  *
+ * R 0.15 : 01/28 2014 SR-4
+ *        - Reorganized the time critical part in the uCycle thread.
+ *        - Reduced the CPU overhead in Events loop and the Drawing thread.
+ *
  * R 0.15 : 01/24 2014 SR-3
  *        - Cosmetic changes with the MDI window. Use '-D 1' to enable the MDI.
  *        - Minimizing or unmapping a widget stops its drawing.
