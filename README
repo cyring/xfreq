@@ -3,7 +3,7 @@
  *
  * A Widget to display the frequency & the temperature of each core in the Intel i7 processor.
  *
- * Copyright (C) 2013 CYRIL INGENIERIE
+ * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  *
  *
@@ -11,6 +11,8 @@
  *
  *  Hardware
  * ----------
+ *
+ * + energy performance counters
  *
  * + kernel module : to reduce cpu usage near to 0.01%
  *     using mmap to transfer the complete RO data structure to userland.
@@ -32,16 +34,14 @@
  *  Graphical
  * -----------
  *
+ * + a new energy Widget.
+ * + some button-switchs & sliders to enable/disable/set the PKG/Core features in the System Info Widget.
  * + full transparency & opacity.
- * + remove the window decoration.
- * + optimize the event loop & reduce the number of Xlib calls.
  * + integrate XCB, wayland ?
  * + handle skins :
  *     second layout should provide processor usage history.
  *     compute which core have the longest usage (displayed as the App title name).
  * + manage others XEvent : close, move, resize, etc.
- * + compatibilty with Xsession & any DE greeters.
- * + keep above others.
  * + gradiant coloring.
  * + screenshot key.
  * + mouse handling.
@@ -60,6 +60,11 @@
  *
  *
  * [HISTORY]
+ *
+ * R 0.16 : 01/29 2014
+ *        - Read the TSC per logical Core using IA32_TIME_STAMP_COUNTER(0x10) rather than RDTSC instruction.
+ *        - Integrate the Misc Processor Features into the System Info Widget. See IA32_MISC_ENABLE(0x1a0).
+ *        - Attempt to handle the temperature Threshold values with IA32_THERM_INTERRUPT(0x19b) : no data !
  *
  * R 0.15 : 01/28 2014 SR-4
  *        - Reorganized the time critical part in the uCycle thread.

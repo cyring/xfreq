@@ -1,13 +1,13 @@
 /*
- * XFreq.c #0.15 SR4 by CyrIng
+ * XFreq.c #0.16 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
 #define _MAJOR   "0"
-#define _MINOR   "15"
-#define _NIGHTLY "4"
+#define _MINOR   "16"
+#define _NIGHTLY "0"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__
 static  char    version[] = AutoDate;
 
@@ -161,8 +161,11 @@ struct IMCINFO
 	}	*Channel;
 };
 
+#define	IA32_TIME_STAMP_COUNTER		0x10
 #define	IA32_PERF_STATUS		0x198
+#define	IA32_THERM_INTERRUPT		0x19b
 #define IA32_THERM_STATUS		0x19c
+#define	IA32_MISC_ENABLE		0x1a0
 #define	IA32_FIXED_CTR1			0x30a
 #define	IA32_FIXED_CTR2			0x30b
 #define	IA32_FIXED_CTR_CTRL		0x38d
@@ -179,9 +182,16 @@ struct IMCINFO
 #define	SMBIOS_PROCINFO_CORES		0x23
 #define	SMBIOS_PROCINFO_THREADS		0x25
 
+typedef	struct
+{
+	unsigned long long
+		Ratio		: 16-0,
+		ReservedBits	: 64-16;
+} PERF_STATUS;
+
 typedef struct
 {
-	unsigned  long long
+	unsigned long long
 		ReservedBits1	:  8-0,
 		MaxNonTurboRatio: 16-8,
 		ReservedBits2	: 28-16,
@@ -234,6 +244,22 @@ typedef struct {
 
 typedef struct {
 	unsigned long long
+		HighTempEnable	:  1-0,
+		LowTempEnable	:  2-1,
+		PROCHOTEnable	:  3-2,
+		FORCEPREnable	:  4-3,
+		OverheatEnable	:  5-4,
+		ReservedBits1	:  8-5,
+		Threshold1	: 15-8,
+		Threshold1Enable: 16-15,
+		Threshold2      : 23-16,
+		Threshold2Enable: 24-23,
+		PowerLimitEnable: 25-24,
+		ReservedBits2	: 64-25;
+} THERM_INTERRUPT;
+
+typedef struct {
+	unsigned long long
 		Status		:  1-0,
 		StatusLog	:  2-1,
 		PROCHOT		:  3-2,
@@ -252,7 +278,31 @@ typedef struct {
 		Resolution	: 31-27,
 		ReadingValid	: 32-31,
 		ReservedBits3	: 64-32;
-} THERM;
+} THERM_STATUS;
+
+typedef	struct {
+	unsigned long long
+		FastStrings	:  1-0,
+		ReservedBits1	:  3-1,
+		TCC		:  4-3,
+		ReservedBits2	:  7-4,
+		PerfMonitoring	:  8-7,
+		ReservedBits3	: 11-8,
+		BTS		: 12-11,
+		PEBS		: 13-12,
+		ReservedBits4	: 16-13,
+		EIST		: 17-16,
+		ReservedBits5	: 18-17,
+		FSM		: 19-18,
+		ReservedBits6	: 22-19,
+		CPUID_MaxVal	: 23-22,
+		xTPR		: 24-23,
+		ReservedBits7	: 34-24,
+		XD_Bit		: 35-34,
+		ReservedBits8	: 38-35,
+		Turbo		: 39-38,
+		ReservedBits9	: 64-39;
+} MISC_PROC_FEATURES;
 
 typedef struct {
 	unsigned long long
@@ -303,15 +353,15 @@ const struct {
 typedef struct {
 		signed int			ArchID;
 		FEATURES			Features;
+		MISC_PROC_FEATURES		MiscFeatures;
 		PLATFORM			Platform;
 		TURBO				Turbo;
-		unsigned long long		TSC[2];
 		unsigned int			ClockSpeed;
 		unsigned int			CPU;
 		struct THREADS {
 			signed int		FD;
-			unsigned int		OperatingRatio,
-						OperatingFreq;
+			PERF_STATUS		Operating;
+			unsigned int		OperatingFreq;
 			GLOBAL_PERF_COUNTER	GlobalPerfCounter;
 			FIXED_PERF_COUNTER	FixedPerfCounter;
 			unsigned long long	UnhaltedCoreCycles[2],
@@ -319,21 +369,25 @@ typedef struct {
 			unsigned int		UnhaltedRatio,
 						UnhaltedFreq;
 			struct {
-				unsigned long long	C3[2],
-							C6[2];
+				unsigned long long
+						C3[2],
+						C6[2];
 			} RefCycles;
+			unsigned long long	TSC[2];
 			struct {
 				double		C0,
 						C3,
 						C6;
 			} State;
-			TJMAX	TjMax;
-			THERM	Therm;
+			unsigned long long	DeltaTSC;
+			TJMAX			TjMax;
+			THERM_INTERRUPT		ThermIntr;
+			THERM_STATUS		ThermStat;
 		} *Core;
 		struct {
-			double		C0,
-					C3,
-					C6;
+			double			C0,
+						C3,
+						C6;
 		} Avg;
 		unsigned int			Top,
 						Hot,
@@ -422,10 +476,10 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, LAST_WIDGET} LAYOUTS;
 			"CPL Qualified Debug Store                                   DS-CPL [%c]\n" \
 			"Virtual Machine Extensions                                     VMX [%c]\n" \
 			"Safer Mode Extensions                                          SMX [%c]\n" \
-			"SpeedStep                                                     EIST [%c]\n" \
+			"SpeedStep                                                     EIST [%c]   [%s]\n" \
 			"L1 Data Cache Context ID                                   CNXT-ID [%c]\n" \
 			"Fused Multiply Add                                             FMA [%c]\n" \
-			"xTPR Update Control                                           xTPR [%c]\n" \
+			"xTPR Update Control                                           xTPR [%c]   [%s]\n" \
 			"Perfmon and Debug Capability                                  PDCM [%c]\n" \
 			"Process Context Identifiers                                   PCID [%c]\n" \
 			"Direct Cache Access                                            DCA [%c]\n" \
@@ -433,13 +487,20 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, LAST_WIDGET} LAYOUTS;
 			"Time Stamp Counter Deadline                           TSC-DEADLINE [%c]\n" \
 			"XSAVE/XSTOR States                                           XSAVE [%c]\n" \
 			"OS-Enabled Ext. State Management                           OSXSAVE [%c]\n" \
-			"Execution Disable Bit Support                               XD-Bit [%c]\n" \
+			"Execution Disable Bit Support                               XD-Bit [%c]   [%s]\n" \
 			"1 GB Pages Support                                       1GB-PAGES [%c]\n" \
+			"Fast-Strings                                        REP MOVS STORS       [%s]\n" \
+			"Automatic Thermal Control Circuit Enable                       TCC       [%s]\n" \
+			"Performance Monitoring Available                                PM       [%s]\n" \
+			"Branch Trace Storage Unavailable                               BTS       [%s]\n" \
+			"Precise Event Based Sampling                                  PEBS       [%s]\n" \
+			"Limit CPUID Maxval                                     Limit-CPUID       [%s]\n" \
+			"Turbo Mode                                                   TURBO       [%s]\n" \
 			"\nInstruction set:\n"                              \
 			"FPU[%c]           CX8[%c]          SEP[%c]          CMOV[%c]      CLFSH[%c]\n" \
 			"MMX[%c]          FXSR[%c]          SSE[%c]          SSE2[%c]       SSE3[%c]\n" \
 			"SSSE3[%c]           SSE4.1[%c]          SSE4.2[%c]            PCLMULDQ[%c]\n" \
-			"MONITOR[%c]           CX16[%c]           MOVBE[%c]              POPCNT[%c]\n" \
+			"MONITOR[%c] [%s]      CX16[%c]           MOVBE[%c]              POPCNT[%c]\n" \
 			"AES[%c]                AVX[%c]            F16C[%c]              RDRAND[%c]\n" \
 			"LAHF/SAHF[%c]      SYSCALL[%c]          RDTSCP[%c]                IA64[%c]\n"
 
@@ -469,7 +530,7 @@ typedef struct {
 	unsigned int	MDI,
 			activity,
 			hertz,
-			cstatePC,
+			cStateFlag,
 			alwaysOnTop,
 			pulse,
 			wallboard;

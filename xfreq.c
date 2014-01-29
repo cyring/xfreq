@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.15 SR4 by CyrIng
+ * XFreq.c #0.16 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -34,6 +34,7 @@ int	Open_MSR(uARG *A) {
 	int	rc=0;
 	// Read the minimum, maximum & the turbo ratios from Core number 0
 	if(tmpFD != -1) {
+		rc=((retval=Read_MSR(tmpFD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &A->P.MiscFeatures)) != -1);
 		rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM *) &A->P.Platform)) != -1);
 		rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->P.Turbo)) != -1);
 		close(tmpFD);
@@ -45,12 +46,12 @@ int	Open_MSR(uARG *A) {
 		if( (rc=((A->P.Core[cpu].FD=open(pathname, O_RDWR)) != -1)) )
 			// Enable the Performance Counters 1 and 2 :
 			// - Set the global counter bits
-			rc=((retval=Read_MSR(A->P.Core[cpu].FD, IA32_PERF_GLOBAL_CTRL, &A->P.Core[cpu].GlobalPerfCounter)) != -1);
+			rc=((retval=Read_MSR(A->P.Core[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Core[cpu].GlobalPerfCounter)) != -1);
 			A->P.Core[cpu].GlobalPerfCounter.EN_FIXED_CTR1=1;
 			A->P.Core[cpu].GlobalPerfCounter.EN_FIXED_CTR2=1;
-			rc=((retval=Write_MSR(A->P.Core[cpu].FD, IA32_PERF_GLOBAL_CTRL, &A->P.Core[cpu].GlobalPerfCounter)) != -1);
+			rc=((retval=Write_MSR(A->P.Core[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Core[cpu].GlobalPerfCounter)) != -1);
 			// - Set the fixed counter bits
-			rc=((retval=Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR_CTRL, &A->P.Core[cpu].FixedPerfCounter)) != -1);
+			rc=((retval=Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Core[cpu].FixedPerfCounter)) != -1);
 			A->P.Core[cpu].FixedPerfCounter.EN1_OS=1;
 			A->P.Core[cpu].FixedPerfCounter.EN2_OS=1;
 			A->P.Core[cpu].FixedPerfCounter.EN1_Usr=1;
@@ -63,7 +64,7 @@ int	Open_MSR(uARG *A) {
 				A->P.Core[cpu].FixedPerfCounter.AnyThread_EN1=0;
 				A->P.Core[cpu].FixedPerfCounter.AnyThread_EN2=0;
 			}
-			rc=((retval=Write_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR_CTRL, &A->P.Core[cpu].FixedPerfCounter)) != -1);
+			rc=((retval=Write_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Core[cpu].FixedPerfCounter)) != -1);
 			// Retreive the Thermal Junction Max. Fallback to 100°C if not available.
 			rc=((retval=Read_MSR(A->P.Core[cpu].FD, MSR_TEMPERATURE_TARGET, (TJMAX *) &A->P.Core[cpu].TjMax)) != -1);
 			if(A->P.Core[cpu].TjMax.Target == 0)
@@ -115,34 +116,31 @@ static void *uCycle(void *uArg) {
 	register unsigned int cpu=0;
 	for(cpu=0; cpu < A->P.CPU; cpu++) {
 		// Initial read of the Unhalted Core & Reference Cycles.
-		Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR1, &A->P.Core[cpu].UnhaltedCoreCycles[0]);
-		Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, &A->P.Core[cpu].UnhaltedRefCycles[0] );
+		Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Core[cpu].UnhaltedCoreCycles[0]);
+		Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Core[cpu].UnhaltedRefCycles[0] );
 		// Initial read of other C-States.
-		Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C3_RESIDENCY, &A->P.Core[cpu].RefCycles.C3[0]);
-		Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C6_RESIDENCY, &A->P.Core[cpu].RefCycles.C6[0]);
+		Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Core[cpu].RefCycles.C3[0]);
+		Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Core[cpu].RefCycles.C6[0]);
+		// Initial read of the TSC in relation to the Logical Core.
+		Read_MSR(A->P.Core[cpu].FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Core[cpu].TSC[0]);
 	}
-	// Initial read of the TSC.
-	A->P.TSC[0]=RDTSC();
 
 	while(A->LOOP) {
 		// Settle down some microseconds as specified by the command argument.
 		usleep(A->P.IdleTime);
 
 /* CRITICAL_IN  */
-		// Update the TSC.
-		A->P.TSC[1]=RDTSC();
-		register unsigned long long DeltaTSC=A->P.TSC[1] - A->P.TSC[0];
-		// Save TSC.
-		A->P.TSC[0]=A->P.TSC[1];
 		for(cpu=0; cpu < A->P.CPU; cpu++) {
 			// Update the Base Operating Ratio.
-			Read_MSR(A->P.Core[cpu].FD, IA32_PERF_STATUS, (unsigned long long *) &A->P.Core[cpu].OperatingRatio);
+			Read_MSR(A->P.Core[cpu].FD, IA32_PERF_STATUS, (PERF_STATUS *) &A->P.Core[cpu].Operating);
 			// Update the Unhalted Core & the Reference Cycles.
-			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR1, &A->P.Core[cpu].UnhaltedCoreCycles[1]);
-			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, &A->P.Core[cpu].UnhaltedRefCycles[1]);
+			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Core[cpu].UnhaltedCoreCycles[1]);
+			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Core[cpu].UnhaltedRefCycles[1]);
 			// Update C-States.
-			Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C3_RESIDENCY, &A->P.Core[cpu].RefCycles.C3[1]);
-			Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C6_RESIDENCY, &A->P.Core[cpu].RefCycles.C6[1]);
+			Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Core[cpu].RefCycles.C3[1]);
+			Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Core[cpu].RefCycles.C6[1]);
+			// Update TSC.
+			Read_MSR(A->P.Core[cpu].FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Core[cpu].TSC[1]);
 		}
 /* CRITICAL_OUT */
 
@@ -152,7 +150,7 @@ static void *uCycle(void *uArg) {
 		unsigned int maxFreq=0, maxTemp=A->P.Core[0].TjMax.Target;
 		for(cpu=0; cpu < A->P.CPU; cpu++) {
 			// Compute the Operating Frequency.
-			A->P.Core[cpu].OperatingFreq=A->P.Core[cpu].OperatingRatio * A->P.ClockSpeed;
+			A->P.Core[cpu].OperatingFreq=A->P.Core[cpu].Operating.Ratio * A->P.ClockSpeed;
 			// Compute the Delta of Unhalted (Core & Ref) Cycles = Current[1] - Previous[0]
 			register unsigned long long	UnhaltedCoreCycles	= A->P.Core[cpu].UnhaltedCoreCycles[1]
 										- A->P.Core[cpu].UnhaltedCoreCycles[0],
@@ -162,16 +160,19 @@ static void *uCycle(void *uArg) {
 										- A->P.Core[cpu].RefCycles.C3[0],
 							DeltaC6RefCycles	= A->P.Core[cpu].RefCycles.C6[1]
 										- A->P.Core[cpu].RefCycles.C6[0];
+			A->P.Core[cpu].DeltaTSC=A->P.Core[cpu].TSC[1] - A->P.Core[cpu].TSC[0];
 			// Compute C-States.
-			A->P.Core[cpu].State.C0=(double) (UnhaltedRefCycles) / (double) (DeltaTSC);
-			A->P.Core[cpu].State.C3=(double) (DeltaC3RefCycles)  / (double) (DeltaTSC);
-			A->P.Core[cpu].State.C6=(double) (DeltaC6RefCycles)  / (double) (DeltaTSC);
+			A->P.Core[cpu].State.C0=(double) (UnhaltedRefCycles) / (double) (A->P.Core[cpu].DeltaTSC);
+			A->P.Core[cpu].State.C3=(double) (DeltaC3RefCycles)  / (double) (A->P.Core[cpu].DeltaTSC);
+			A->P.Core[cpu].State.C6=(double) (DeltaC6RefCycles)  / (double) (A->P.Core[cpu].DeltaTSC);
 			// Compute the Current Core Ratio per Cycles Delta. Set with the Operating value to protect against a division by zero.
 			A->P.Core[cpu].UnhaltedRatio	= (UnhaltedRefCycles != 0) ?
-							 (A->P.Core[cpu].OperatingRatio * UnhaltedCoreCycles) / UnhaltedRefCycles
-							: A->P.Core[cpu].OperatingRatio;
-			// Actual Frequency = Current Ratio x Bus Clock Frequency
+							 (A->P.Core[cpu].Operating.Ratio * UnhaltedCoreCycles) / UnhaltedRefCycles
+							: A->P.Core[cpu].Operating.Ratio;
+			// Dynamic Frequency = Unhalted Ratio x Bus Clock Frequency
 			A->P.Core[cpu].UnhaltedFreq=A->P.Core[cpu].UnhaltedRatio * A->P.ClockSpeed;
+			// Save TSC.
+			A->P.Core[cpu].TSC[0]=A->P.Core[cpu].TSC[1];
 			// Save the Unhalted Core & Reference Cycles for next iteration.
 			A->P.Core[cpu].UnhaltedCoreCycles[0]=A->P.Core[cpu].UnhaltedCoreCycles[1];
 			A->P.Core[cpu].UnhaltedRefCycles[0] =A->P.Core[cpu].UnhaltedRefCycles[1];
@@ -189,12 +190,13 @@ static void *uCycle(void *uArg) {
 				A->P.Top=cpu;
 			}
 			// Update the Digital Thermal Sensor.
-			if( (Read_MSR(A->P.Core[cpu].FD, IA32_THERM_STATUS, (THERM *) &A->P.Core[cpu].Therm)) == -1)
-				A->P.Core[cpu].Therm.DTS=0;
+			if( (Read_MSR(A->P.Core[cpu].FD, IA32_THERM_STATUS, (THERM_STATUS *) &A->P.Core[cpu].ThermStat)) == -1)
+				A->P.Core[cpu].ThermStat.DTS=0;
+			Read_MSR(A->P.Core[cpu].FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->P.Core[cpu].ThermIntr);
 
 			// Index the Hotest Core.
-			if(A->P.Core[cpu].Therm.DTS < maxTemp) {
-				maxTemp=A->P.Core[cpu].Therm.DTS;
+			if(A->P.Core[cpu].ThermStat.DTS < maxTemp) {
+				maxTemp=A->P.Core[cpu].ThermStat.DTS;
 				A->P.Hot=cpu;
 			}
 		}
@@ -910,7 +912,8 @@ void	BuildLayout(uARG *A, int G) {
 		{
 			char items[16384]={0}, str[4096]={0};
 
-			const char  powered[2]={'N', 'Y'};
+			const char	powered[2]={'N', 'Y'},
+					*enabled[2]={"OFF", "ON"};
 			sprintf(items, PROC_FORMAT,
 					A->P.Features.BrandString,
 					ARCH[A->P.ArchID].Architecture,
@@ -942,10 +945,10 @@ void	BuildLayout(uARG *A, int G) {
 					powered[A->P.Features.Std.ECX.DS_CPL],
 					powered[A->P.Features.Std.ECX.VMX],
 					powered[A->P.Features.Std.ECX.SMX],
-					powered[A->P.Features.Std.ECX.EIST],
+					powered[A->P.Features.Std.ECX.EIST],	enabled[A->P.MiscFeatures.EIST],
 					powered[A->P.Features.Std.ECX.CNXT_ID],
 					powered[A->P.Features.Std.ECX.FMA],
-					powered[A->P.Features.Std.ECX.xTPR],
+					powered[A->P.Features.Std.ECX.xTPR],	enabled[!A->P.MiscFeatures.xTPR],
 					powered[A->P.Features.Std.ECX.PDCM],
 					powered[A->P.Features.Std.ECX.PCID],
 					powered[A->P.Features.Std.ECX.DCA],
@@ -953,8 +956,15 @@ void	BuildLayout(uARG *A, int G) {
 					powered[A->P.Features.Std.ECX.TSCDEAD],
 					powered[A->P.Features.Std.ECX.XSAVE],
 					powered[A->P.Features.Std.ECX.OSXSAVE],
-					powered[A->P.Features.Ext.EDX.XD_Bit],
+					powered[A->P.Features.Ext.EDX.XD_Bit],	enabled[!A->P.MiscFeatures.XD_Bit],
 					powered[A->P.Features.Ext.EDX.PG_1GB],
+										enabled[A->P.MiscFeatures.FastStrings],
+										enabled[A->P.MiscFeatures.TCC],
+										enabled[A->P.MiscFeatures.PerfMonitoring],
+										enabled[!A->P.MiscFeatures.BTS],
+										enabled[!A->P.MiscFeatures.PEBS],
+										enabled[A->P.MiscFeatures.CPUID_MaxVal],
+										enabled[!A->P.MiscFeatures.Turbo],
 					powered[A->P.Features.Std.EDX.FPU],
 					powered[A->P.Features.Std.EDX.CX8],
 					powered[A->P.Features.Std.EDX.SEP],
@@ -969,7 +979,7 @@ void	BuildLayout(uARG *A, int G) {
 					powered[A->P.Features.Std.ECX.SSE41],
 					powered[A->P.Features.Std.ECX.SSE42],
 					powered[A->P.Features.Std.ECX.PCLMULDQ],
-					powered[A->P.Features.Std.ECX.MONITOR],
+					powered[A->P.Features.Std.ECX.MONITOR],	enabled[A->P.MiscFeatures.FSM],
 					powered[A->P.Features.Std.ECX.CX16],
 					powered[A->P.Features.Std.ECX.MOVBE],
 					powered[A->P.Features.Std.ECX.POPCNT],
@@ -1113,7 +1123,7 @@ void	DrawLayout(uARG *A, int G) {
 							( A->W[G].extents.charHeight * (cpu + 1 + 1) ),
 							str, strlen(str) );
 				}
-				if(A->L.cstatePC) {
+				if(A->L.cStateFlag) {
 					XSetForeground(A->display, A->W[G].gc, 0x737373);
 					sprintf(str, CORE_STATE,100 * A->P.Core[cpu].State.C0,
 									100 * A->P.Core[cpu].State.C3,
@@ -1196,7 +1206,7 @@ void	DrawLayout(uARG *A, int G) {
 			U->x1=(history + 2) * A->W[G].extents.charWidth;
 			U->y1=V->y2;
 			U->x2=U->x1 + A->W[G].extents.charWidth;
-			U->y2=(( (amplitude * A->P.Core[A->P.Hot].Therm.DTS)
+			U->y2=(( (amplitude * A->P.Core[A->P.Hot].ThermStat.DTS)
 				/ A->P.Core[A->P.Hot].TjMax.Target) + 2) * A->W[G].extents.charHeight;
 
 			XSetForeground(A->display, A->W[G].gc, 0x6666f0);
@@ -1206,7 +1216,7 @@ void	DrawLayout(uARG *A, int G) {
 			for(cpu=0; cpu < A->P.CPU; cpu++) {
 				// Display the Core temperature.
 				XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
-				sprintf(str, "%3d", A->P.Core[cpu].TjMax.Target - A->P.Core[cpu].Therm.DTS);
+				sprintf(str, "%3d", A->P.Core[cpu].TjMax.Target - A->P.Core[cpu].ThermStat.DTS);
 				XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 						(A->W[G].extents.charWidth * 5)
 						+ (A->W[G].extents.charWidth >> 1)
@@ -1214,9 +1224,33 @@ void	DrawLayout(uARG *A, int G) {
 						A->W[G].extents.charHeight * (amplitude + 1 + 1),
 						str, strlen(str));
 			}
+			XSetForeground(A->display, A->W[G].gc, 0xc04040);
+			// Show Temperature Thresholds
+			int Threshold[2]={(( (amplitude * A->P.Core[A->P.Hot].ThermIntr.Threshold1)
+					/ A->P.Core[A->P.Hot].TjMax.Target) + 2) * A->W[G].extents.charHeight,
+					(( (amplitude * A->P.Core[A->P.Hot].ThermIntr.Threshold2)
+					/ A->P.Core[A->P.Hot].TjMax.Target) + 2) * A->W[G].extents.charHeight};
+			XDrawLine(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+					A->W[G].extents.charWidth << 1,
+					Threshold[0],
+					(A->W[G].extents.charWidth << 2) + (A->P.CPU << 1) * (A->W[G].extents.charWidth << 1),
+					Threshold[1]);
+			XSetForeground(A->display, A->W[G].gc, 0xc0c0c0);
+			XDrawString(A->display,
+					A->W[G].pixmap.F,
+					A->W[G].gc,
+					A->W[G].extents.charWidth << 2,
+					Threshold[0],
+					"T#1", 3);
+			XDrawString(A->display,
+					A->W[G].pixmap.F,
+					A->W[G].gc,
+					(A->P.CPU << 1) * (A->W[G].extents.charWidth << 1),
+					Threshold[1],
+					"T#2", 3);
 			// Display the hottest temperature.
 			XSetForeground(A->display, A->W[G].gc, 0xffa500);
-			sprintf(str, "%2d", A->P.Core[A->P.Hot].TjMax.Target - A->P.Core[A->P.Hot].Therm.DTS);
+			sprintf(str, "%2d", A->P.Core[A->P.Hot].TjMax.Target - A->P.Core[A->P.Hot].ThermStat.DTS);
 			XDrawImageString(A->display,
 					A->W[G].pixmap.F,
 					A->W[G].gc,
@@ -1245,7 +1279,7 @@ void	UpdateTitle(uARG *A, int G) {
 			break;
 		case TEMPS:
 			sprintf(str, "Core#%d @ %dC",
-				A->P.Top, A->P.Core[A->P.Hot].TjMax.Target - A->P.Core[A->P.Hot].Therm.DTS);
+				A->P.Top, A->P.Core[A->P.Hot].TjMax.Target - A->P.Core[A->P.Hot].ThermStat.DTS);
 			break;
 		case SYSINFO:
 			sprintf(str, "Clock @ %dMHz",
@@ -1328,7 +1362,7 @@ static void *uLoop(uARG *A) {
 						break;
 					case XK_p:
 					case XK_P:
-						A->L.cstatePC=!A->L.cstatePC;
+						A->L.cStateFlag=!A->L.cStateFlag;
 						break;
 					case XK_w:
 					case XK_W:
@@ -1476,7 +1510,7 @@ int	Help(uARG *A, int argc, char *argv[]) {
 				{"-s", "%ld",&A->P.IdleTime,      "Idle time (usec)"             },
 				{"-a", "%ud",&A->L.activity,      "Pulse activity (0/1)"         },
 				{"-h", "%ud",&A->L.hertz,         "CPU frequency (0/1)"          },
-				{"-p", "%ud",&A->L.cstatePC,      "C-STATE percentage (0/1)"     },
+				{"-p", "%ud",&A->L.cStateFlag,    "C-STATE percentage (0/1)"     },
 				{"-t", "%ud",&A->L.alwaysOnTop,   "Always On Top (0/1)"          },
 				{"-w", "%ud",&A->L.wallboard,     "Scroll wallboard (0/1)"       },
 				{"-D", "%lx",&A->L.MDI,           "Enable MDI Window (0/1)"      },
@@ -1709,7 +1743,7 @@ int main(int argc, char *argv[]) {
 				},
 				activity:false,
 				hertz:true,
-				cstatePC:false,
+				cStateFlag:false,
 				alwaysOnTop: false,
 				pulse:false,
 				wallboard:false,
