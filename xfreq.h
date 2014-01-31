@@ -1,15 +1,9 @@
 /*
- * XFreq.c #0.16 SR0 by CyrIng
+ * XFreq.c #0.16 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  */
-
-#define _MAJOR   "0"
-#define _MINOR   "16"
-#define _NIGHTLY "0"
-#define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__
-static  char    version[] = AutoDate;
 
 typedef enum {false=0, true=1} bool;
 
@@ -182,15 +176,13 @@ struct IMCINFO
 #define	SMBIOS_PROCINFO_CORES		0x23
 #define	SMBIOS_PROCINFO_THREADS		0x25
 
-typedef	struct
-{
+typedef	struct {
 	unsigned long long
 		Ratio		: 16-0,
 		ReservedBits	: 64-16;
 } PERF_STATUS;
 
-typedef struct
-{
+typedef struct {
 	unsigned long long
 		ReservedBits1	:  8-0,
 		MaxNonTurboRatio: 16-8,
@@ -420,19 +412,31 @@ typedef struct {
 
 #define	HDSIZE		".1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0"
 
-typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, LAST_WIDGET} LAYOUTS;
+typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, LAST_WIDGET} LAYOUTS;
 #define	FIRST_WIDGET	(MAIN + 1)
 #define	WIDGETS		LAST_WIDGET
+
 #define	MAIN_WIDTH	48
 #define	MAIN_HEIGHT	14
+
 #define	CSTATES_HEIGHT	10
+
 #define	SYSINFO_WIDTH	80
 #define	SYSINFO_HEIGHT	20
 
+#define	REG_ALIGN	24
+// BIN64: 16 x 4 digits + '\0'
+#define BIN64_STR	(16 * 4) + 1
+// PRE_TEXT: (Addr + ':' + Name + Padding) + '['
+#define PRE_TEXT	5 + 1 + REG_ALIGN + 1
+// WIDTH: PRE_TEXT + BIN64 w/ 15 interspaces + ']'
+#define	DUMP_WIDTH	PRE_TEXT + BIN64_STR + 15 + 1
+#define	DUMP_HEIGHT	13
+
 #define	MENU_FORMAT	"[F1]     Help             [ESC]    Quit\n"          \
 			"[F2]     Core             [F3]     C-States\n"      \
-			"[F3]     Temps            [F4]     System Info\n"   \
-			"                                 [Up]\n"            \
+			"[F4]     Temps            [F5]     System Info\n"   \
+			"[F6]     Dump                    [Up]\n"            \
 			"  Scrolling page          [Left]      [Right]\n"    \
 			"                                [Down]\n"   \
 			"[PgDw]   Page Down        [PgUp]   Page Up\n"       \
@@ -448,8 +452,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, LAST_WIDGET} LAYOUTS;
 #define	CORE_STATE	"%6.2f%% %6.2f%% %6.2f%%"
 #define	OVERCLOCK	"%s [%4d MHz]"
 
-#define	PROC_FORMAT	"Processor [%s]\n"                                                       \
-			"Architecture [%s]\n\n"                                                  \
+#define	PROC_FORMAT	"Processor [%s]    Architecture [%s]\n\n"                                \
 			" Family               Model             Stepping             Max# of\n" \
 			"  Code                 No.                 ID                Threads\n" \
 			"[%6X]            [%6X]            [%6d]            [%6d]\n\n"           \
@@ -504,11 +507,18 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, LAST_WIDGET} LAYOUTS;
 			"AES[%c]                AVX[%c]            F16C[%c]              RDRAND[%c]\n" \
 			"LAHF/SAHF[%c]      SYSCALL[%c]          RDTSCP[%c]                IA64[%c]\n"
 
-
+#define	RAM_SECTION	"\nRAM\n"
 #define	CHA_FORMAT	"Channel   tCL   tRCD  tRP   tRAS  tRRD  tRFC  tWR   tRTPr tWTPr tFAW  B2B\n"
 #define	CAS_FORMAT	"   #%1i   |%4d%6d%6d%6d%6d%6d%6d%6d%6d%6d%6d\n"
 
+#define	BIOS_SECTION	"\nBIOS\n"
 #define	BIOS_FORMAT	"Base Clock [%3d MHz]\n"
+
+#define	SYSINFO_SECTION	"System Information"
+
+#define	DUMP_SECTION	"Addr.     Register                                             Value"
+#define	REG_HEXVAL	"%016llX"
+#define	REG_FORMAT	"%05X:%s%%%zdc["
 
 typedef struct {
 	int	cols,

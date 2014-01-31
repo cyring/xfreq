@@ -1,9 +1,15 @@
 /*
- * XFreq.c #0.16 SR0 by CyrIng
+ * XFreq.c #0.16 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  */
+
+#define _MAJOR   "0"
+#define _MINOR   "16"
+#define _NIGHTLY "1"
+#define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__
+static  char    version[] = AutoDate;
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -26,6 +32,56 @@
 // The drawing thread.
 static pthread_mutex_t	uDraw_mutex;
 static void *uDraw(void *uArg);
+
+unsigned long long
+	DumpRegister(signed int FD, unsigned long long msr, char *pHexStr, char *pBinStr)
+{
+	unsigned long long value=0;
+	Read_MSR(FD, msr, &value);
+
+	char hexStr[16+1]={0}, binStr[64+1]={0};
+	// Convert value as an ASCII UPPERCASE Hexadecimal.
+	sprintf(hexStr, REG_HEXVAL, value);
+	// Convert value as an ASCII Binary.
+	const char *BIN[0x10]=	{
+			"0000",
+			"0001",
+			"0010",
+			"0011",
+
+			"0100",
+			"0101",
+			"0110",
+			"0111",
+
+			"1000",
+			"1001",
+			"1010",
+			"1011",
+
+			"1100",
+			"1101",
+			"1110",
+			"1111",
+			};
+	unsigned int H=0, nibble=0;
+	for(H=0; H < strlen(hexStr); H++) {
+		nibble=(int) hexStr[H];
+		nibble=(nibble > (int) '9') ? 10 + nibble - (int) 'A' : nibble - (int) '0';
+		binStr[(H << 2)+0]=BIN[nibble][0];
+		binStr[(H << 2)+1]=BIN[nibble][1];
+		binStr[(H << 2)+2]=BIN[nibble][2];
+		binStr[(H << 2)+3]=BIN[nibble][3];
+	}
+
+	// Terminate string and copy back to caller.
+	binStr[(H << 2)]='\0';
+	if(pHexStr != NULL)
+		strcpy(pHexStr, hexStr);
+	if(pBinStr != NULL)
+		strcpy(pBinStr, binStr);
+	return(value);
+}
 
 //	Open one MSR handle per Processor Core.
 int	Open_MSR(uARG *A) {
@@ -69,6 +125,7 @@ int	Open_MSR(uARG *A) {
 			rc=((retval=Read_MSR(A->P.Core[cpu].FD, MSR_TEMPERATURE_TARGET, (TJMAX *) &A->P.Core[cpu].TjMax)) != -1);
 			if(A->P.Core[cpu].TjMax.Target == 0)
 				A->P.Core[cpu].TjMax.Target=100;
+			Read_MSR(A->P.Core[cpu].FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->P.Core[cpu].ThermIntr);
 	}
 	return(rc);
 }
@@ -192,7 +249,6 @@ static void *uCycle(void *uArg) {
 			// Update the Digital Thermal Sensor.
 			if( (Read_MSR(A->P.Core[cpu].FD, IA32_THERM_STATUS, (THERM_STATUS *) &A->P.Core[cpu].ThermStat)) == -1)
 				A->P.Core[cpu].ThermStat.DTS=0;
-			Read_MSR(A->P.Core[cpu].FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->P.Core[cpu].ThermIntr);
 
 			// Index the Hotest Core.
 			if(A->P.Core[cpu].ThermStat.DTS < maxTemp) {
@@ -527,8 +583,8 @@ int	OpenWidgets(uARG *A) {
 					XSetFont(A->display, A->W[G].gc, A->xfont->fid);
 
 					switch(G) {
+						// Compute Widgets scaling.
 						case MAIN: {
-							// Compute Window scaling.
 							XTextExtents(	A->xfont, HDSIZE, MAIN_WIDTH,
 									&A->W[G].extents.dir, &A->W[G].extents.ascent,
 									&A->W[G].extents.descent, &A->W[G].extents.overall);
@@ -554,12 +610,11 @@ int	OpenWidgets(uARG *A) {
 								A->W[G].y=0;
 							}
 							// First run : adjust the global margins with the font size. Don't overlap axes.
-							A->L.margin.H=A->W[G].extents.charWidth << 1;
+							A->L.margin.H=A->W[G].extents.charWidth << 2;
 							A->L.margin.V=A->W[G].extents.charHeight << 1;
 						}
 							break;
 						case CORES: {
-							// Compute Window scaling.
 							XTextExtents(	A->xfont, HDSIZE, A->P.Turbo.MaxRatio_1C << 1,
 									&A->W[G].extents.dir, &A->W[G].extents.ascent,
 									&A->W[G].extents.descent, &A->W[G].extents.overall);
@@ -586,7 +641,6 @@ int	OpenWidgets(uARG *A) {
 						}
 							break;
 						case CSTATES: {
-							// Compute Window scaling.
 							XTextExtents(	A->xfont, HDSIZE, A->P.CPU * 3,
 									&A->W[G].extents.dir, &A->W[G].extents.ascent,
 									&A->W[G].extents.descent, &A->W[G].extents.overall);
@@ -613,7 +667,6 @@ int	OpenWidgets(uARG *A) {
 						}
 							break;
 						case TEMPS: {
-							// Compute Window scaling.
 							int	amplitude=A->P.Features.ThreadCount,
 								history=amplitude << 2;
 
@@ -641,7 +694,6 @@ int	OpenWidgets(uARG *A) {
 						}
 							break;
 						case SYSINFO: {
-							// Compute Window scaling.
 							XTextExtents(	A->xfont, HDSIZE, SYSINFO_WIDTH,
 									&A->W[G].extents.dir, &A->W[G].extents.ascent,
 									&A->W[G].extents.descent, &A->W[G].extents.overall);
@@ -653,6 +705,28 @@ int	OpenWidgets(uARG *A) {
 							A->W[G].width=	A->W[G].extents.overall.width;
 							A->W[G].height=	(A->W[G].extents.charWidth >> 1)
 									+ A->W[G].extents.charHeight * SYSINFO_HEIGHT;
+
+							// Prepare the chart axes.
+							A->L.axes[G]=malloc(sizeof(XSegment));
+							A->L.axes[G][0].x1=0;
+							A->L.axes[G][0].y1=A->W[G].extents.charHeight + (A->W[G].extents.charHeight >> 1) - 1;
+							A->L.axes[G][0].x2=A->W[G].width;
+							A->L.axes[G][0].y2=A->W[G].extents.charHeight + (A->W[G].extents.charHeight >> 1) - 1;
+						}
+							break;
+						case DUMP: {
+							XTextExtents(	A->xfont, HDSIZE, DUMP_WIDTH,
+									&A->W[G].extents.dir, &A->W[G].extents.ascent,
+									&A->W[G].extents.descent, &A->W[G].extents.overall);
+
+							A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
+										- A->xfont->min_bounds.lbearing;
+							A->W[G].extents.charHeight=A->W[G].extents.ascent
+											+ A->W[G].extents.descent;
+							A->W[G].width=	A->W[G].extents.overall.width
+									+ (A->W[G].extents.charWidth >> 1);
+							A->W[G].height=	(A->W[G].extents.charWidth >> 1)
+									+ A->W[G].extents.charHeight * DUMP_HEIGHT;
 
 							// Prepare the chart axes.
 							A->L.axes[G]=malloc(sizeof(XSegment));
@@ -749,7 +823,7 @@ void	BuildLayout(uARG *A, int G) {
 	switch(G) {
 		case MAIN:
 		{
-			char items[4096]={0};
+			char items[MAIN_WIDTH * MAIN_HEIGHT]={0};
 			strcpy(items, MENU_FORMAT);
 			XRectangle R[]=	{ {
 						x:0,
@@ -910,7 +984,7 @@ void	BuildLayout(uARG *A, int G) {
 			break;
 		case SYSINFO:
 		{
-			char items[16384]={0}, str[4096]={0};
+			char items[8192]={0}, str[SYSINFO_WIDTH]={0};
 
 			const char	powered[2]={'N', 'Y'},
 					*enabled[2]={"OFF", "ON"};
@@ -992,7 +1066,7 @@ void	BuildLayout(uARG *A, int G) {
 					powered[A->P.Features.Ext.EDX.RDTSCP],
 					powered[A->P.Features.Ext.EDX.IA64] );
 
-			strcat(items, "\nRAM\n");
+			strcat(items, RAM_SECTION);
 			strcat(items, CHA_FORMAT);
 			if(A->M != NULL) {
 				unsigned cha=0;
@@ -1016,9 +1090,73 @@ void	BuildLayout(uARG *A, int G) {
 			else
 				strcat(items, "Unknown\n");
 
-			strcat(items, "\nBIOS\n");
+			strcat(items, BIOS_SECTION);
 			sprintf(str, BIOS_FORMAT, A->P.ClockSpeed);
 			strcat(items, str);
+
+			// Dispose & scroll all data strings stored in items.
+			XRectangle R[]=	{      {0,
+						0,
+						A->W[G].width,
+						A->W[G].height - (A->W[G].extents.charHeight + (A->W[G].extents.charHeight >> 1))
+					}	};
+			ScrollLayout(A, G, items, A->W[G].extents.charHeight, R);
+		}
+			break;
+		case DUMP:
+			#define	PrettyPrint(regName, regAddr) { \
+				sprintf(mask, REG_FORMAT, regAddr, regName, REG_ALIGN - strlen(regName)); \
+				sprintf(str, mask, 0x20); \
+				strcat(items, str); \
+				int H=0; \
+				for(H=0; H < 15; H++) { \
+					strncat(items, &binStr[H << 2], 4); \
+					strcat(items, " "); \
+				}; \
+				strncat(items, &binStr[H << 2], 4); \
+				strcat(items, "]\n"); \
+			}
+		// Dump a bunch of Registers with their Address, Name & Value.
+		{
+			char	items[DUMP_WIDTH * DUMP_HEIGHT]={0},
+				binStr[BIN64_STR]={0},
+				mask[PRE_TEXT]={0},
+				str[PRE_TEXT]={0};
+
+			DumpRegister(A->P.Core[0].FD, IA32_PERF_STATUS, NULL, binStr);
+			PrettyPrint("IA32_PERF_STATUS", IA32_PERF_STATUS);
+
+			DumpRegister(A->P.Core[0].FD, IA32_THERM_INTERRUPT, NULL, binStr);
+			PrettyPrint("IA32_THERM_INTERRUPT", IA32_THERM_INTERRUPT);
+
+			DumpRegister(A->P.Core[0].FD, IA32_THERM_STATUS, NULL, binStr);
+			PrettyPrint("IA32_THERM_STATUS", IA32_THERM_STATUS);
+
+			DumpRegister(A->P.Core[0].FD, IA32_MISC_ENABLE, NULL, binStr);
+			PrettyPrint("IA32_MISC_ENABLE", IA32_MISC_ENABLE);
+
+			DumpRegister(A->P.Core[0].FD, IA32_FIXED_CTR1, NULL, binStr);
+			PrettyPrint("IA32_FIXED_CTR1", IA32_FIXED_CTR1);
+
+			DumpRegister(A->P.Core[0].FD, IA32_FIXED_CTR2, NULL, binStr);
+			PrettyPrint("IA32_FIXED_CTR2", IA32_FIXED_CTR2);
+
+			DumpRegister(A->P.Core[0].FD, IA32_FIXED_CTR_CTRL, NULL, binStr);
+			PrettyPrint("IA32_FIXED_CTR_CTRL", IA32_FIXED_CTR_CTRL);
+
+			DumpRegister(A->P.Core[0].FD, IA32_PERF_GLOBAL_CTRL, NULL, binStr);
+			PrettyPrint("IA32_PERF_GLOBAL_CTRL", IA32_PERF_GLOBAL_CTRL);
+
+			DumpRegister(A->P.Core[0].FD, MSR_PLATFORM_INFO, NULL, binStr);
+			PrettyPrint("MSR_PLATFORM_INFO", MSR_PLATFORM_INFO);
+
+			DumpRegister(A->P.Core[0].FD, MSR_TURBO_RATIO_LIMIT, NULL, binStr);
+			PrettyPrint("MSR_TURBO_RATIO_LIMIT", MSR_TURBO_RATIO_LIMIT);
+
+			DumpRegister(A->P.Core[0].FD, MSR_TEMPERATURE_TARGET, NULL, binStr);
+			PrettyPrint("MSR_TEMPERATURE_TARGET", MSR_TEMPERATURE_TARGET);
+
+			// Dispose & scroll all data strings stored in items.
 			XRectangle R[]=	{      {0,
 						0,
 						A->W[G].width,
@@ -1230,10 +1368,11 @@ void	DrawLayout(uARG *A, int G) {
 					/ A->P.Core[A->P.Hot].TjMax.Target) + 2) * A->W[G].extents.charHeight,
 					(( (amplitude * A->P.Core[A->P.Hot].ThermIntr.Threshold2)
 					/ A->P.Core[A->P.Hot].TjMax.Target) + 2) * A->W[G].extents.charHeight};
+
 			XDrawLine(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 					A->W[G].extents.charWidth << 1,
 					Threshold[0],
-					(A->W[G].extents.charWidth << 2) + (A->P.CPU << 1) * (A->W[G].extents.charWidth << 1),
+					U->x2,
 					Threshold[1]);
 			XSetForeground(A->display, A->W[G].gc, 0xc0c0c0);
 			XDrawString(A->display,
@@ -1245,9 +1384,10 @@ void	DrawLayout(uARG *A, int G) {
 			XDrawString(A->display,
 					A->W[G].pixmap.F,
 					A->W[G].gc,
-					(A->P.CPU << 1) * (A->W[G].extents.charWidth << 1),
+					history * A->W[G].extents.charWidth,
 					Threshold[1],
 					"T#2", 3);
+
 			// Display the hottest temperature.
 			XSetForeground(A->display, A->W[G].gc, 0xffa500);
 			sprintf(str, "%2d", A->P.Core[A->P.Hot].TjMax.Target - A->P.Core[A->P.Hot].ThermStat.DTS);
@@ -1267,6 +1407,7 @@ void	UpdateTitle(uARG *A, int G) {
 	char str[32];
 	switch(G) {
 		case MAIN:
+		case DUMP:
 			sprintf(str, "X-Freq %s.%s-%s",
 				_MAJOR, _MINOR, _NIGHTLY);
 			break;
@@ -1456,7 +1597,8 @@ static void *uLoop(uARG *A) {
 					case XK_F2:
 					case XK_F3:
 					case XK_F4:
-					case XK_F5: {
+					case XK_F5:
+					case XK_F6: {
 						// Convert the function key number into a Widget index.
 						G=XLookupKeysym(&E.xkey, 0) - XK_F1;
 						// Get Map status.
@@ -1640,7 +1782,7 @@ int main(int argc, char *argv[]) {
 				},
 				gc:0,
 				x:CSTATES,
-				y:CORES,
+				y:MAIN,
 				width:150,
 				height:150,
 				extents: {
@@ -1664,6 +1806,29 @@ int main(int argc, char *argv[]) {
 				gc:0,
 				x:-1,
 				y:CSTATES,
+				width:400,
+				height:400,
+				extents: {
+					overall:{0},
+					dir:0,
+					ascent:11,
+					descent:2,
+					charWidth:6,
+					charHeight:13,
+				},
+				background:0x333333,
+				foreground:0x8fcefa,
+				},
+				// DUMP
+				{
+				window:0,
+				pixmap: {
+					B:0,
+					F:0,
+				},
+				gc:0,
+				x:-1,
+				y:SYSINFO,
 				width:400,
 				height:400,
 				extents: {
@@ -1732,7 +1897,18 @@ int main(int argc, char *argv[]) {
 					// SYSINFO
 					{
 						pageable: true,
-						title: "System Information",
+						title: SYSINFO_SECTION,
+						max: {
+							cols:0,
+							rows:1,
+						},
+						hScroll:1,
+						vScroll:1,
+					},
+					// DUMP
+					{
+						pageable: true,
+						title: DUMP_SECTION,
 						max: {
 							cols:0,
 							rows:1,
