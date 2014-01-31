@@ -11,6 +11,10 @@ LIB4RPi_FLAGS=-lm -lGLESv2 -lEGL -lbcm_host -lvcos -L/opt/vc/lib/
 #
 all :		$(APP_NAME)
 		@echo 'Ready     : '$(BIN_PATH)/$(APP_NAME)
+		@echo '--- Prerequisites ---'
+		@echo '1- Super User privileges'
+		@echo '2- Insert or modprobe the Kernel modules : dmi_sysfs and msr'
+		@echo '3- Allow the root user access the X Server with a xhost +'
 #
 help :
 		@echo 'make [all]     : Compile, link and store executable file in' $(BIN_PATH)/$(APP_NAME)
