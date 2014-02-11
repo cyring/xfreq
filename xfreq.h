@@ -1,9 +1,12 @@
 /*
- * XFreq.c #0.16 SR1 by CyrIng
+ * XFreq.h #0.16 SR4 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  */
+
+#define MAX(M, m)               ((M) > (m) ? (M) : (m))
+#define MIN(m, M)               ((m) < (M) ? (m) : (M))
 
 typedef enum {false=0, true=1} bool;
 
@@ -132,6 +135,10 @@ typedef struct
 	char		BrandString[48+1];
 } FEATURES;
 
+// Read data from the PCI bus.
+#define PCI_CONFIG_ADDRESS(bus, dev, fn, reg) \
+	(0x80000000 | (bus << 16) | (dev << 11) | (fn << 8) | (reg & ~3))
+
 struct IMCINFO
 {
 	unsigned ChannelCount;
@@ -176,6 +183,11 @@ struct IMCINFO
 #define	SMBIOS_PROCINFO_CORES		0x23
 #define	SMBIOS_PROCINFO_THREADS		0x25
 
+
+//	Read, Write a Model Specific Register.
+#define	Read_MSR(FD, offset, msr)  pread(FD, msr, sizeof(*msr), offset)
+#define	Write_MSR(FD, offset, msr) pwrite(FD, msr, sizeof(*msr), offset)
+
 typedef	struct {
 	unsigned long long
 		Ratio		: 16-0,
@@ -206,6 +218,30 @@ typedef struct {
 		MaxRatio_8C	: 64-56;
 } TURBO;
 
+typedef	struct {
+	unsigned long long
+		FastStrings	:  1-0,
+		ReservedBits1	:  3-1,
+		TCC		:  4-3,
+		ReservedBits2	:  7-4,
+		PerfMonitoring	:  8-7,
+		ReservedBits3	: 11-8,
+		BTS		: 12-11,
+		PEBS		: 13-12,
+		ReservedBits4	: 16-13,
+		EIST		: 17-16,
+		ReservedBits5	: 18-17,
+		FSM		: 19-18,
+		ReservedBits6	: 22-19,
+		CPUID_MaxVal	: 23-22,
+		xTPR		: 24-23,
+		ReservedBits7	: 34-24,
+		XD_Bit		: 35-34,
+		ReservedBits8	: 38-35,
+		Turbo		: 39-38,
+		ReservedBits9	: 64-39;
+} MISC_PROC_FEATURES;
+
 typedef struct {
 	unsigned long long
 		EN_PMC0		:  1-0,
@@ -233,6 +269,10 @@ typedef struct {
 		EN2_PMI		: 12-11,
 		ReservedBits	: 64-12;
 } FIXED_PERF_COUNTER;
+
+#define	LOW_TEMP_VALUE		35
+#define MED_TEMP_VALUE		45
+#define	HIGH_TEMP_VALUE		65
 
 typedef struct {
 	unsigned long long
@@ -271,30 +311,6 @@ typedef struct {
 		ReadingValid	: 32-31,
 		ReservedBits3	: 64-32;
 } THERM_STATUS;
-
-typedef	struct {
-	unsigned long long
-		FastStrings	:  1-0,
-		ReservedBits1	:  3-1,
-		TCC		:  4-3,
-		ReservedBits2	:  7-4,
-		PerfMonitoring	:  8-7,
-		ReservedBits3	: 11-8,
-		BTS		: 12-11,
-		PEBS		: 13-12,
-		ReservedBits4	: 16-13,
-		EIST		: 17-16,
-		ReservedBits5	: 18-17,
-		FSM		: 19-18,
-		ReservedBits6	: 22-19,
-		CPUID_MaxVal	: 23-22,
-		xTPR		: 24-23,
-		ReservedBits7	: 34-24,
-		XD_Bit		: 35-34,
-		ReservedBits8	: 38-35,
-		Turbo		: 39-38,
-		ReservedBits9	: 64-39;
-} MISC_PROC_FEATURES;
 
 typedef struct {
 	unsigned long long
@@ -350,28 +366,44 @@ typedef struct {
 		TURBO				Turbo;
 		unsigned int			ClockSpeed;
 		unsigned int			CPU;
+		char				Bump[2+2+2+1];
 		struct THREADS {
 			signed int		FD;
 			PERF_STATUS		Operating;
 			unsigned int		OperatingFreq;
 			GLOBAL_PERF_COUNTER	GlobalPerfCounter;
 			FIXED_PERF_COUNTER	FixedPerfCounter;
-			unsigned long long	UnhaltedCoreCycles[2],
-						UnhaltedRefCycles[2];
 			unsigned int		UnhaltedRatio,
 						UnhaltedFreq;
 			struct {
+				struct {
+				unsigned long long
+					UCC,
+					URC;
+				}		C0[2];
 				unsigned long long
 						C3[2],
-						C6[2];
+						C6[2],
+						TSC[2];
 			} RefCycles;
-			unsigned long long	TSC[2];
+			struct {
+				struct {
+				unsigned long long
+					UCC,
+					URC;
+				}		C0;
+				unsigned long long
+						C3,
+						C6,
+						TSC;
+			} Delta;
 			struct {
 				double		C0,
 						C3,
 						C6;
 			} State;
-			unsigned long long	DeltaTSC;
+			double			RelativeRatio,
+						RelativeFreq;
 			TJMAX			TjMax;
 			THERM_INTERRUPT		ThermIntr;
 			THERM_STATUS		ThermStat;
@@ -386,6 +418,58 @@ typedef struct {
 						PerCore;
 		useconds_t			IdleTime;
 } PROCESSOR;
+
+#define	GLOBAL_BACKGROUND	0x333333
+#define	GLOBAL_FOREGROUND	0x8fcefa
+#define	MAIN_BACKGROUND		0x333333
+#define	MAIN_FOREGROUND		0x8fcefa
+#define	CORES_BACKGROUND	0x191970
+#define	CORES_FOREGROUND	0x8fcefa
+#define	CSTATES_BACKGROUND	0x191970
+#define	CSTATES_FOREGROUND	0x8fcefa
+#define	TEMPS_BACKGROUND	0x191970
+#define	TEMPS_FOREGROUND	0x8fcefa
+#define	SYSINFO_BACKGROUND	0x191970
+#define	SYSINFO_FOREGROUND	0x8fcefa
+#define	DUMP_BACKGROUND		0x191970
+#define	DUMP_FOREGROUND		0x8fcefa
+
+#define	AXES_COLOR		0x404040
+#define	LABEL_COLOR		0xc0c0c0
+#define	PRINT_COLOR		0xf0f0f0
+#define	PROMPT_COLOR		0xffff00
+#define	CURSOR_COLOR		0xfd0000
+#define	DYNAMIC_COLOR		0xdddddd
+#define	GRAPH1_COLOR		0x6666f0
+#define	GRAPH2_COLOR		0x6666b0
+#define	GRAPH3_COLOR		0x666690
+#define	INIT_VALUE_COLOR	0x6666b0
+#define	LOW_VALUE_COLOR		0x00aa66
+#define	MED_VALUE_COLOR		0xe49400
+#define	HIGH_VALUE_COLOR	0xfd0000
+#define	PULSE_COLOR		0xf0f000
+#define	FOCUS_COLOR		0x8fcefa
+#define	MDI_SEP_COLOR		0x737373
+
+#define	NORTH_DIR	'N'
+#define	SOUTH_DIR	'S'
+#define	EAST_DIR	'E'
+#define	WEST_DIR	'W'
+#define	PGUP_DIR	'U'
+#define	PGDW_DIR	'D'
+
+enum	{HEAD, TAIL, CHAINS};
+
+struct WButton {
+	struct	WButton	*Chain;
+	int		x,
+			y;
+	unsigned int	w,
+			h;
+	void		(*DrawFunc)();
+	void		(*CallBack)();
+	unsigned long	Parameter;
+};
 
 typedef struct {
 	Window		window;
@@ -408,51 +492,100 @@ typedef struct {
 	} extents;
 	unsigned long	background,
 			foreground;
+	struct	WButton	*wButton[CHAINS];
 } XWINDOW;
+
+//			L-CTRL		L-ALT		R-CTRL		L-WIN		R-ALTGR
+#define	AllModMask	(ControlMask	| Mod1Mask	| Mod3Mask	| Mod4Mask	| Mod5Mask)
+#define	BASE_EVENTS	KeyPressMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | FocusChangeMask
+#define	MOVE_EVENTS	ButtonReleaseMask | Button3MotionMask
+#define	CLICK_EVENTS	ButtonPressMask
+
+typedef struct {
+	int		S,
+			dx,
+			dy;
+} XTARGET;
 
 #define	HDSIZE		".1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0"
 
-typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, LAST_WIDGET} LAYOUTS;
+typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
+
 #define	FIRST_WIDGET	(MAIN + 1)
-#define	WIDGETS		LAST_WIDGET
+#define	LAST_WIDGET	(WIDGETS - 1)
 
-#define	MAIN_WIDTH	48
-#define	MAIN_HEIGHT	14
+#define	Quarter_Char_Width	(A->W[G].extents.charWidth >> 2)
+#define	Half_Char_Width		(A->W[G].extents.charWidth >> 1)
+#define	One_Char_Width		(A->W[G].extents.charWidth)
+#define	One_Half_Char_Width	(One_Char_Width + Half_Char_Width)
+#define	Twice_Char_Width	(A->W[G].extents.charWidth << 1)
+#define	Twice_Half_Char_Width	(Twice_Char_Width + Half_Char_Width)
 
-#define	CSTATES_HEIGHT	10
+#define	Quarter_Char_Height	(A->W[G].extents.charHeight >> 2)
+#define	Half_Char_Height	(A->W[G].extents.charHeight >> 1)
+#define	One_Char_Height		(A->W[G].extents.charHeight)
+#define	One_Half_Char_Height	(One_Char_Height + Half_Char_Height)
+#define	Twice_Char_Height	(A->W[G].extents.charHeight << 1)
+#define	Twice_Half_Char_Height	(Twice_Char_Height + Half_Char_Height)
 
-#define	SYSINFO_WIDTH	80
-#define	SYSINFO_HEIGHT	20
+#define	Header_Height		(One_Char_Height + Quarter_Char_Height)
+#define	Footer_Height		(One_Char_Height + Quarter_Char_Height)
 
-#define	REG_ALIGN	24
+#define	MAIN_TEXT_WIDTH		48
+#define	MAIN_TEXT_HEIGHT	14
+
+#define	CORES_TEXT_WIDTH	(A->P.Turbo.MaxRatio_1C)
+#define	CORES_TEXT_HEIGHT	(A->P.CPU)
+
+#define	TEMPS_TEXT_HEIGHT	18
+#define	TEMPS_TEXT_WIDTH	(A->P.Features.ThreadCount << 2)
+
+#define	CSTATES_TEXT_SPACING	3
+#define	CSTATES_TEXT_WIDTH	(A->P.CPU * CSTATES_TEXT_SPACING)
+#define	CSTATES_TEXT_HEIGHT	10
+
+#define	SYSINFO_TEXT_WIDTH	80
+#define	SYSINFO_TEXT_HEIGHT	19
+
+#define	REG_ALIGN		24
 // BIN64: 16 x 4 digits + '\0'
-#define BIN64_STR	(16 * 4) + 1
+#define BIN64_STR		(16 * 4) + 1
 // PRE_TEXT: (Addr + ':' + Name + Padding) + '['
-#define PRE_TEXT	5 + 1 + REG_ALIGN + 1
-// WIDTH: PRE_TEXT + BIN64 w/ 15 interspaces + ']'
-#define	DUMP_WIDTH	PRE_TEXT + BIN64_STR + 15 + 1
-#define	DUMP_HEIGHT	13
+#define PRE_TEXT		5 + 1 + REG_ALIGN + 1
+// WIDTH: PRE_TEXT + BIN64 w/ 15 interspaces + ']' + ScrollButtons
+#define	DUMP_TEXT_WIDTH		PRE_TEXT + BIN64_STR + 15 + 1 + 2
+#define	DUMP_TEXT_HEIGHT	13
 
-#define	MENU_FORMAT	"[F1]     Help             [ESC]    Quit\n"          \
-			"[F2]     Core             [F3]     C-States\n"      \
-			"[F4]     Temps            [F5]     System Info\n"   \
-			"[F6]     Dump                    [Up]\n"            \
-			"  Scrolling page          [Left]      [Right]\n"    \
-			"                                [Down]\n"   \
-			"[PgDw]   Page Down        [PgUp]   Page Up\n"       \
-			"[Pause]  Suspend          [Space]  Resume\n"        \
-			"[Return] Redraw           [C][c]   Center page\n"   \
-			"[H][h]   Frequency Hz     [P][p]   Counters %\n"    \
-			"[A][a]   Activity pulse   [W][w]   Wallboard\n"     \
-			"[Home]   Keep on top      [End]    Keep below\n"    \
-			"KPad [+] Faster           KPad [-] Slower\n"
+#define	MENU_FORMAT	"[F1]     Help             [F2]     Core\n"               \
+			"[F3]     C-States         [F4]     Temps \n"             \
+			"[F5]     System Info      [F6]     Dump\n"               \
+			"                                 [Up]\n"                 \
+			"  Page Scrolling          [Left]      [Right]\n"         \
+			"                                [Down]\n"                \
+			"[Pause]  Suspend/Resume\n"                               \
+			"[PgDw]   Page Down        [PgUp]   Page Up\n"            \
+			"[Home]   Keep on top      [End]    Keep below\n"         \
+			"KPad [+] Faster           KPad [-] Slower\n\n"           \
+			"With the [Control] key, activate the followings :\n"     \
+			"[L][l]   Refresh          [C][c]   Center page\n"        \
+			"[A][a]   Activity pulse   [W][w]   Wallboard\n"          \
+			"[H][h]   Frequency Hz     [P][p]   Counters %\n"         \
+			"[R][r]   Ratio values     [Q][q]   Quit\n\n"             \
+			"Commands :\n"                                            \
+			"[Backspace] Remove the rightmost character\n"            \
+			"[Erase] Suppress the full Command line\n"                \
+			"[Enter] Submit the Command\n\n"                          \
+			"Mouse buttons :\n"                                       \
+			"[Left]   Click any Button [Right] Grab & Move Widget\n"  \
+			"[WheelUp] Page Scroll Up  [WheelDw] Page Scroll Down\n"
 
 #define	CORE_NUM	"#%-2d"
-#define	CORE_FREQ	"%5d MHz"
+#define	CORE_FREQ	"%4.0f/%4dMHz"
 #define	CORE_STATE	"%6.2f%% %6.2f%% %6.2f%%"
+#define	CORE_RATIO	"%-3.1f"
 #define	OVERCLOCK	"%s [%4d MHz]"
 
-#define	PROC_FORMAT	"Processor [%s]    Architecture [%s]\n\n"                                \
+#define	PROC_FORMAT	"Processor [%s]  Architecture [%s]\n\n"                                \
 			" Family               Model             Stepping             Max# of\n" \
 			"  Code                 No.                 ID                Threads\n" \
 			"[%6X]            [%6X]            [%6d]            [%6d]\n\n"           \
@@ -515,46 +648,73 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, LAST_WIDGET} LAYOUTS;
 #define	BIOS_FORMAT	"Base Clock [%3d MHz]\n"
 
 #define	SYSINFO_SECTION	"System Information"
-
-#define	DUMP_SECTION	"Addr.     Register                                             Value"
+//                       12345 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234]
+#define	DUMP_SECTION	"Addr.     Register               60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0"
 #define	REG_HEXVAL	"%016llX"
-#define	REG_FORMAT	"%05X:%s%%%zdc["
+#define	REG_FORMAT	"%05X %s%%%zdc["
 
 typedef struct {
 	int	cols,
 		rows;
-} XMAXPRINT;
+} MaxText;
 
 typedef struct {
 	struct	{
-		int	H,
-			V;
-	} margin;
+		int		H,
+				V;
+	} Margin;
 	struct	{
-		bool	pageable;
-		char	*title;
-		XMAXPRINT max;
-		int	hScroll,
-			vScroll;
-	} Page[LAST_WIDGET];
-	unsigned int	MDI,
-			activity,
-			hertz,
-			cStateFlag,
-			alwaysOnTop,
-			pulse,
-			wallboard;
-	int		wbScroll,
-			wbLength;
-	char		*wbString;
-	char		bump[2+2+2+1];
+		bool		pageable;
+		char		*title;
+		MaxText 	Text;
+		int		hScroll,
+				vScroll;
+	} Page[WIDGETS];
+	struct {
+		bool
+				flashActivity,
+				freqHertz,
+				cState,
+				ratioValues,
+				alwaysOnTop,
+				flashPulse,
+				wallboard,
+				flashCursor;
+	} Play;
+	struct {;
+		int		Scroll,
+				Length;
+		char		*String;
+	} WB;
 	struct {
 		XRectangle	*C0,
 				*C3,
 				*C6;
-	} usage;
-	XSegment	*axes[WIDGETS];
+	} Usage;
+	struct {;
+		int		N;
+		XSegment	*Segment;
+	} Axes[WIDGETS];
+	XPoint			Cursor[3];
+	struct {
+		char		KeyBuffer[256];
+		int		KeyLength;
+	} Input;
+	char			*Output;
+	unsigned long		globalBackground,
+				globalForeground;
 } LAYOUT;
+
+#define	_IS_MDI_	(A->MDI != false)
+
+// Fast drawing macro.
+#define	fDraw(WG, DoCenter, DoBuild, DoDraw) {	\
+	if(DoCenter) CenterLayout(A, WG);	\
+	if(DoBuild)  BuildLayout(A, WG);	\
+	MapLayout(A, WG);			\
+	if(DoDraw)   DrawLayout(A, WG);		\
+	FlushLayout(A, WG);			\
+}
 
 typedef struct {
 	PROCESSOR	P;
@@ -564,6 +724,8 @@ typedef struct {
 	char		*fontName;
 	XFontStruct	*xfont;
 	XWINDOW		W[WIDGETS];
+	XTARGET		T;
+	bool		MDI;
 	LAYOUT		L;
 	bool		LOOP,
 			PAUSE[WIDGETS];
@@ -576,3 +738,8 @@ typedef struct {
 	void *pointer;
 	char *manual;
 } OPTION;
+
+typedef	struct {
+	char	*Instruction;
+	void	(*Procedure)();
+} COMMAND;

@@ -61,6 +61,22 @@
  *
  * [HISTORY]
  *
+ * R 0.16 : 02/11 2014 SR-4
+ *        - In main() provide a none stop program startup and log any missing prerequisites.
+ *        - Modified Ratio & Frequency computation to Relative values.
+ *
+ * R 0.16 : 02/10 2014 SR-3
+ *        - A few scripting commands are implemented.
+ *        - The mouse is supported for some functions such as scrolling buttons and moving Widget.
+ *        - Rolling back to an unique input buffer located in the MAIN Widget:
+ *            some option keys need to be pressed with the [Control] key.
+ *        - Simplify all code using macros:
+ *            [Quarter][Half][One][Twice][Twice_Half]_Char_Width
+ *            [Quarter][Half][One][Twice][Twice_Half]_Char_Height
+ *
+ * R 0.16 : 02/01 2014 SR-2
+ *        - Implemented a global handling of input characters string.
+ *
  * R 0.16 : 01/31 2014 SR-1
  *        - Added a new Widget to dump MSR registers in binary.
  *
