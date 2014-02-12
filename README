@@ -4,6 +4,8 @@
  * A Widget to display the frequency & the temperature of each core in the Intel i7 processor.
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
+ * http://blog.cyring.fr
+ *
  * Licenses: GPL2
  *
  *
@@ -31,6 +33,10 @@
  *
  * + procstat
  *
+ * + live CD
+ *
+ * + scripting, alarm
+ *
  *  Graphical
  * -----------
  *
@@ -40,11 +46,8 @@
  * + integrate XCB, wayland ?
  * + handle skins :
  *     second layout should provide processor usage history.
- *     compute which core have the longest usage (displayed as the App title name).
- * + manage others XEvent : close, move, resize, etc.
  * + gradiant coloring.
  * + screenshot key.
- * + mouse handling.
  *
  *
  *  Source code
@@ -56,10 +59,17 @@
  *
  *   Issues
  * ----------
- * + Cores rarely reach Turbo ratios : working on the Performance Counters.
+ * + Turbo ratios don't show up : please contact us if you have any idea why ?
  *
  *
  * [HISTORY]
+ *
+ * R 0.16 : 02/12 2014 SR-5
+ *        - Registers Dump Widget is now auto refreshed.
+ *        - [CTRL]+[P] or startup option '-p 1'prints the following :
+ *            Raw Cycles values in the Core Widget.
+ *            C-States % in its own Widget.
+ *        - In the System Info Widget the Base Clock frequency is now printed below the Processor brand string.
  *
  * R 0.16 : 02/11 2014 SR-4
  *        - In main() provide a none stop program startup and log any missing prerequisites.

@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.16 SR4 by CyrIng
+ * XFreq.c #0.16 SR5 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,7 +7,7 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "16"
-#define _NIGHTLY "4"
+#define _NIGHTLY "5"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__
 static  char    version[] = AutoDate;
 
@@ -203,19 +203,19 @@ static void *uCycle(void *uArg)
 	unsigned int cpu=0;
 	for(cpu=0; cpu < A->P.CPU; cpu++) {
 		// Initial read of the Unhalted Core & Reference Cycles.
-		Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Core[cpu].RefCycles.C0[0].UCC);
-		Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Core[cpu].RefCycles.C0[0].URC );
+		Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Core[cpu].Cycles.C0[0].UCC);
+		Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Core[cpu].Cycles.C0[0].URC );
 		// Initial read of other C-States.
-		Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Core[cpu].RefCycles.C3[0]);
-		Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Core[cpu].RefCycles.C6[0]);
+		Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Core[cpu].Cycles.C3[0]);
+		Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Core[cpu].Cycles.C6[0]);
 		// Initial read of the TSC in relation to the Logical Core.
-		Read_MSR(A->P.Core[cpu].FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Core[cpu].RefCycles.TSC[0]);
-		// A->P.Core[cpu].RefCycles.TSC[0]=tsc;
+		Read_MSR(A->P.Core[cpu].FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Core[cpu].Cycles.TSC[0]);
+		// A->P.Core[cpu].Cycles.TSC[0]=tsc;
 	}
 
 	while(A->LOOP) {
 		// Settle down some microseconds as specified by the command argument.
-		usleep(A->P.IdleTime);
+		usleep(1 << A->P.IdleTime);
 
 /* CRITICAL_IN  */
 		// tsc=RDTSC();
@@ -223,14 +223,14 @@ static void *uCycle(void *uArg)
 			// Update the Base Operating Ratio.
 			Read_MSR(A->P.Core[cpu].FD, IA32_PERF_STATUS, (PERF_STATUS *) &A->P.Core[cpu].Operating);
 			// Update the Unhalted Core & the Reference Cycles.
-			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Core[cpu].RefCycles.C0[1].UCC);
-			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Core[cpu].RefCycles.C0[1].URC);
+			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Core[cpu].Cycles.C0[1].UCC);
+			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Core[cpu].Cycles.C0[1].URC);
 			// Update C-States.
-			Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Core[cpu].RefCycles.C3[1]);
-			Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Core[cpu].RefCycles.C6[1]);
+			Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Core[cpu].Cycles.C3[1]);
+			Read_MSR(A->P.Core[cpu].FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Core[cpu].Cycles.C6[1]);
 			// Update TSC.
-			Read_MSR(A->P.Core[cpu].FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Core[cpu].RefCycles.TSC[1]);
-			// A->P.Core[cpu].RefCycles.TSC[1]=tsc;
+			Read_MSR(A->P.Core[cpu].FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Core[cpu].Cycles.TSC[1]);
+			// A->P.Core[cpu].Cycles.TSC[1]=tsc;
 		}
 /* CRITICAL_OUT */
 
@@ -243,11 +243,11 @@ static void *uCycle(void *uArg)
 			A->P.Core[cpu].OperatingFreq=A->P.Core[cpu].Operating.Ratio * A->P.ClockSpeed;
 
 			// Compute the Delta of Unhalted (Core & Ref) C0 Cycles = Current[1] - Previous[0]
-			A->P.Core[cpu].Delta.C0.UCC=A->P.Core[cpu].RefCycles.C0[1].UCC - A->P.Core[cpu].RefCycles.C0[0].UCC;
-			A->P.Core[cpu].Delta.C0.URC=A->P.Core[cpu].RefCycles.C0[1].URC - A->P.Core[cpu].RefCycles.C0[0].URC;
-			A->P.Core[cpu].Delta.C3=A->P.Core[cpu].RefCycles.C3[1] - A->P.Core[cpu].RefCycles.C3[0];
-			A->P.Core[cpu].Delta.C6=A->P.Core[cpu].RefCycles.C6[1] - A->P.Core[cpu].RefCycles.C6[0];
-			A->P.Core[cpu].Delta.TSC=A->P.Core[cpu].RefCycles.TSC[1] - A->P.Core[cpu].RefCycles.TSC[0];
+			A->P.Core[cpu].Delta.C0.UCC=A->P.Core[cpu].Cycles.C0[1].UCC - A->P.Core[cpu].Cycles.C0[0].UCC;
+			A->P.Core[cpu].Delta.C0.URC=A->P.Core[cpu].Cycles.C0[1].URC - A->P.Core[cpu].Cycles.C0[0].URC;
+			A->P.Core[cpu].Delta.C3=A->P.Core[cpu].Cycles.C3[1] - A->P.Core[cpu].Cycles.C3[0];
+			A->P.Core[cpu].Delta.C6=A->P.Core[cpu].Cycles.C6[1] - A->P.Core[cpu].Cycles.C6[0];
+			A->P.Core[cpu].Delta.TSC=A->P.Core[cpu].Cycles.TSC[1] - A->P.Core[cpu].Cycles.TSC[0];
 
 			// Compute the Current Core Ratio per Cycles Delta. (Protect against a division by zero with the Operating value)
 			A->P.Core[cpu].UnhaltedRatio=	(A->P.Core[cpu].Delta.C0.URC != 0) ?
@@ -269,13 +269,13 @@ static void *uCycle(void *uArg)
 			A->P.Core[cpu].State.C6=(double) (A->P.Core[cpu].Delta.C6)  / (double) (A->P.Core[cpu].Delta.TSC);
 
 			// Save TSC.
-			A->P.Core[cpu].RefCycles.TSC[0]=A->P.Core[cpu].RefCycles.TSC[1];
+			A->P.Core[cpu].Cycles.TSC[0]=A->P.Core[cpu].Cycles.TSC[1];
 			// Save the Unhalted Core & Reference Cycles for next iteration.
-			A->P.Core[cpu].RefCycles.C0[0].UCC=A->P.Core[cpu].RefCycles.C0[1].UCC;
-			A->P.Core[cpu].RefCycles.C0[0].URC =A->P.Core[cpu].RefCycles.C0[1].URC;
+			A->P.Core[cpu].Cycles.C0[0].UCC=A->P.Core[cpu].Cycles.C0[1].UCC;
+			A->P.Core[cpu].Cycles.C0[0].URC =A->P.Core[cpu].Cycles.C0[1].URC;
 			// Save also the C-State Reference Cycles.
-			A->P.Core[cpu].RefCycles.C3[0]=A->P.Core[cpu].RefCycles.C3[1];
-			A->P.Core[cpu].RefCycles.C6[0]=A->P.Core[cpu].RefCycles.C6[1];
+			A->P.Core[cpu].Cycles.C3[0]=A->P.Core[cpu].Cycles.C3[1];
+			A->P.Core[cpu].Cycles.C6[0]=A->P.Core[cpu].Cycles.C6[1];
 
 			// Sum the C-States before the average.
 			A->P.Avg.C0+=A->P.Core[cpu].State.C0;
@@ -333,6 +333,7 @@ int	Read_SMBIOS(int structure, int instance, off_t offset, void *buf, size_t nby
 // Old fashion style to compute the processor frequency based on TSC.
 unsigned long long int FallBack_Freq()
 {
+	#define ELAPSED	100000
 	struct timezone tz;
 	struct timeval tvstart, tvstop;
 	unsigned long long int cycles[2];
@@ -344,11 +345,11 @@ unsigned long long int FallBack_Freq()
 	cycles[0] = RDTSC();
 	gettimeofday(&tvstart, &tz);
 
-	usleep(10000);
+	usleep(ELAPSED);
 
 	cycles[1] = RDTSC();
 	gettimeofday(&tvstop, &tz);
-	microseconds = ( (tvstop.tv_sec - tvstart.tv_sec) * 10000) + (tvstop.tv_usec - tvstart.tv_usec);
+	microseconds = ( (tvstop.tv_sec - tvstart.tv_sec) * ELAPSED) + (tvstop.tv_usec - tvstart.tv_usec);
 
 	return( (cycles[1] - cycles[0]) / microseconds );
 }
@@ -1183,31 +1184,6 @@ void	CenterLayout(uARG *A, int G) {
 	A->L.Page[G].vScroll=1;
 }
 
-// Display & scroll content into the specified clip rectangle.
-void	ScrollLayout(uARG *A, int G, char *items, int spacing, XRectangle *R)
-{
-	XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
-	XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
-			One_Char_Width,
-			One_Char_Height,
-			A->L.Page[G].title,
-			strlen(A->L.Page[G].title) );
-
-	XSetClipRectangles(A->display, A->W[G].gc,
-			0,
-			0,
-			R, 1, Unsorted);
-
-	XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
-	A->L.Page[G].Text=XPrint(A->display, A->W[G].pixmap.B, A->W[G].gc,
-				One_Char_Width * A->L.Page[G].hScroll,
-				+ One_Half_Char_Height
-				+ (One_Char_Height * A->L.Page[G].vScroll),
-				items,
-				spacing);
-	XSetClipMask(A->display, A->W[G].gc, None);
-}
-
 // Draw the layout background.
 void	BuildLayout(uARG *A, int G)
 {
@@ -1227,6 +1203,13 @@ void	BuildLayout(uARG *A, int G)
 	switch(G) {
 		case MAIN:
 		{
+			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+			XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+					One_Char_Width,
+					One_Char_Height,
+					A->L.Page[G].title,
+					strlen(A->L.Page[G].title) );
+
 			if(_IS_MDI_) {
 				XSetForeground(A->display, A->W[G].gc, MDI_SEP_COLOR);
 				XDrawLine(A->display, A->W[G].pixmap.B, A->W[G].gc,
@@ -1243,7 +1226,21 @@ void	BuildLayout(uARG *A, int G)
 						width:A->W[G].width,
 						height:(One_Char_Height * MAIN_TEXT_HEIGHT) - Footer_Height,
 						} };
-				ScrollLayout(A, G, A->L.Output, One_Char_Height+Quarter_Char_Height, R);
+
+				XSetClipRectangles(A->display, A->W[G].gc,
+						0,
+						0,
+						R, 1, Unsorted);
+
+				XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
+				A->L.Page[G].Text=XPrint(A->display, A->W[G].pixmap.B, A->W[G].gc,
+							One_Char_Width * A->L.Page[G].hScroll,
+							+ One_Half_Char_Height
+							+ (One_Char_Height * A->L.Page[G].vScroll),
+							A->L.Output,
+							One_Char_Height+Quarter_Char_Height);
+
+				XSetClipMask(A->display, A->W[G].gc, None);
 			}
 		}
 			break;
@@ -1383,6 +1380,13 @@ void	BuildLayout(uARG *A, int G)
 			break;
 		case SYSINFO:
 		{
+			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+			XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+					One_Char_Width,
+					One_Char_Height,
+					A->L.Page[G].title,
+					strlen(A->L.Page[G].title) );
+
 			char items[8192]={0}, str[SYSINFO_TEXT_WIDTH]={0};
 
 			const char	powered[2]={'N', 'Y'},
@@ -1390,6 +1394,7 @@ void	BuildLayout(uARG *A, int G)
 			sprintf(items, PROC_FORMAT,
 					A->P.Features.BrandString,
 					ARCH[A->P.ArchID].Architecture,
+					A->P.ClockSpeed,
 					A->P.Features.Std.EAX.ExtFamily + A->P.Features.Std.EAX.Family,
 					(A->P.Features.Std.EAX.ExtModel << 4) + A->P.Features.Std.EAX.Model,
 					A->P.Features.Std.EAX.Stepping,
@@ -1489,10 +1494,6 @@ void	BuildLayout(uARG *A, int G)
 			else
 				strcat(items, "Unknown\n");
 
-			strcat(items, BIOS_SECTION);
-			sprintf(str, BIOS_FORMAT, A->P.ClockSpeed);
-			strcat(items, str);
-
 			// Dispose & scroll all data strings stored in items.
 			XRectangle R[]=	{ {
 						x:0,
@@ -1500,70 +1501,32 @@ void	BuildLayout(uARG *A, int G)
 						width:A->W[G].width,
 						height:A->W[G].height - Header_Height - Footer_Height,
 					} };
-			ScrollLayout(A, G, items, One_Char_Height, R);
+
+			XSetClipRectangles(A->display, A->W[G].gc,
+					0,
+					0,
+					R, 1, Unsorted);
+
+			XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
+			A->L.Page[G].Text=XPrint(A->display, A->W[G].pixmap.B, A->W[G].gc,
+						One_Char_Width * A->L.Page[G].hScroll,
+						+ One_Half_Char_Height
+						+ (One_Char_Height * A->L.Page[G].vScroll),
+						items,
+						One_Char_Height);
+
+			XSetClipMask(A->display, A->W[G].gc, None);
 		}
 			break;
 		case DUMP:
-			#define	PrettyPrint(regName, regAddr) { \
-				sprintf(mask, REG_FORMAT, regAddr, regName, REG_ALIGN - strlen(regName)); \
-				sprintf(str, mask, 0x20); \
-				strcat(items, str); \
-				int H=0; \
-				for(H=0; H < 15; H++) { \
-					strncat(items, &binStr[H << 2], 4); \
-					strcat(items, " "); \
-				}; \
-				strncat(items, &binStr[H << 2], 4); \
-				strcat(items, "]\n"); \
-			}
-		// Dump a bunch of Registers with their Address, Name & Value.
 		{
-			char	items[DUMP_TEXT_WIDTH * DUMP_TEXT_HEIGHT]={0},
-				binStr[BIN64_STR]={0},
-				mask[PRE_TEXT]={0},
-				str[PRE_TEXT]={0};
+			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+			XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+					One_Char_Width,
+					One_Char_Height,
+					A->L.Page[G].title,
+					strlen(A->L.Page[G].title) );
 
-			DumpRegister(A->P.Core[4].FD, IA32_PERF_STATUS, NULL, binStr);
-			PrettyPrint("IA32_PERF_STATUS", IA32_PERF_STATUS);
-
-			DumpRegister(A->P.Core[0].FD, IA32_THERM_INTERRUPT, NULL, binStr);
-			PrettyPrint("IA32_THERM_INTERRUPT", IA32_THERM_INTERRUPT);
-
-			DumpRegister(A->P.Core[0].FD, IA32_THERM_STATUS, NULL, binStr);
-			PrettyPrint("IA32_THERM_STATUS", IA32_THERM_STATUS);
-
-			DumpRegister(A->P.Core[0].FD, IA32_MISC_ENABLE, NULL, binStr);
-			PrettyPrint("IA32_MISC_ENABLE", IA32_MISC_ENABLE);
-
-			DumpRegister(A->P.Core[0].FD, IA32_FIXED_CTR1, NULL, binStr);
-			PrettyPrint("IA32_FIXED_CTR1", IA32_FIXED_CTR1);
-
-			DumpRegister(A->P.Core[0].FD, IA32_FIXED_CTR2, NULL, binStr);
-			PrettyPrint("IA32_FIXED_CTR2", IA32_FIXED_CTR2);
-
-			DumpRegister(A->P.Core[0].FD, IA32_FIXED_CTR_CTRL, NULL, binStr);
-			PrettyPrint("IA32_FIXED_CTR_CTRL", IA32_FIXED_CTR_CTRL);
-
-			DumpRegister(A->P.Core[0].FD, IA32_PERF_GLOBAL_CTRL, NULL, binStr);
-			PrettyPrint("IA32_PERF_GLOBAL_CTRL", IA32_PERF_GLOBAL_CTRL);
-
-			DumpRegister(A->P.Core[0].FD, MSR_PLATFORM_INFO, NULL, binStr);
-			PrettyPrint("MSR_PLATFORM_INFO", MSR_PLATFORM_INFO);
-
-			DumpRegister(A->P.Core[0].FD, MSR_TURBO_RATIO_LIMIT, NULL, binStr);
-			PrettyPrint("MSR_TURBO_RATIO_LIMIT", MSR_TURBO_RATIO_LIMIT);
-
-			DumpRegister(A->P.Core[0].FD, MSR_TEMPERATURE_TARGET, NULL, binStr);
-			PrettyPrint("MSR_TEMPERATURE_TARGET", MSR_TEMPERATURE_TARGET);
-
-			// Dispose & scroll all data strings stored in items.
-			XRectangle R[]=	{ {
-						x:0,
-						y:Header_Height,
-						width:A->W[G].width,
-						height:A->W[G].height - Header_Height - Footer_Height,
-					} };
-			ScrollLayout(A, G, items, One_Char_Height, R);
 		}
 			break;
 	}
@@ -1639,7 +1602,8 @@ void	DrawWB(uARG *A, int G)
 void	DrawLayout(uARG *A, int G)
 {
 	switch(G) {
-		case MAIN: {
+		case MAIN:
+		{
 			int edline=_IS_MDI_ ? A->L.Axes[G].Segment[1].y2 + Footer_Height : A->W[G].height;
 			// Draw the buffer if it is not empty.
 			if(A->L.Input.KeyLength > 0)
@@ -1690,21 +1654,24 @@ void	DrawLayout(uARG *A, int G)
 						One_Char_Height - 3);
 
 				// For each Core, display its frequency, C-STATE & ratio.
-				if(A->L.Play.freqHertz) {
+				if(A->L.Play.freqHertz && (A->P.Core[cpu].RelativeFreq > 0) ) {
 					XSetForeground(A->display, A->W[G].gc, BarFg);
-					sprintf(str, CORE_FREQ, A->P.Core[cpu].RelativeFreq, A->P.Core[cpu].UnhaltedFreq);
+					sprintf(str, CORE_FREQ, A->P.Core[cpu].RelativeFreq);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							One_Char_Width * 5,
 							One_Char_Height * (cpu + 1 + 1),
 							str, strlen(str) );
 				}
 				if(A->L.Play.cState) {
-					XSetForeground(A->display, A->W[G].gc, DYNAMIC_COLOR);
-					sprintf(str, CORE_STATE,100 * A->P.Core[cpu].State.C0,
-								100 * A->P.Core[cpu].State.C3,
-								100 * A->P.Core[cpu].State.C6);
+					XSetForeground(A->display, A->W[G].gc, BarFg);
+					sprintf(str, "%5llu :%5llu%5llu%5llu /%5llu",
+							A->P.Core[cpu].Delta.C0.UCC >> A->P.IdleTime,
+							A->P.Core[cpu].Delta.C0.URC >> A->P.IdleTime,
+							A->P.Core[cpu].Delta.C3 >> A->P.IdleTime,
+							A->P.Core[cpu].Delta.C6 >> A->P.IdleTime,
+							A->P.Core[cpu].Delta.TSC >> A->P.IdleTime);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-							One_Char_Width * 18,
+							One_Char_Width * 13,
 							One_Char_Height * (cpu + 1 + 1),
 							str, strlen(str) );
 				}
@@ -1766,6 +1733,26 @@ void	DrawLayout(uARG *A, int G)
 			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C3, A->P.CPU);
 			XSetForeground(A->display, A->W[G].gc, GRAPH3_COLOR);
 			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C6, A->P.CPU);
+
+			if(A->L.Play.cState)
+				for(cpu=0; cpu < A->P.CPU; cpu++) {
+					XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+					sprintf(str, CORE_NUM, cpu);
+					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+							0,
+							One_Char_Height * (cpu + 1 + 1),
+							str, strlen(str) );
+
+					XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
+					sprintf(str, CORE_STATE,100 * A->P.Core[cpu].State.C0,
+								100 * A->P.Core[cpu].State.C3,
+								100 * A->P.Core[cpu].State.C6);
+
+					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+							Twice_Half_Char_Width,
+							One_Char_Height * (cpu + 1 + 1),
+							str, strlen(str) );
+				}
 		}
 			break;
 		case TEMPS:
@@ -1845,6 +1832,57 @@ void	DrawLayout(uARG *A, int G)
 					Half_Char_Width,
 					U->y2,
 					str, 3);
+		}
+			break;
+		case DUMP:
+		{
+			// Dump a bunch of Registers with their Address, Name & Value.
+			char *items=calloc(DUMP_TABLE_ROWS, DUMP_TEXT_WIDTH);
+			int row=0;
+			for(row=0; row < DUMP_TABLE_ROWS; row++)
+			{
+				char binStr[BIN64_STR]={0};
+				DumpRegister(A->P.Core[0].FD, A->L.DumpTable[row].Addr, NULL, binStr);
+
+				char mask[PRE_TEXT]={0}, str[PRE_TEXT]={0};
+				sprintf(mask, REG_FORMAT, row,
+							A->L.DumpTable[row].Addr,
+							A->L.DumpTable[row].Name,
+							REG_ALIGN - strlen(A->L.DumpTable[row].Name));
+				sprintf(str, mask, 0x20);
+				strcat(items, str);
+
+				int H=0;
+				for(H=0; H < 15; H++) {
+					strncat(items, &binStr[H << 2], 4);
+					strcat(items, " ");
+				};
+				strncat(items, &binStr[H << 2], 4);
+				strcat(items, "]\n");
+			}
+			// Dispose & scroll all data strings stored in items.
+			XRectangle R[]=	{ {
+						x:0,
+						y:Header_Height,
+						width:A->W[G].width,
+						height:A->W[G].height - Header_Height - Footer_Height,
+					} };
+
+			XSetClipRectangles(A->display, A->W[G].gc,
+					0,
+					0,
+					R, 1, Unsorted);
+
+			XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
+			A->L.Page[G].Text=XPrint(A->display, A->W[G].pixmap.F, A->W[G].gc,
+						One_Char_Width * A->L.Page[G].hScroll,
+						+ One_Half_Char_Height
+						+ (One_Char_Height * A->L.Page[G].vScroll),
+						items,
+						One_Char_Height);
+			free(items);
+
+			XSetClipMask(A->display, A->W[G].gc, None);
 		}
 			break;
 	}
@@ -2155,9 +2193,9 @@ static void *uLoop(uARG *A)
 						break;
 					case XK_KP_Add: {
 						char str[32];
-						if(A->P.IdleTime > 50000)
-							A->P.IdleTime-=25000;
-						sprintf(str, "[%d usecs]", A->P.IdleTime);
+						if(A->P.IdleTime > 16)
+							A->P.IdleTime--;
+						sprintf(str, "[%d usecs]", (1 << A->P.IdleTime) );
 						XSetForeground(A->display, A->W[G].gc, PULSE_COLOR);
 						XDrawImageString(A->display, A->W[G].window, A->W[G].gc,
 								A->W[G].width - (15 * One_Char_Width),
@@ -2167,8 +2205,8 @@ static void *uLoop(uARG *A)
 						break;
 					case XK_KP_Subtract: {
 						char str[32];
-						A->P.IdleTime+=25000;
-						sprintf(str, "[%d usecs]", A->P.IdleTime);
+						A->P.IdleTime++;
+						sprintf(str, "[%d usecs]", (1 << A->P.IdleTime) );
 						XSetForeground(A->display, A->W[G].gc, PULSE_COLOR);
 						XDrawImageString(A->display, A->W[G].window, A->W[G].gc,
 								A->W[G].width - (15 * One_Char_Width),
@@ -2292,7 +2330,7 @@ int	Args(uARG *A, int argc, char *argv[])
 				{"-b", "%x", &A->L.globalBackground,   "Background color"             },
 				{"-f", "%x", &A->L.globalForeground,   "Foreground color"             },
 				{"-c", "%ud",&A->P.PerCore,            "Monitor per Thread/Core (0/1)"},
-				{"-s", "%ld",&A->P.IdleTime,           "Idle time (usec)"             },
+				{"-s", "%ld",&A->P.IdleTime,           "Idle time (usec) where 2^N"   },
 				{"-a", "%ud",&A->L.Play.flashActivity, "Pulse activity (0/1)"         },
 				{"-h", "%ud",&A->L.Play.freqHertz,     "CPU frequency (0/1)"          },
 				{"-p", "%ud",&A->L.Play.cState,        "C-STATE percentage (0/1)"     },
@@ -2345,7 +2383,7 @@ int main(int argc, char *argv[])
 				Top:0,
 				Hot:0,
 				PerCore:false,
-				IdleTime:1000000,
+				IdleTime:20,
 			},
 			W: {
 				// MAIN
@@ -2590,6 +2628,19 @@ int main(int argc, char *argv[])
 					String:NULL,
 				},
 				Usage:{C0:NULL, C3:NULL, C6:NULL},
+				DumpTable: {
+					{"IA32_PERF_STATUS", IA32_PERF_STATUS},
+					{"IA32_THERM_INTERRUPT", IA32_THERM_INTERRUPT},
+					{"IA32_THERM_STATUS", IA32_THERM_STATUS},
+					{"IA32_MISC_ENABLE", IA32_MISC_ENABLE},
+					{"IA32_FIXED_CTR1", IA32_FIXED_CTR1},
+					{"IA32_FIXED_CTR2", IA32_FIXED_CTR2},
+					{"IA32_FIXED_CTR_CTRL", IA32_FIXED_CTR_CTRL},
+					{"IA32_PERF_GLOBAL_CTRL", IA32_PERF_GLOBAL_CTRL},
+					{"MSR_PLATFORM_INFO", MSR_PLATFORM_INFO},
+					{"MSR_TURBO_RATIO_LIMIT", MSR_TURBO_RATIO_LIMIT},
+					{"MSR_TEMPERATURE_TARGET", MSR_TEMPERATURE_TARGET},
+				},
 				Axes:{{0, NULL}},
 				// Design the Cursor
 				Cursor:{{x:+0, y:+0},

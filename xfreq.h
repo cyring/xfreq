@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.16 SR4 by CyrIng
+ * XFreq.h #0.16 SR5 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -385,7 +385,7 @@ typedef struct {
 						C3[2],
 						C6[2],
 						TSC[2];
-			} RefCycles;
+			} Cycles;
 			struct {
 				struct {
 				unsigned long long
@@ -541,7 +541,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	TEMPS_TEXT_WIDTH	(A->P.Features.ThreadCount << 2)
 
 #define	CSTATES_TEXT_SPACING	3
-#define	CSTATES_TEXT_WIDTH	(A->P.CPU * CSTATES_TEXT_SPACING)
+#define	CSTATES_TEXT_WIDTH	( MAX(A->P.CPU, 6) * CSTATES_TEXT_SPACING )
 #define	CSTATES_TEXT_HEIGHT	10
 
 #define	SYSINFO_TEXT_WIDTH	80
@@ -550,11 +550,12 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	REG_ALIGN		24
 // BIN64: 16 x 4 digits + '\0'
 #define BIN64_STR		(16 * 4) + 1
-// PRE_TEXT: (Addr + ':' + Name + Padding) + '['
-#define PRE_TEXT		5 + 1 + REG_ALIGN + 1
+// PRE_TEXT: ##' 'Addr[5]' 'Name&Padding[24]'['
+#define PRE_TEXT		2 + 1 + 5 + 1 + REG_ALIGN + 1
 // WIDTH: PRE_TEXT + BIN64 w/ 15 interspaces + ']' + ScrollButtons
 #define	DUMP_TEXT_WIDTH		PRE_TEXT + BIN64_STR + 15 + 1 + 2
 #define	DUMP_TEXT_HEIGHT	13
+#define	DUMP_TABLE_ROWS		11
 
 #define	MENU_FORMAT	"[F1]     Help             [F2]     Core\n"               \
 			"[F3]     C-States         [F4]     Temps \n"             \
@@ -580,15 +581,16 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"[WheelUp] Page Scroll Up  [WheelDw] Page Scroll Down\n"
 
 #define	CORE_NUM	"#%-2d"
-#define	CORE_FREQ	"%4.0f/%4dMHz"
+#define	CORE_FREQ	"%4.0fMHz"
 #define	CORE_STATE	"%6.2f%% %6.2f%% %6.2f%%"
 #define	CORE_RATIO	"%-3.1f"
 #define	OVERCLOCK	"%s [%4d MHz]"
 
-#define	PROC_FORMAT	"Processor [%s]  Architecture [%s]\n\n"                                \
-			" Family               Model             Stepping             Max# of\n" \
-			"  Code                 No.                 ID                Threads\n" \
-			"[%6X]            [%6X]            [%6d]            [%6d]\n\n"           \
+#define	PROC_FORMAT	"Processor [%s]  Architecture [%s]\n"                                       \
+			"Base Clock [%3d MHz]\n\n"                                                  \
+			" Family               Model             Stepping             Max# of\n"    \
+			"  Code                 No.                 ID                Threads\n"    \
+			"[%6X]            [%6X]            [%6d]            [%6d]\n\n"              \
 			"Virtual Mode Extension                                         VME [%c]\n" \
 			"Debugging Extension                                             DE [%c]\n" \
 			"Page Size Extension                                            PSE [%c]\n" \
@@ -644,14 +646,11 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CHA_FORMAT	"Channel   tCL   tRCD  tRP   tRAS  tRRD  tRFC  tWR   tRTPr tWTPr tFAW  B2B\n"
 #define	CAS_FORMAT	"   #%1i   |%4d%6d%6d%6d%6d%6d%6d%6d%6d%6d%6d\n"
 
-#define	BIOS_SECTION	"\nBIOS\n"
-#define	BIOS_FORMAT	"Base Clock [%3d MHz]\n"
-
 #define	SYSINFO_SECTION	"System Information"
-//                       12345 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234]
-#define	DUMP_SECTION	"Addr.     Register               60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0"
+//                       ## 12345 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234]
+#define	DUMP_SECTION	"Addr.        Register               60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0"
 #define	REG_HEXVAL	"%016llX"
-#define	REG_FORMAT	"%05X %s%%%zdc["
+#define	REG_FORMAT	"%02d %05X %s%%%zdc["
 
 typedef struct {
 	int	cols,
@@ -691,6 +690,10 @@ typedef struct {
 				*C3,
 				*C6;
 	} Usage;
+	struct {
+		char		*Name;
+		unsigned int	Addr;
+	} DumpTable[DUMP_TABLE_ROWS];
 	struct {;
 		int		N;
 		XSegment	*Segment;
