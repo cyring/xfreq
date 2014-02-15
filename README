@@ -14,7 +14,7 @@
  *  Hardware
  * ----------
  *
- * + energy performance counters
+ * + power energy performance counters
  *
  * + kernel module : to reduce cpu usage near to 0.01%
  *     using mmap to transfer the complete RO data structure to userland.
@@ -59,10 +59,16 @@
  *
  *   Issues
  * ----------
- * + Turbo ratios don't show up : please contact us if you have any idea why ?
+ * + Turbo ratios now show up : can be enhanced.
  *
  *
  * [HISTORY]
+ *
+ * R 0.17 : 02/15 2014 SR-1
+ *        - Corrected the Turbo ratio calculation.
+ *        - A Core frequency is displayed when the ratio is greater or equal 5
+ *        - A minimized Widget has an associated icon button in the Main Widget right bar.
+ *        - Cycle and C-State options are now dissociated.
  *
  * R 0.16 : 02/12 2014 SR-5
  *        - Registers Dump Widget is now auto refreshed.

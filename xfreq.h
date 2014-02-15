@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.16 SR5 by CyrIng
+ * XFreq.h #0.17 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -164,9 +164,11 @@ struct IMCINFO
 
 #define	IA32_TIME_STAMP_COUNTER		0x10
 #define	IA32_PERF_STATUS		0x198
+#define	IA32_CLOCK_MODULATION		0x19a
 #define	IA32_THERM_INTERRUPT		0x19b
 #define IA32_THERM_STATUS		0x19c
 #define	IA32_MISC_ENABLE		0x1a0
+#define	IA32_ENERGY_PERF_BIAS		0x1b0
 #define	IA32_FIXED_CTR1			0x30a
 #define	IA32_FIXED_CTR2			0x30b
 #define	IA32_FIXED_CTR_CTRL		0x38d
@@ -340,22 +342,22 @@ typedef struct {
 
 const struct {
 	struct	SIGNATURE	Signature;
-	const	unsigned int	MaxOfCores,
-				ClockSpeed;
+	const	unsigned int	MaxOfCores;
+	const	double		ClockSpeed;
 	const	char		*Architecture;
 } ARCH[ARCHITECTURES]={
-				{ Nehalem_Bloomfield,    4, 133, "Nehalem" },
-				{ Nehalem_Lynnfield,     4, 133, "Nehalem" },
-				{ Nehalem_NehalemEP,     4, 133, "Nehalem" },
-				{ Westmere_Arrandale,    4, 133, "Westmere" },
-				{ Westmere_Gulftown,     6, 133, "Westmere" },
-				{ Westmere_WestmereEP,   6, 133, "Westmere" },
-				{ SandyBridge_1G,        6, 100, "SandyBridge" },
-				{ SandyBridge_Bromolow,  4, 100, "SandyBridge" },
-				{ IvyBridge,             6 ,100, "IvyBridge" },
-				{ Haswell_3C,            4, 100, "Haswell" },
-				{ Haswell_45,            4, 100, "Haswell" },
-				{ Haswell_46,            4, 100, "Haswell" },
+				{ Nehalem_Bloomfield,    4, 133.66, "Nehalem" },
+				{ Nehalem_Lynnfield,     4, 133.66, "Nehalem" },
+				{ Nehalem_NehalemEP,     4, 133.66, "Nehalem" },
+				{ Westmere_Arrandale,    4, 133.66, "Westmere" },
+				{ Westmere_Gulftown,     6, 133.66, "Westmere" },
+				{ Westmere_WestmereEP,   6, 133.66, "Westmere" },
+				{ SandyBridge_1G,        6, 100.00, "SandyBridge" },
+				{ SandyBridge_Bromolow,  4, 100.00, "SandyBridge" },
+				{ IvyBridge,             6 ,100.00, "IvyBridge" },
+				{ Haswell_3C,            4, 100.00, "Haswell" },
+				{ Haswell_45,            4, 100.00, "Haswell" },
+				{ Haswell_46,            4, 100.00, "Haswell" },
 			};
 
 typedef struct {
@@ -364,7 +366,7 @@ typedef struct {
 		MISC_PROC_FEATURES		MiscFeatures;
 		PLATFORM			Platform;
 		TURBO				Turbo;
-		unsigned int			ClockSpeed;
+		double				ClockSpeed;
 		unsigned int			CPU;
 		char				Bump[2+2+2+1];
 		struct THREADS {
@@ -373,8 +375,6 @@ typedef struct {
 			unsigned int		OperatingFreq;
 			GLOBAL_PERF_COUNTER	GlobalPerfCounter;
 			FIXED_PERF_COUNTER	FixedPerfCounter;
-			unsigned int		UnhaltedRatio,
-						UnhaltedFreq;
 			struct {
 				struct {
 				unsigned long long
@@ -402,7 +402,8 @@ typedef struct {
 						C3,
 						C6;
 			} State;
-			double			RelativeRatio,
+			double			TurboRatio,
+						RelativeRatio,
 						RelativeFreq;
 			TJMAX			TjMax;
 			THERM_INTERRUPT		ThermIntr;
@@ -451,25 +452,50 @@ typedef struct {
 #define	FOCUS_COLOR		0x8fcefa
 #define	MDI_SEP_COLOR		0x737373
 
-#define	NORTH_DIR	'N'
-#define	SOUTH_DIR	'S'
-#define	EAST_DIR	'E'
-#define	WEST_DIR	'W'
-#define	PGUP_DIR	'U'
-#define	PGDW_DIR	'D'
+#define	ID_NULL		'\0'
+#define	ID_NORTH	'N'
+#define	ID_SOUTH	'S'
+#define	ID_EAST		'E'
+#define	ID_WEST		'W'
+#define	ID_PGUP		'U'
+#define	ID_PGDW		'D'
+#define	ID_PAUSE	'I'
+#define	ID_FREQ		'H'
+#define	ID_CYCLE	'Y'
+#define	ID_RATIO	'R'
+#define	ID_STATE	'P'
 
-enum	{HEAD, TAIL, CHAINS};
+#define	RSC_PAUSE	"Pause"
+#define	RSC_FREQ	"Freq."
+#define	RSC_CYCLE	"Cycle"
+#define	RSC_STATE	"State"
+#define	RSC_RATIO	"Ratio"
+
+typedef	enum	{SCROLLING, TEXT, ICON} WBTYPE;
+
+typedef	union	{
+	char		*Text;
+	char		Label;
+	Pixmap		*Bitmap;
+} RESOURCE;
 
 struct WButton {
-	struct	WButton	*Chain;
+	WBTYPE		Type;
+	char		ID;
+	int		Target;
 	int		x,
 			y;
 	unsigned int	w,
 			h;
-	void		(*DrawFunc)();
 	void		(*CallBack)();
-	unsigned long	Parameter;
+	void		(*DrawFunc)();
+	RESOURCE	Resource;
+	struct	WButton	*Chain;
 };
+
+typedef	struct	WButton	WBUTTON;
+
+enum	{HEAD, TAIL, CHAINS};
 
 typedef struct {
 	Window		window;
@@ -492,7 +518,7 @@ typedef struct {
 	} extents;
 	unsigned long	background,
 			foreground;
-	struct	WButton	*wButton[CHAINS];
+	WBUTTON		*wButton[CHAINS];
 } XWINDOW;
 
 //			L-CTRL		L-ALT		R-CTRL		L-WIN		R-ALTGR
@@ -514,22 +540,22 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	FIRST_WIDGET	(MAIN + 1)
 #define	LAST_WIDGET	(WIDGETS - 1)
 
-#define	Quarter_Char_Width	(A->W[G].extents.charWidth >> 2)
-#define	Half_Char_Width		(A->W[G].extents.charWidth >> 1)
-#define	One_Char_Width		(A->W[G].extents.charWidth)
-#define	One_Half_Char_Width	(One_Char_Width + Half_Char_Width)
-#define	Twice_Char_Width	(A->W[G].extents.charWidth << 1)
-#define	Twice_Half_Char_Width	(Twice_Char_Width + Half_Char_Width)
+#define	Quarter_Char_Width(N)		(A->W[N].extents.charWidth >> 2)
+#define	Half_Char_Width(N)		(A->W[N].extents.charWidth >> 1)
+#define	One_Char_Width(N)		(A->W[N].extents.charWidth)
+#define	One_Half_Char_Width(N)		(One_Char_Width(N) + Half_Char_Width(N))
+#define	Twice_Char_Width(N)		(A->W[N].extents.charWidth << 1)
+#define	Twice_Half_Char_Width(N)	(Twice_Char_Width(N) + Half_Char_Width(N))
 
-#define	Quarter_Char_Height	(A->W[G].extents.charHeight >> 2)
-#define	Half_Char_Height	(A->W[G].extents.charHeight >> 1)
-#define	One_Char_Height		(A->W[G].extents.charHeight)
-#define	One_Half_Char_Height	(One_Char_Height + Half_Char_Height)
-#define	Twice_Char_Height	(A->W[G].extents.charHeight << 1)
-#define	Twice_Half_Char_Height	(Twice_Char_Height + Half_Char_Height)
+#define	Quarter_Char_Height(N)		(A->W[N].extents.charHeight >> 2)
+#define	Half_Char_Height(N)		(A->W[N].extents.charHeight >> 1)
+#define	One_Char_Height(N)		(A->W[N].extents.charHeight)
+#define	One_Half_Char_Height(N)		(One_Char_Height(N) + Half_Char_Height(N))
+#define	Twice_Char_Height(N)		(A->W[N].extents.charHeight << 1)
+#define	Twice_Half_Char_Height(N)	(Twice_Char_Height(N) + Half_Char_Height(N))
 
-#define	Header_Height		(One_Char_Height + Quarter_Char_Height)
-#define	Footer_Height		(One_Char_Height + Quarter_Char_Height)
+#define	Header_Height(N)		(One_Char_Height(N) + Quarter_Char_Height(N))
+#define	Footer_Height(N)		(One_Char_Height(N) + Quarter_Char_Height(N))
 
 #define	MAIN_TEXT_WIDTH		48
 #define	MAIN_TEXT_HEIGHT	14
@@ -545,7 +571,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CSTATES_TEXT_HEIGHT	10
 
 #define	SYSINFO_TEXT_WIDTH	80
-#define	SYSINFO_TEXT_HEIGHT	19
+#define	SYSINFO_TEXT_HEIGHT	20
 
 #define	REG_ALIGN		24
 // BIN64: 16 x 4 digits + '\0'
@@ -582,12 +608,14 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 
 #define	CORE_NUM	"#%-2d"
 #define	CORE_FREQ	"%4.0fMHz"
-#define	CORE_STATE	"%6.2f%% %6.2f%% %6.2f%%"
+#define	CORE_CYCLES	"%04llu:%04llu %04llu %04llu / %04llu"
 #define	CORE_RATIO	"%-3.1f"
-#define	OVERCLOCK	"%s [%4d MHz]"
+#define	CSTATES_PERCENT	"%6.2f%% %6.2f%% %6.2f%%"
+#define	OVERCLOCK	"%s [%4.0f MHz]"
+#define	TEMPERATURE	"%3d"
 
 #define	PROC_FORMAT	"Processor [%s]  Architecture [%s]\n"                                       \
-			"Base Clock [%3d MHz]\n\n"                                                  \
+			"Base Clock [%5.2f MHz]\n\n"                                                  \
 			" Family               Model             Stepping             Max# of\n"    \
 			"  Code                 No.                 ID                Threads\n"    \
 			"[%6X]            [%6X]            [%6d]            [%6d]\n\n"              \
@@ -648,7 +676,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 
 #define	SYSINFO_SECTION	"System Information"
 //                       ## 12345 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234]
-#define	DUMP_SECTION	"Addr.        Register               60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0"
+#define	DUMP_SECTION	"   Addr.     Register               60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0"
 #define	REG_HEXVAL	"%016llX"
 #define	REG_FORMAT	"%02d %05X %s%%%zdc["
 
@@ -663,8 +691,8 @@ typedef struct {
 				V;
 	} Margin;
 	struct	{
-		bool		pageable;
-		char		*title;
+		bool		Pageable;
+		char		*Title;
 		MaxText 	Text;
 		int		hScroll,
 				vScroll;
@@ -673,8 +701,9 @@ typedef struct {
 		bool
 				flashActivity,
 				freqHertz,
-				cState,
+				cycleValues,
 				ratioValues,
+				cStatePercent,
 				alwaysOnTop,
 				flashPulse,
 				wallboard,
