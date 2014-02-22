@@ -1,12 +1,12 @@
 /*
- * XFreq.h #0.17 SR1 by CyrIng
+ * XFreq.h #0.17 SR5 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
-#define MAX(M, m)               ((M) > (m) ? (M) : (m))
-#define MIN(m, M)               ((m) < (M) ? (m) : (M))
+#define MAX(M, m)	((M) > (m) ? (M) : (m))
+#define MIN(m, M)	((m) < (M) ? (m) : (M))
 
 typedef enum {false=0, true=1} bool;
 
@@ -94,7 +94,7 @@ typedef struct
 			PSN	: 19-18,
 			CLFSH	: 20-19,
 			Unused2	: 21-20,
-			DS	: 22-21,
+			DS_PEBS	: 22-21,
 			ACPI	: 23-22,
 			MMX	: 24-23,
 			FXSR	: 25-24,
@@ -108,6 +108,89 @@ typedef struct
 		} EDX;
 	} Std;
 	unsigned	ThreadCount;
+	struct
+	{
+		struct {
+			unsigned
+			DTS	:  1-0,
+			Turbo	:  2-1,
+			ARAT	:  3-2,
+			Unused1	:  4-3,
+			PLN	:  5-4,
+			ECMD	:  6-5,
+			PTM	:  7-6,
+			Unused2	: 32-7;
+		} EAX;
+		struct	{
+			unsigned
+			Threshld:  4-0,
+			Unused1	: 32-4;
+		} EBX;
+		struct	{
+			unsigned
+			HCF_Cap	:  1-0,
+			ACNT_Cap:  2-1,
+			Unused1	:  3-2,
+			PEB_Cap	:  4-3,
+			Unused2	: 32-4;
+		} ECX;
+		struct	{
+			unsigned
+			Unused1	: 32-0;
+		} EDX;
+	} Thermal_Power_Leaf;
+	struct
+	{
+		struct	{
+			unsigned
+			Version	:  8-0,
+			MonCtrs	: 16-8,
+			MonWidth: 24-16,
+			VectorSz: 32-24;
+		} EAX;
+		struct	{
+			unsigned
+			CoreCycl:  1-0,
+			InRetire:  2-1,
+			RefCycle:  3-2,
+			LLC_Ref	:  4-3,
+			LLC_Miss:  5-4,
+			BrInRet	:  6-5,
+			BrMispre:  7-6,
+			Unused1	: 32-7;
+		} EBX;
+		struct	{
+			unsigned
+			Unused1	: 32-0;
+		} ECX;
+		struct	{
+			unsigned
+			FixCtrs	:  5-0,
+			FixWidth: 13-5,
+			Unused1	: 32-13;
+		} EDX;
+	} Perf_Monitoring_Leaf;
+	struct
+	{
+		struct {
+			unsigned
+			MaxSubLeaf	: 32-0;
+		} EAX;
+		struct {
+			unsigned
+			FSGSBASE	:  1-0,
+			Unused1		:  7-1,
+			SMEP		:  8-7,
+			Unused2		:  9-8,
+			FastStrings	: 10-9,
+			INVPCID		: 11-10,
+			Unused3		: 32-11;
+		} EBX;
+			unsigned
+		ECX			: 32-0,
+		EDX			: 32-0;
+
+	} ExtFeature;
 	unsigned	LargestExtFunc;
 	struct
 	{
@@ -131,7 +214,7 @@ typedef struct
 			IA64	: 30-29,
 			Unused5	: 32-30;
 		} EDX;
-	} Ext;
+	} ExtFunc;
 	char		BrandString[48+1];
 } FEATURES;
 
@@ -371,8 +454,7 @@ typedef struct {
 		char				Bump[2+2+2+1];
 		struct THREADS {
 			signed int		FD;
-			PERF_STATUS		Operating;
-			unsigned int		OperatingFreq;
+//			PERF_STATUS		Operating;
 			GLOBAL_PERF_COUNTER	GlobalPerfCounter;
 			FIXED_PERF_COUNTER	FixedPerfCounter;
 			struct {
@@ -398,19 +480,20 @@ typedef struct {
 						TSC;
 			} Delta;
 			struct {
-				double		C0,
+				double		Turbo,
+						C0,
 						C3,
 						C6;
 			} State;
-			double			TurboRatio,
-						RelativeRatio,
+			double			RelativeRatio,
 						RelativeFreq;
 			TJMAX			TjMax;
 			THERM_INTERRUPT		ThermIntr;
 			THERM_STATUS		ThermStat;
 		} *Core;
 		struct {
-			double			C0,
+			double			Turbo,
+						C0,
 						C3,
 						C6;
 		} Avg;
@@ -449,10 +532,11 @@ typedef struct {
 #define	MED_VALUE_COLOR		0xe49400
 #define	HIGH_VALUE_COLOR	0xfd0000
 #define	PULSE_COLOR		0xf0f000
-#define	FOCUS_COLOR		0x8fcefa
+#define	FOCUS_COLOR		0xffffff
 #define	MDI_SEP_COLOR		0x737373
 
 #define	ID_NULL		'\0'
+#define	ID_MIN		'm'
 #define	ID_NORTH	'N'
 #define	ID_SOUTH	'S'
 #define	ID_EAST		'E'
@@ -471,7 +555,7 @@ typedef struct {
 #define	RSC_STATE	"State"
 #define	RSC_RATIO	"Ratio"
 
-typedef	enum	{SCROLLING, TEXT, ICON} WBTYPE;
+typedef	enum	{DECORATION, SCROLLING, TEXT, ICON} WBTYPE;
 
 typedef	union	{
 	char		*Text;
@@ -608,9 +692,10 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 
 #define	CORE_NUM	"#%-2d"
 #define	CORE_FREQ	"%4.0fMHz"
-#define	CORE_CYCLES	"%04llu:%04llu %04llu %04llu / %04llu"
+#define	CORE_CYCLES	"%016llu:%016llu"
+#define	CORE_DELTA	"%04llu:%04llu %04llu %04llu / %04llu"
 #define	CORE_RATIO	"%-3.1f"
-#define	CSTATES_PERCENT	"%6.2f%% %6.2f%% %6.2f%%"
+#define	CSTATES_PERCENT	"%6.2f%% %6.2f%% %6.2f%% %6.2f%%"
 #define	OVERCLOCK	"%s [%4.0f MHz]"
 #define	TEMPERATURE	"%3d"
 
@@ -632,7 +717,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"Page Attribute Table                                           PAT [%c]\n" \
 			"36-bit Page Size Extension                                   PSE36 [%c]\n" \
 			"Processor Serial Number                                        PSN [%c]\n" \
-			"Debug Store                                                     DS [%c]\n" \
+			"Debug Store & Precise Event Based Sampling                DS, PEBS [%c]   [%s]\n" \
 			"Advanced Configuration & Power Interface                      ACPI [%c]\n" \
 			"Self-Snoop                                                      SS [%c]\n" \
 			"Hyper-Threading                                                HTT [%c]\n" \
@@ -655,13 +740,12 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"OS-Enabled Ext. State Management                           OSXSAVE [%c]\n" \
 			"Execution Disable Bit Support                               XD-Bit [%c]   [%s]\n" \
 			"1 GB Pages Support                                       1GB-PAGES [%c]\n" \
-			"Fast-Strings                                        REP MOVS STORS       [%s]\n" \
+			"Fast-Strings                                       REP MOVSB/STOSB [%c]   [%s]\n" \
 			"Automatic Thermal Control Circuit Enable                       TCC       [%s]\n" \
 			"Performance Monitoring Available                                PM       [%s]\n" \
 			"Branch Trace Storage Unavailable                               BTS       [%s]\n" \
-			"Precise Event Based Sampling                                  PEBS       [%s]\n" \
 			"Limit CPUID Maxval                                     Limit-CPUID       [%s]\n" \
-			"Turbo Mode                                                   TURBO       [%s]\n" \
+			"Turbo Mode                                                   TURBO [%c]   [%s]\n" \
 			"\nInstruction set:\n"                              \
 			"FPU[%c]           CX8[%c]          SEP[%c]          CMOV[%c]      CLFSH[%c]\n" \
 			"MMX[%c]          FXSR[%c]          SSE[%c]          SSE2[%c]       SSE3[%c]\n" \
@@ -679,6 +763,12 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	DUMP_SECTION	"   Addr.     Register               60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0"
 #define	REG_HEXVAL	"%016llX"
 #define	REG_FORMAT	"%02d %05X %s%%%zdc["
+
+#define	TITLE_MAIN_FMT		"X-Freq %s.%s-%s"
+#define	TITLE_CORES_FMT		"Core#%d @ %4.0fMHz"
+#define	TITLE_CSTATES_FMT	"C-States [%.2f%%] [%.2f%%]"
+#define	TITLE_TEMPS_FMT		"Core#%d @ %dC"
+#define	TITLE_SYSINFO_FMT	"Clock @ %5.2f MHz"
 
 typedef struct {
 	int	cols,
@@ -699,13 +789,11 @@ typedef struct {
 	} Page[WIDGETS];
 	struct {
 		bool
-				flashActivity,
 				freqHertz,
 				cycleValues,
 				ratioValues,
 				cStatePercent,
 				alwaysOnTop,
-				flashPulse,
 				wallboard,
 				flashCursor;
 	} Play;
@@ -740,12 +828,12 @@ typedef struct {
 #define	_IS_MDI_	(A->MDI != false)
 
 // Fast drawing macro.
-#define	fDraw(WG, DoCenter, DoBuild, DoDraw) {	\
-	if(DoCenter) CenterLayout(A, WG);	\
-	if(DoBuild)  BuildLayout(A, WG);	\
-	MapLayout(A, WG);			\
-	if(DoDraw)   DrawLayout(A, WG);		\
-	FlushLayout(A, WG);			\
+#define	fDraw(N, DoCenter, DoBuild, DoDraw) {	\
+	if(DoCenter) CenterLayout(A, N);	\
+	if(DoBuild)  BuildLayout(A, N);	\
+	MapLayout(A, N);			\
+	if(DoDraw)   DrawLayout(A, N);		\
+	FlushLayout(A, N);			\
 }
 
 typedef struct {

@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -g -pthread -x c
+CFLAGS = -Wall -pthread -x c
 APP_NAME=xfreq
 SRC_PATH=.
 OBJ_PATH=./obj

@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.17 SR1 by CyrIng
+ * XFreq.c #0.17 SR5 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,7 +7,7 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "17"
-#define _NIGHTLY "1"
+#define _NIGHTLY "4"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__
 static  char    version[] = AutoDate;
 
@@ -203,7 +203,7 @@ static void *uCycle(void *uArg)
 	for(cpu=0; cpu < A->P.CPU; cpu++) {
 		// Initial read of the Unhalted Core & Reference Cycles.
 		Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Core[cpu].Cycles.C0[0].UCC);
-		Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Core[cpu].Cycles.C0[0].URC );
+		Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Core[cpu].Cycles.C0[0].URC);
 		// Initial read of the TSC in relation to the Logical Core.
 		Read_MSR(A->P.Core[cpu].FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Core[cpu].Cycles.TSC[0]);
 		// Initial read of other C-States.
@@ -218,7 +218,7 @@ static void *uCycle(void *uArg)
 /* CRITICAL_IN  */
 		for(cpu=0; cpu < A->P.CPU; cpu++) {
 			// Update the Base Operating Ratio.
-			Read_MSR(A->P.Core[cpu].FD, IA32_PERF_STATUS, (PERF_STATUS *) &A->P.Core[cpu].Operating);
+			// Read_MSR(A->P.Core[cpu].FD, IA32_PERF_STATUS, (PERF_STATUS *) &A->P.Core[cpu].Operating);
 			// Update the Unhalted Core & the Reference Cycles.
 			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Core[cpu].Cycles.C0[1].UCC);
 			Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Core[cpu].Cycles.C0[1].URC);
@@ -231,39 +231,39 @@ static void *uCycle(void *uArg)
 /* CRITICAL_OUT */
 
 		// Reset C-States average.
-		A->P.Avg.C0=A->P.Avg.C3=A->P.Avg.C6=0;
+		A->P.Avg.Turbo=A->P.Avg.C0=A->P.Avg.C3=A->P.Avg.C6=0;
 
 		unsigned int maxFreq=0, maxTemp=A->P.Core[0].TjMax.Target;
 		for(cpu=0; cpu < A->P.CPU; cpu++) {
 			// Compute the Operating Frequency.
-			A->P.Core[cpu].OperatingFreq=A->P.Core[cpu].Operating.Ratio * A->P.ClockSpeed;
+			// A->P.Core[cpu].OperatingFreq=A->P.Core[cpu].Operating.Ratio * A->P.ClockSpeed;
 
-			// Compute the Delta of Unhalted (Core & Ref) C0 Cycles = Current[1] - Previous[0]
-			A->P.Core[cpu].Delta.C0.UCC=A->P.Core[cpu].Cycles.C0[1].UCC - A->P.Core[cpu].Cycles.C0[0].UCC;
-			A->P.Core[cpu].Delta.C0.URC=A->P.Core[cpu].Cycles.C0[1].URC - A->P.Core[cpu].Cycles.C0[0].URC;
-			A->P.Core[cpu].Delta.C3=A->P.Core[cpu].Cycles.C3[1] - A->P.Core[cpu].Cycles.C3[0];
-			A->P.Core[cpu].Delta.C6=A->P.Core[cpu].Cycles.C6[1] - A->P.Core[cpu].Cycles.C6[0];
-			A->P.Core[cpu].Delta.TSC=A->P.Core[cpu].Cycles.TSC[1] - A->P.Core[cpu].Cycles.TSC[0];
+			// Compute the absolute Delta of Unhalted (Core & Ref) C0 Cycles = Current[1] - Previous[0].
+			A->P.Core[cpu].Delta.C0.UCC=	(A->P.Core[cpu].Cycles.C0[0].UCC > A->P.Core[cpu].Cycles.C0[1].UCC) ?
+							 A->P.Core[cpu].Cycles.C0[0].UCC - A->P.Core[cpu].Cycles.C0[1].UCC
+							:A->P.Core[cpu].Cycles.C0[1].UCC - A->P.Core[cpu].Cycles.C0[0].UCC;
 
-			// Compute the Core Turbo Ratio per Cycles Delta. (Protect against a division by zero)
-			A->P.Core[cpu].TurboRatio=(double) (A->P.Core[cpu].Delta.C0.URC != 0) ?
+			A->P.Core[cpu].Delta.C0.URC=	A->P.Core[cpu].Cycles.C0[1].URC - A->P.Core[cpu].Cycles.C0[0].URC;
+
+			A->P.Core[cpu].Delta.C3=	A->P.Core[cpu].Cycles.C3[1] - A->P.Core[cpu].Cycles.C3[0];
+
+			A->P.Core[cpu].Delta.C6=	A->P.Core[cpu].Cycles.C6[1] - A->P.Core[cpu].Cycles.C6[0];
+
+			A->P.Core[cpu].Delta.TSC=	A->P.Core[cpu].Cycles.TSC[1] - A->P.Core[cpu].Cycles.TSC[0];
+
+			// Compute Turbo State per Cycles Delta. (Protect against a division by zero)
+			A->P.Core[cpu].State.Turbo=(double) (A->P.Core[cpu].Delta.C0.URC != 0) ?
 						  (double) (A->P.Core[cpu].Delta.C0.UCC) / (double) A->P.Core[cpu].Delta.C0.URC
 						 : 0.0f;
-
-			// Compute the Relative Core Ratio based on the Unhalted States divided by the TSC.
-			A->P.Core[cpu].RelativeRatio =  (A->P.Core[cpu].Delta.TSC != 0) ?
-							(double) (A->P.Core[cpu].Operating.Ratio * A->P.Core[cpu].Delta.C0.URC) / (double) A->P.Core[cpu].Delta.TSC
-						     :	(double) A->P.Core[cpu].Operating.Ratio;
-
-			A->P.Core[cpu].RelativeRatio+=A->P.Core[cpu].TurboRatio;
-
-			// Relative Frequency = Relative Ratio x Bus Clock Frequency
-			A->P.Core[cpu].RelativeFreq=A->P.Core[cpu].RelativeRatio * A->P.ClockSpeed;
-
 			// Compute C-States.
 			A->P.Core[cpu].State.C0=(double) (A->P.Core[cpu].Delta.C0.URC) / (double) (A->P.Core[cpu].Delta.TSC);
 			A->P.Core[cpu].State.C3=(double) (A->P.Core[cpu].Delta.C3)  / (double) (A->P.Core[cpu].Delta.TSC);
 			A->P.Core[cpu].State.C6=(double) (A->P.Core[cpu].Delta.C6)  / (double) (A->P.Core[cpu].Delta.TSC);
+
+			A->P.Core[cpu].RelativeRatio=A->P.Core[cpu].State.Turbo * A->P.Core[cpu].State.C0 * (double) A->P.Platform.MaxNonTurboRatio;
+
+			// Relative Frequency = Relative Ratio x Bus Clock Frequency
+			A->P.Core[cpu].RelativeFreq=A->P.Core[cpu].RelativeRatio * A->P.ClockSpeed;
 
 			// Save TSC.
 			A->P.Core[cpu].Cycles.TSC[0]=A->P.Core[cpu].Cycles.TSC[1];
@@ -275,13 +275,14 @@ static void *uCycle(void *uArg)
 			A->P.Core[cpu].Cycles.C6[0]=A->P.Core[cpu].Cycles.C6[1];
 
 			// Sum the C-States before the average.
+			A->P.Avg.Turbo+=A->P.Core[cpu].State.Turbo;
 			A->P.Avg.C0+=A->P.Core[cpu].State.C0;
 			A->P.Avg.C3+=A->P.Core[cpu].State.C3;
 			A->P.Avg.C6+=A->P.Core[cpu].State.C6;
 
 			// Index the Top CPU speed.
-			if(maxFreq < A->P.Core[cpu].Operating.Ratio) {
-				maxFreq=A->P.Core[cpu].Operating.Ratio;
+			if(maxFreq < A->P.Core[cpu].RelativeFreq) {
+				maxFreq=A->P.Core[cpu].RelativeFreq;
 				A->P.Top=cpu;
 			}
 
@@ -296,6 +297,7 @@ static void *uCycle(void *uArg)
 			}
 		}
 		// Average the C-States.
+		A->P.Avg.Turbo/=A->P.CPU;
 		A->P.Avg.C0/=A->P.CPU;
 		A->P.Avg.C3/=A->P.CPU;
 		A->P.Avg.C6/=A->P.CPU;
@@ -304,7 +306,7 @@ static void *uCycle(void *uArg)
 		if(pthread_mutex_trylock(&uDraw_mutex) == 0)
 			pthread_create(&A->TID_Draw, NULL, uDraw, A);
 	}
-	// Drawing is still processing ?
+	// Is drawing still processing ?
 	if(pthread_mutex_trylock(&uDraw_mutex) == EBUSY)
 		pthread_join(A->TID_Draw, NULL);
 
@@ -327,30 +329,7 @@ int	Read_SMBIOS(int structure, int instance, off_t offset, void *buf, size_t nby
 	return(rc);
 }
 
-/* Old fashion style to compute the processor frequency based on TSC.
-unsigned long long int FallBack_Freq()
-{
-	#define ELAPSED	100000
-	struct timezone tz;
-	struct timeval tvstart, tvstop;
-	unsigned long long int cycles[2];
-	unsigned int microseconds;
-
-	memset(&tz, 0, sizeof(tz));
-
-	gettimeofday(&tvstart, &tz);
-	cycles[0] = RDTSC();
-	gettimeofday(&tvstart, &tz);
-
-	usleep(ELAPSED);
-
-	cycles[1] = RDTSC();
-	gettimeofday(&tvstop, &tz);
-	microseconds = ( (tvstop.tv_sec - tvstart.tv_sec) * ELAPSED) + (tvstop.tv_usec - tvstart.tv_usec);
-
-	return( (cycles[1] - cycles[0]) / microseconds );
-}
-*/
+// Estimate the Bus Clock Frequency from the TSC.
 double	Compute_ExtClock()
 {
 	unsigned long long TSC[2];
@@ -423,6 +402,36 @@ void	CPUID(FEATURES *features)
 	);
 	__asm__ volatile
 	(
+		"movq	$0x6, %%rax;"
+		"cpuid;"
+		: "=a"	(features->Thermal_Power_Leaf.EAX),
+		  "=b"	(features->Thermal_Power_Leaf.EBX),
+		  "=c"	(features->Thermal_Power_Leaf.ECX),
+		  "=d"	(features->Thermal_Power_Leaf.EDX)
+	);
+	__asm__ volatile
+	(
+		"movq	$0x7, %%rax;"
+		"xorq	%%rbx, %%rbx;"
+		"xorq	%%rcx, %%rcx;"
+		"xorq	%%rdx, %%rdx;"
+		"cpuid;"
+		: "=a"	(features->ExtFeature.EAX),
+		  "=b"	(features->ExtFeature.EBX),
+		  "=c"	(features->ExtFeature.ECX),
+		  "=d"	(features->ExtFeature.EDX)
+	);
+	__asm__ volatile
+	(
+		"movq	$0xa, %%rax;"
+		"cpuid;"
+		: "=a"	(features->Perf_Monitoring_Leaf.EAX),
+		  "=b"	(features->Perf_Monitoring_Leaf.EBX),
+		  "=c"	(features->Perf_Monitoring_Leaf.ECX),
+		  "=d"	(features->Perf_Monitoring_Leaf.EDX)
+	);
+	__asm__ volatile
+	(
 		"movq	$0x80000000, %%rax;"
 		"cpuid;"
 		: "=a"	(features->LargestExtFunc)
@@ -433,8 +442,8 @@ void	CPUID(FEATURES *features)
 		(
 			"movq	$0x80000001, %%rax;"
 			"cpuid;"
-			: "=c"	(features->Ext.ECX),
-			  "=d"	(features->Ext.EDX)
+			: "=c"	(features->ExtFunc.ECX),
+			  "=d"	(features->ExtFunc.EDX)
 		);
 		struct
 		{
@@ -526,6 +535,18 @@ void IMC_Free_Info(struct IMCINFO *imc)
 }
 
 // Draw buttons.
+
+void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
+{
+//	XSetForeground(A->display, A->W[G].gc, (A->L.Play.flashPulse=!A->L.Play.flashPulse) ? PULSE_COLOR : A->W[G].background);
+	XDrawArc(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
+		wButton->x,
+		wButton->y,
+		wButton->w,
+		wButton->h,
+		0, 360 << 8);
+}
+
 void	DrawScrollingButton(uARG *A, WBUTTON *wButton)
 {
 	switch(wButton->ID) {
@@ -597,8 +618,9 @@ void	DrawIconButton(uARG *A, WBUTTON *wButton)
 }
 
 // CallBack functions definition.
-void	ButtonCallBack(uARG *A, WBUTTON *wButton) ;
-void	RestoreWidgetCallBack(uARG *A, WBUTTON *wButton) ;
+void	CallBackButton(uARG *A, WBUTTON *wButton) ;
+void	CallBackMinimizeWidget(uARG *A, WBUTTON *wButton) ;
+void	CallBackRestoreWidget(uARG *A, WBUTTON *wButton) ;
 
 // Create a button with callback, drawing & collision functions.
 void	CreateButton(uARG *A, WBTYPE Type, char ID, int Target, int x, int y, unsigned int w, unsigned h, void *CallBack, RESOURCE *Resource)
@@ -616,7 +638,13 @@ void	CreateButton(uARG *A, WBTYPE Type, char ID, int Target, int x, int y, unsig
 	NewButton->CallBack=CallBack;
 	int G=NewButton->Target=Target;
 
-	switch(NewButton->Type) {
+	switch(NewButton->Type)
+	{
+		case DECORATION: {
+			NewButton->Resource.Bitmap=NULL;
+			NewButton->DrawFunc=DrawDecorationButton;
+		}
+			break;
 		case SCROLLING: {
 			NewButton->Resource.Bitmap=NULL;
 			NewButton->DrawFunc=DrawScrollingButton;
@@ -665,6 +693,7 @@ void	DestroyButton(uARG *A, int G, char ID)
 					if(cButton->Resource.Text != NULL)
 						free(cButton->Resource.Text);
 					break;
+				case DECORATION:
 				case SCROLLING:
 				case ICON:
 					break;
@@ -687,6 +716,7 @@ void	DestroyAllButtons(uARG *A, int G)
 			case TEXT:
 				if(wButton->Resource.Text != NULL)
 					free(wButton->Resource.Text);
+			case DECORATION:
 			case SCROLLING:
 			case ICON:
 				break;
@@ -720,13 +750,14 @@ void	WidgetButtonPress(uARG *A, int G, XEvent *E)
 				break;
 			}
 	}
-
+	// Search which button is pressed.
 	WBUTTON *wButton=NULL;
 	for(wButton=A->W[T].wButton[HEAD]; wButton != NULL; wButton=wButton->Chain)
 		if((x > wButton->x + xOffset)
 		&& (y > wButton->y + yOffset)
 		&& (x < wButton->x + xOffset + wButton->w)
 		&& (y < wButton->y + yOffset + wButton->h)) {
+			// Execute its callback.
 			wButton->CallBack(A, wButton);
 			break;
 		}
@@ -826,15 +857,15 @@ void	IconifyWidget(uARG *A, int G, XEvent *E)
 		case UnmapNotify: {
 			RESOURCE Resource[WIDGETS]={{Label:'M'}, {Label:'C'}, {Label:'S'}, {Label:'T'}, {Label:'I'}, {Label:'D'}};
 
-			int 	length=Twice_Char_Width(MAIN),
+			int 	length=One_Half_Char_Width(MAIN) + Quarter_Char_Width(MAIN),
 				spacing=Header_Height(MAIN) + (G * One_Half_Char_Height(MAIN));
 
 			CreateButton(	A, ICON, (ID_NULL + G), G,
-					A->W[MAIN].width - Quarter_Char_Width(MAIN) - length,
+					A->W[MAIN].width - Half_Char_Width(MAIN) - length,
 					spacing,
 					length,
 					One_Char_Height(MAIN),
-					RestoreWidgetCallBack,
+					CallBackRestoreWidget,
 					&Resource[G]);
 		}
 			break;
@@ -843,6 +874,21 @@ void	IconifyWidget(uARG *A, int G, XEvent *E)
 		}
 			break;
 	}
+}
+
+void	MinimizeWidget(uARG *A, int G)
+{
+	if(_IS_MDI_) {
+		if(G != MAIN)
+			XUnmapWindow(A->display, A->W[G].window);
+	}
+	else
+		XIconifyWindow(A->display, A->W[G].window, DefaultScreen(A->display));
+}
+
+void	RestoreWidget(uARG *A, int G)
+{
+	XMapWindow(A->display, A->W[G].window);
 }
 
 // Create the X-Window Widget.
@@ -946,6 +992,14 @@ int	OpenWidgets(uARG *A)
 								A->W[G].y=0;
 							}
 							else {
+								CreateButton(	A, DECORATION, ID_MIN, G,
+										A->W[G].width - Twice_Char_Width(G),
+										A->W[G].height - Twice_Char_Width(G),
+										One_Char_Width(G),
+										One_Char_Width(G),
+										CallBackMinimizeWidget,
+										NULL);
+
 								unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
 
 								CreateButton(	A, SCROLLING, ID_NORTH, G,
@@ -953,7 +1007,7 @@ int	OpenWidgets(uARG *A)
 										Header_Height(G) + 2,
 										square,
 										square,
-										ButtonCallBack,
+										CallBackButton,
 										NULL);
 
 								CreateButton(	A, SCROLLING, ID_SOUTH, G,
@@ -961,7 +1015,7 @@ int	OpenWidgets(uARG *A)
 										A->W[G].height - (Footer_Height(G) + square + 2),
 										square,
 										square,
-										ButtonCallBack,
+										CallBackButton,
 										NULL);
 
 								CreateButton(	A, SCROLLING, ID_EAST, G,
@@ -970,7 +1024,7 @@ int	OpenWidgets(uARG *A)
 										A->W[G].height - (square + 2),
 										square,
 										square,
-										ButtonCallBack,
+										CallBackButton,
 										NULL);
 
 								CreateButton(	A, SCROLLING, ID_WEST, G,
@@ -980,7 +1034,7 @@ int	OpenWidgets(uARG *A)
 										A->W[G].height - (square + 2),
 										square,
 										square,
-										ButtonCallBack,
+										CallBackButton,
 										NULL);
 							}
 						}
@@ -1018,6 +1072,14 @@ int	OpenWidgets(uARG *A)
 							A->L.Axes[G].Segment[i].y2=A->L.Axes[G].Segment[i].y1;
 							A->W[G].height+=Footer_Height(G);
 
+							CreateButton(	A, DECORATION, ID_MIN, G,
+									A->W[G].width - Twice_Char_Width(G),
+									A->W[G].height - Twice_Char_Width(G),
+									One_Char_Width(G),
+									One_Char_Width(G),
+									CallBackMinimizeWidget,
+									NULL);
+
 							struct {
 								char		ID;
 								RESOURCE 	RSC;
@@ -1034,7 +1096,7 @@ int	OpenWidgets(uARG *A)
 											A->W[G].height - Footer_Height(G) + 2,
 											One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
 											One_Char_Height(G),
-											ButtonCallBack,
+											CallBackButton,
 											&Loader[i].RSC);
 						}
 							break;
@@ -1077,6 +1139,14 @@ int	OpenWidgets(uARG *A)
 							A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y2=A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y1;
 							A->W[G].height+=Footer_Height(G);
 
+							CreateButton(	A, DECORATION, ID_MIN, G,
+									A->W[G].width - Twice_Char_Width(G),
+									A->W[G].height - Twice_Char_Width(G),
+									One_Char_Width(G),
+									One_Char_Width(G),
+									CallBackMinimizeWidget,
+									NULL);
+
 							struct {
 								char		ID;
 								RESOURCE 	RSC;
@@ -1091,7 +1161,7 @@ int	OpenWidgets(uARG *A)
 										A->W[G].height - Footer_Height(G) + 2,
 										One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
 										One_Char_Height(G),
-										ButtonCallBack,
+										CallBackButton,
 										&Loader[i].RSC);
 						}
 							break;
@@ -1134,6 +1204,14 @@ int	OpenWidgets(uARG *A)
 							A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y2=A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y1;
 							A->W[G].height+=Footer_Height(G);
 
+							CreateButton(	A, DECORATION, ID_MIN, G,
+									A->W[G].width - Twice_Char_Width(G),
+									A->W[G].height - Twice_Char_Width(G),
+									One_Char_Width(G),
+									One_Char_Width(G),
+									CallBackMinimizeWidget,
+									NULL);
+
 							struct {
 								char		ID;
 								RESOURCE 	RSC;
@@ -1147,7 +1225,7 @@ int	OpenWidgets(uARG *A)
 											A->W[G].height - Footer_Height(G) + 2,
 											One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
 											One_Char_Height(G),
-											ButtonCallBack,
+											CallBackButton,
 											&Loader[i].RSC);
 						}
 							break;
@@ -1178,6 +1256,14 @@ int	OpenWidgets(uARG *A)
 							A->L.Axes[G].Segment[1].y2=A->L.Axes[G].Segment[1].y1;
 							A->W[G].height+=Footer_Height(G);
 
+							CreateButton(	A, DECORATION, ID_MIN, G,
+									A->W[G].width - Twice_Char_Width(G),
+									A->W[G].height - Twice_Char_Width(G),
+									One_Char_Width(G),
+									One_Char_Width(G),
+									CallBackMinimizeWidget,
+									NULL);
+
 							unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
 
 							CreateButton(	A, SCROLLING, ID_NORTH, G,
@@ -1185,7 +1271,7 @@ int	OpenWidgets(uARG *A)
 									Header_Height(G) + 2,
 									square,
 									square,
-									ButtonCallBack,
+									CallBackButton,
 									NULL);
 
 							CreateButton(	A, SCROLLING, ID_SOUTH, G,
@@ -1193,7 +1279,7 @@ int	OpenWidgets(uARG *A)
 									A->W[G].height - (Footer_Height(G) + square + 2),
 									square,
 									square,
-									ButtonCallBack,
+									CallBackButton,
 									NULL);
 
 							CreateButton(	A, SCROLLING, ID_EAST, G,
@@ -1202,7 +1288,7 @@ int	OpenWidgets(uARG *A)
 									A->W[G].height - (square + 2),
 									square,
 									square,
-									ButtonCallBack,
+									CallBackButton,
 									NULL);
 
 							CreateButton(	A, SCROLLING, ID_WEST, G,
@@ -1210,7 +1296,7 @@ int	OpenWidgets(uARG *A)
 									A->W[G].height - (square + 2),
 									square,
 									square,
-									ButtonCallBack,
+									CallBackButton,
 									NULL);
 						}
 							break;
@@ -1241,6 +1327,14 @@ int	OpenWidgets(uARG *A)
 							A->L.Axes[G].Segment[1].y2=A->L.Axes[G].Segment[1].y1;
 							A->W[G].height+=Footer_Height(G);
 
+							CreateButton(	A, DECORATION, ID_MIN, G,
+									A->W[G].width - Twice_Char_Width(G),
+									A->W[G].height - Twice_Char_Width(G),
+									One_Char_Width(G),
+									One_Char_Width(G),
+									CallBackMinimizeWidget,
+									NULL);
+
 							unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
 
 							CreateButton(	A, SCROLLING, ID_NORTH, G,
@@ -1248,7 +1342,7 @@ int	OpenWidgets(uARG *A)
 									Header_Height(G) + 2,
 									square,
 									square,
-									ButtonCallBack,
+									CallBackButton,
 									NULL);
 
 							CreateButton(	A, SCROLLING, ID_SOUTH, G,
@@ -1256,7 +1350,7 @@ int	OpenWidgets(uARG *A)
 									A->W[G].height - (Footer_Height(G) + square + 2),
 									square,
 									square,
-									ButtonCallBack,
+									CallBackButton,
 									NULL);
 
 							CreateButton(	A, SCROLLING, ID_EAST, G,
@@ -1265,7 +1359,7 @@ int	OpenWidgets(uARG *A)
 									A->W[G].height - (square + 2),
 									square,
 									square,
-									ButtonCallBack,
+									CallBackButton,
 									NULL);
 
 							CreateButton(	A, SCROLLING, ID_WEST, G,
@@ -1273,7 +1367,7 @@ int	OpenWidgets(uARG *A)
 									A->W[G].height - (square + 2),
 									square,
 									square,
-									ButtonCallBack,
+									CallBackButton,
 									NULL);
 
 							struct {
@@ -1290,7 +1384,7 @@ int	OpenWidgets(uARG *A)
 										A->W[G].height - Footer_Height(G) + 2,
 										One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
 										One_Char_Height(G),
-										ButtonCallBack,
+										CallBackButton,
 										&Loader[i].RSC);
 						}
 							break;
@@ -1313,7 +1407,7 @@ int	OpenWidgets(uARG *A)
 					Header_Height(MAIN) + 2,
 					square,
 					square,
-					ButtonCallBack,
+					CallBackButton,
 					NULL);
 
 			CreateButton(	A, SCROLLING, ID_SOUTH, MAIN,
@@ -1321,7 +1415,7 @@ int	OpenWidgets(uARG *A)
 					A->L.Axes[MAIN].Segment[1].y2 - (square + 2),
 					square,
 					square,
-					ButtonCallBack,
+					CallBackButton,
 					NULL);
 
 			CreateButton(	A, SCROLLING, ID_EAST, MAIN,
@@ -1330,7 +1424,7 @@ int	OpenWidgets(uARG *A)
 					A->L.Axes[MAIN].Segment[1].y2 + 2,
 					square,
 					square,
-					ButtonCallBack,
+					CallBackButton,
 					NULL);
 
 			CreateButton(	A, SCROLLING, ID_WEST, MAIN,
@@ -1341,7 +1435,7 @@ int	OpenWidgets(uARG *A)
 					A->L.Axes[MAIN].Segment[1].y2 + 2,
 					square,
 					square,
-					ButtonCallBack,
+					CallBackButton,
 					NULL);
 		}
 		for(G=0; noerr && (G < WIDGETS); G++)
@@ -1480,18 +1574,21 @@ void	BuildLayout(uARG *A, int G)
 					One_Char_Width(G) * ((5 + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					"5", 1);
+			XSetForeground(A->display, A->W[G].gc, LOW_VALUE_COLOR);
 			XDrawString(	A->display,
 					A->W[G].pixmap.B,
 					A->W[G].gc,
 					One_Char_Width(G) * ((A->P.Platform.MinimumRatio + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					&A->P.Bump[0], 2);
+			XSetForeground(A->display, A->W[G].gc, MED_VALUE_COLOR);
 			XDrawString(	A->display,
 					A->W[G].pixmap.B,
 					A->W[G].gc,
 					One_Char_Width(G) * ((A->P.Platform.MaxNonTurboRatio + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					&A->P.Bump[2], 2);
+			XSetForeground(A->display, A->W[G].gc, HIGH_VALUE_COLOR);
 			XDrawString(	A->display,
 					A->W[G].pixmap.B,
 					A->W[G].gc,
@@ -1616,7 +1713,7 @@ void	BuildLayout(uARG *A, int G)
 					powered[A->P.Features.Std.EDX.PAT],
 					powered[A->P.Features.Std.EDX.PSE36],
 					powered[A->P.Features.Std.EDX.PSN],
-					powered[A->P.Features.Std.EDX.DS],
+					powered[A->P.Features.Std.EDX.DS_PEBS],			enabled[!A->P.MiscFeatures.PEBS],
 					powered[A->P.Features.Std.EDX.ACPI],
 					powered[A->P.Features.Std.EDX.SS],
 					powered[A->P.Features.Std.EDX.HTT],
@@ -1627,10 +1724,10 @@ void	BuildLayout(uARG *A, int G)
 					powered[A->P.Features.Std.ECX.DS_CPL],
 					powered[A->P.Features.Std.ECX.VMX],
 					powered[A->P.Features.Std.ECX.SMX],
-					powered[A->P.Features.Std.ECX.EIST],	enabled[A->P.MiscFeatures.EIST],
+					powered[A->P.Features.Std.ECX.EIST],			enabled[A->P.MiscFeatures.EIST],
 					powered[A->P.Features.Std.ECX.CNXT_ID],
 					powered[A->P.Features.Std.ECX.FMA],
-					powered[A->P.Features.Std.ECX.xTPR],	enabled[!A->P.MiscFeatures.xTPR],
+					powered[A->P.Features.Std.ECX.xTPR],			enabled[!A->P.MiscFeatures.xTPR],
 					powered[A->P.Features.Std.ECX.PDCM],
 					powered[A->P.Features.Std.ECX.PCID],
 					powered[A->P.Features.Std.ECX.DCA],
@@ -1638,15 +1735,14 @@ void	BuildLayout(uARG *A, int G)
 					powered[A->P.Features.Std.ECX.TSCDEAD],
 					powered[A->P.Features.Std.ECX.XSAVE],
 					powered[A->P.Features.Std.ECX.OSXSAVE],
-					powered[A->P.Features.Ext.EDX.XD_Bit],	enabled[!A->P.MiscFeatures.XD_Bit],
-					powered[A->P.Features.Ext.EDX.PG_1GB],
-										enabled[A->P.MiscFeatures.FastStrings],
-										enabled[A->P.MiscFeatures.TCC],
-										enabled[A->P.MiscFeatures.PerfMonitoring],
-										enabled[!A->P.MiscFeatures.BTS],
-										enabled[!A->P.MiscFeatures.PEBS],
-										enabled[A->P.MiscFeatures.CPUID_MaxVal],
-										enabled[!A->P.MiscFeatures.Turbo],
+					powered[A->P.Features.ExtFunc.EDX.XD_Bit],		enabled[!A->P.MiscFeatures.XD_Bit],
+					powered[A->P.Features.ExtFunc.EDX.PG_1GB],
+					powered[A->P.Features.ExtFeature.EBX.FastStrings],	enabled[A->P.MiscFeatures.FastStrings],
+												enabled[A->P.MiscFeatures.TCC],
+												enabled[A->P.MiscFeatures.PerfMonitoring],
+												enabled[!A->P.MiscFeatures.BTS],
+												enabled[A->P.MiscFeatures.CPUID_MaxVal],
+					powered[A->P.Features.Thermal_Power_Leaf.EAX.Turbo],	enabled[!A->P.MiscFeatures.Turbo],
 					powered[A->P.Features.Std.EDX.FPU],
 					powered[A->P.Features.Std.EDX.CX8],
 					powered[A->P.Features.Std.EDX.SEP],
@@ -1661,7 +1757,7 @@ void	BuildLayout(uARG *A, int G)
 					powered[A->P.Features.Std.ECX.SSE41],
 					powered[A->P.Features.Std.ECX.SSE42],
 					powered[A->P.Features.Std.ECX.PCLMULDQ],
-					powered[A->P.Features.Std.ECX.MONITOR],	enabled[A->P.MiscFeatures.FSM],
+					powered[A->P.Features.Std.ECX.MONITOR],			enabled[A->P.MiscFeatures.FSM],
 					powered[A->P.Features.Std.ECX.CX16],
 					powered[A->P.Features.Std.ECX.MOVBE],
 					powered[A->P.Features.Std.ECX.POPCNT],
@@ -1669,10 +1765,10 @@ void	BuildLayout(uARG *A, int G)
 					powered[A->P.Features.Std.ECX.AVX],
 					powered[A->P.Features.Std.ECX.F16C],
 					powered[A->P.Features.Std.ECX.RDRAND],
-					powered[A->P.Features.Ext.ECX.LAHFSAHF],
-					powered[A->P.Features.Ext.EDX.SYSCALL],
-					powered[A->P.Features.Ext.EDX.RDTSCP],
-					powered[A->P.Features.Ext.EDX.IA64] );
+					powered[A->P.Features.ExtFunc.ECX.LAHFSAHF],
+					powered[A->P.Features.ExtFunc.EDX.SYSCALL],
+					powered[A->P.Features.ExtFunc.EDX.RDTSCP],
+					powered[A->P.Features.ExtFunc.EDX.IA64] );
 
 			strcat(items, RAM_SECTION);
 			strcat(items, CHA_FORMAT);
@@ -1775,18 +1871,6 @@ void	FlushLayout(uARG *A, int G)
 	XFlush(A->display);
 }
 
-// An activity pulse blinks during the calculation (red) or when in pause (yellow).
-void	DrawPulse(uARG *A, int G)
-{
-	XSetForeground(A->display, A->W[G].gc, (A->L.Play.flashPulse=!A->L.Play.flashPulse) ? PULSE_COLOR : A->W[G].background);
-	XDrawArc(A->display, A->W[G].pixmap.F, A->W[G].gc,
-		A->W[G].width - (Twice_Char_Width(G) << 1),
-		Header_Height(G) >> 2,
-		One_Char_Width(G),
-		One_Char_Width(G),
-		0, 360 << 8);
-}
-
 // Scroll the Wallboard.
 void	DrawWB(uARG *A, int G)
 {
@@ -1828,8 +1912,6 @@ void	DrawLayout(uARG *A, int G)
 					};
 			DrawCursor(A, G, &Origin);
 
-			if(A->L.Play.flashActivity)
-				DrawPulse(A, G);
 		}
 			break;
 		case CORES:
@@ -1866,9 +1948,10 @@ void	DrawLayout(uARG *A, int G)
 							One_Char_Height(G) * (cpu + 1 + 1),
 							str, strlen(str) );
 				}
+
+				XSetForeground(A->display, A->W[G].gc, DYNAMIC_COLOR);
 				if(A->L.Play.cycleValues) {
-					XSetForeground(A->display, A->W[G].gc, DYNAMIC_COLOR);
-					sprintf(str, CORE_CYCLES,
+					sprintf(str, CORE_DELTA,
 							A->P.Core[cpu].Delta.C0.UCC >> A->P.IdleTime,
 							A->P.Core[cpu].Delta.C0.URC >> A->P.IdleTime,
 							A->P.Core[cpu].Delta.C3 >> A->P.IdleTime,
@@ -1879,9 +1962,18 @@ void	DrawLayout(uARG *A, int G)
 							One_Char_Height(G) * (cpu + 1 + 1),
 							str, strlen(str) );
 				}
+				else if(!A->L.Play.ratioValues) {
+					sprintf(str, CORE_CYCLES,
+							A->P.Core[cpu].Cycles.C0[1].UCC,
+							A->P.Core[cpu].Cycles.C0[1].URC);
+					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+							One_Char_Width(G) * 13,
+							One_Char_Height(G) * (cpu + 1 + 1),
+							str, strlen(str) );
+				}
+
 				if(A->L.Play.ratioValues) {
-					XSetForeground(A->display, A->W[G].gc, DYNAMIC_COLOR);
-					sprintf(str, CORE_RATIO, A->P.Core[cpu].RelativeRatio );
+					sprintf(str, CORE_RATIO, A->P.Core[cpu].RelativeRatio);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							Twice_Char_Width(G) * A->P.Turbo.MaxRatio_1C,
 							One_Char_Height(G) * (cpu + 1 + 1),
@@ -1921,9 +2013,10 @@ void	DrawLayout(uARG *A, int G)
 							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->P.Core[cpu].State.C6;
 			}
 			// Display the C-State averages.
-			sprintf(str, CSTATES_PERCENT,	100 * A->P.Avg.C0,
-							100 * A->P.Avg.C3,
-							100 * A->P.Avg.C6);
+			sprintf(str, CSTATES_PERCENT,	100.f * A->P.Avg.Turbo,
+							100.f * A->P.Avg.C0,
+							100.f * A->P.Avg.C3,
+							100.f * A->P.Avg.C6);
 			XDrawString(A->display, A->W[G].pixmap.F, A->W[G].gc,
 						Twice_Char_Width(G),
 						One_Char_Height(G) + (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT + 1)),
@@ -1947,9 +2040,10 @@ void	DrawLayout(uARG *A, int G)
 							str, strlen(str) );
 
 					XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
-					sprintf(str, CSTATES_PERCENT,	100 * A->P.Core[cpu].State.C0,
-									100 * A->P.Core[cpu].State.C3,
-									100 * A->P.Core[cpu].State.C6);
+					sprintf(str, CSTATES_PERCENT,	100.f * A->P.Core[cpu].State.Turbo,
+									100.f * A->P.Core[cpu].State.C0,
+									100.f * A->P.Core[cpu].State.C3,
+									100.f * A->P.Core[cpu].State.C6);
 
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							Twice_Half_Char_Width(G),
@@ -2098,22 +2192,22 @@ void	UpdateTitle(uARG *A, int G)
 	switch(G) {
 		case MAIN:
 		case DUMP:
-			sprintf(str, "X-Freq %s.%s-%s",
+			sprintf(str, TITLE_MAIN_FMT,
 				_MAJOR, _MINOR, _NIGHTLY);
 			break;
 		case CORES:
-			sprintf(str, "Core#%d @ %4.0fMHz",
+			sprintf(str, TITLE_CORES_FMT,
 				A->P.Top, A->P.Core[A->P.Top].RelativeFreq);
 			break;
 		case CSTATES:
-			sprintf(str, "C-States [%.2f%%] [%.2f%%]", 100 * A->P.Avg.C0, 100 * (A->P.Avg.C3 + A->P.Avg.C6));
+			sprintf(str, TITLE_CSTATES_FMT, 100 * A->P.Avg.C0, 100 * (A->P.Avg.C3 + A->P.Avg.C6));
 			break;
 		case TEMPS:
-			sprintf(str, "Core#%d @ %dC",
+			sprintf(str, TITLE_TEMPS_FMT,
 				A->P.Top, A->P.Core[A->P.Hot].TjMax.Target - A->P.Core[A->P.Hot].ThermStat.DTS);
 			break;
 		case SYSINFO:
-			sprintf(str, "Clock @ %fMHz",
+			sprintf(str, TITLE_SYSINFO_FMT,
 				A->P.ClockSpeed);
 			break;
 	}
@@ -2203,14 +2297,23 @@ void	Play(uARG *A, int G, char ID)
 	}
 }
 
-void	ButtonCallBack(uARG *A, WBUTTON *wButton)
+void	CallBackButton(uARG *A, WBUTTON *wButton)
 {
+	// Flash the selected button.
+	XSetForeground(A->display, A->W[wButton->Target].gc, FOCUS_COLOR);
+	XDrawRectangle(A->display, A->W[wButton->Target].window, A->W[wButton->Target].gc, wButton->x, wButton->y, wButton->w, wButton->h);
+	// Update associated values.
 	Play(A, wButton->Target, wButton->ID);
 }
 
-void	RestoreWidgetCallBack(uARG *A, WBUTTON *wButton)
+void	CallBackMinimizeWidget(uARG *A, WBUTTON *wButton)
 {
-	XMapWindow(A->display, A->W[wButton->Target].window);
+	MinimizeWidget(A, wButton->Target);
+}
+
+void	CallBackRestoreWidget(uARG *A, WBUTTON *wButton)
+{
+	RestoreWidget(A, wButton->Target);
 }
 
 // Instructions set.
@@ -2342,11 +2445,6 @@ static void *uLoop(uARG *A)
 							A->L.Play.alwaysOnTop=false;
 						}
 						break;
-					case XK_a:
-					case XK_A:
-						if(E.xkey.state & ControlMask)
-							A->L.Play.flashActivity=!A->L.Play.flashActivity;
-						break;
 					case XK_c:
 					case XK_C:
 						if(E.xkey.state & ControlMask)
@@ -2458,17 +2556,11 @@ static void *uLoop(uARG *A)
 						XGetWindowAttributes(A->display, A->W[T].window, &xwa);
 						// Hide or unhide the Widget.
 						switch(xwa.map_state) {
-							case IsViewable: {
-								if(_IS_MDI_) {
-									if(T != MAIN)
-										XUnmapWindow(A->display, A->W[T].window);
-								}
-								else
-									XIconifyWindow(A->display, A->W[T].window, DefaultScreen(A->display));
-							}
+							case IsViewable:
+								MinimizeWidget(A, T);
 								break;
 							case IsUnmapped:
-								XMapWindow(A->display, A->W[T].window);
+								RestoreWidget(A, T);
 								break;
 						}
 					}
@@ -2566,7 +2658,7 @@ static void *uLoop(uARG *A)
 int	Args(uARG *A, int argc, char *argv[])
 {
 	OPTION	options[] = {
-				{"-D", "%lx",&A->MDI,                  "Enable MDI Window (0/1)"      },
+				{"-D", "%d", &A->MDI,                  "Enable MDI Window (0/1)"      },
 				{"-F", "%s", A->fontName,              "Font name"                    },
 				{"-x", "%d", &A->L.Margin.H,           "Left position"                },
 				{"-y", "%d", &A->L.Margin.V,           "Top position"                 },
@@ -2574,7 +2666,6 @@ int	Args(uARG *A, int argc, char *argv[])
 				{"-f", "%x", &A->L.globalForeground,   "Foreground color"             },
 				{"-c", "%ud",&A->P.PerCore,            "Monitor per Thread/Core (0/1)"},
 				{"-s", "%ld",&A->P.IdleTime,           "Idle time (usec) where 2^N"   },
-				{"-a", "%ud",&A->L.Play.flashActivity, "Pulse activity (0/1)"         },
 				{"-h", "%ud",&A->L.Play.freqHertz,     "CPU frequency (0/1)"          },
 				{"-l", "%ud",&A->L.Play.cycleValues,   "Cycle Values (0/1)"           },
 				{"-r", "%ud",&A->L.Play.ratioValues,   "Ratio Values (0/1)"           },
@@ -2857,13 +2948,11 @@ int main(int argc, char *argv[])
 					},
 				},
 				Play: {
-					flashActivity:false,
 					freqHertz:true,
 					cycleValues:false,
-					ratioValues:false,
+					ratioValues:true,
 					cStatePercent:false,
 					alwaysOnTop: false,
-					flashPulse:false,
 					wallboard:false,
 					flashCursor:true,
 				},
@@ -2879,7 +2968,7 @@ int main(int argc, char *argv[])
 					{"IA32_THERM_INTERRUPT", IA32_THERM_INTERRUPT},
 					{"IA32_THERM_STATUS", IA32_THERM_STATUS},
 					{"IA32_MISC_ENABLE", IA32_MISC_ENABLE},
-					{"IA32_ENERGY_PERF_BIAS", IA32_ENERGY_PERF_BIAS},
+					{"IA32_FIXED_CTR1", IA32_FIXED_CTR1},
 					{"IA32_FIXED_CTR_CTRL", IA32_FIXED_CTR_CTRL},
 					{"IA32_PERF_GLOBAL_CTRL", IA32_PERF_GLOBAL_CTRL},
 					{"MSR_PLATFORM_INFO", MSR_PLATFORM_INFO},

@@ -33,8 +33,6 @@
  *
  * + procstat
  *
- * + live CD
- *
  * + scripting, alarm
  *
  *  Graphical
@@ -59,10 +57,35 @@
  *
  *   Issues
  * ----------
- * + Turbo ratios now show up : can be enhanced.
+ * + Turbo ratios now show up : must be enhanced with 48 bits overflow tests.
+ *
+ * + The live CD is too big (up to 500 MB).
  *
  *
  * [HISTORY]
+ *
+ * R 0.17 : 02/22 2014 SR-5
+ *        - Clean up some code.
+ *        - Added to System Info Widget the CPUID functions :
+ *            leaf (0x6) Digital Thermal Sensor & Power Management
+ *            leaf (0x7) Extended Feature Flags
+ *            leaf (0xa) Performance Monitoring
+ *
+ * R 0.17 : 02/20 2014 SR-4
+ *        - Display Ratio formula :
+ *
+ *            DisplayRatio=TurboRatio x State(C0) * MaxNonTurboRatio
+ *              where
+ *                  TurboRatio=Delta(UCC) / Delta(URC)
+ *              and State(C0)=Delta(URC) / Delta(TSC)
+ *              and MaxNonTurboRatio=MSR_PLATFORM_INFO[15-8]
+ *
+ * R 0.17 : 02/18 2014 SR-3
+ *        - In Cycles calculation, test for 64 bits overflow.
+ *
+ * R 0.17 : 02/16 2014 SR-2
+ *        - Added Decoration buttons.
+ *        - Highlight button when clicked.
  *
  * R 0.17 : 02/15 2014 SR-1
  *        - Corrected the Turbo ratio calculation.
