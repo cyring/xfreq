@@ -1,13 +1,13 @@
 /*
- * XFreq.c #0.17 SR5 by CyrIng
+ * XFreq.c #0.18 SR3 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
 #define _MAJOR   "0"
-#define _MINOR   "17"
-#define _NIGHTLY "4"
+#define _MINOR   "18"
+#define _NIGHTLY "3"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__
 static  char    version[] = AutoDate;
 
@@ -15,6 +15,7 @@ static  char    version[] = AutoDate;
 #include <X11/Xutil.h>
 #include <X11/Xos.h>
 #include <X11/Xatom.h>
+#include <X11/cursorfont.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/io.h>
@@ -117,7 +118,7 @@ int	Open_MSR(uARG *A)
 		A->P.Turbo.MaxRatio_7C=30;
 		A->P.Turbo.MaxRatio_8C=25;
 	}
-	char	pathname[]="/dev/cpu/999/msr";
+	char	pathname[]="/dev/cpu/999/msr", warning[64];
 	int	cpu=0;
 	for(cpu=0; cpu < A->P.CPU; cpu++) {
 		sprintf(pathname, "/dev/cpu/%d/msr", cpu);
@@ -125,9 +126,18 @@ int	Open_MSR(uARG *A)
 			// Enable the Performance Counters 1 and 2 :
 			// - Set the global counter bits
 			rc=((retval=Read_MSR(A->P.Core[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Core[cpu].GlobalPerfCounter)) != -1);
+			if(A->P.Core[cpu].GlobalPerfCounter.EN_FIXED_CTR1 != 0) {
+				sprintf(warning, "Warning CPU#%02d: Fixed Counter #1 is already activated.\n", cpu);
+				Output(A, warning);
+			}
+			if(A->P.Core[cpu].GlobalPerfCounter.EN_FIXED_CTR2 != 0) {
+				sprintf(warning, "Warning CPU#%02d: Fixed Counter #2 is already activated.\n", cpu);
+				Output(A, warning);
+			}
 			A->P.Core[cpu].GlobalPerfCounter.EN_FIXED_CTR1=1;
 			A->P.Core[cpu].GlobalPerfCounter.EN_FIXED_CTR2=1;
 			rc=((retval=Write_MSR(A->P.Core[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Core[cpu].GlobalPerfCounter)) != -1);
+
 			// - Set the fixed counter bits
 			rc=((retval=Read_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Core[cpu].FixedPerfCounter)) != -1);
 			A->P.Core[cpu].FixedPerfCounter.EN1_OS=1;
@@ -143,14 +153,39 @@ int	Open_MSR(uARG *A)
 				A->P.Core[cpu].FixedPerfCounter.AnyThread_EN2=0;
 			}
 			rc=((retval=Write_MSR(A->P.Core[cpu].FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Core[cpu].FixedPerfCounter)) != -1);
+
+			// Check & fixe Counter Overflow.
+			GLOBAL_PERF_STATUS Overflow={0};
+			GLOBAL_PERF_OVF_CTRL OvfControl={0};
+			rc=((retval=Read_MSR(A->P.Core[cpu].FD, IA32_PERF_GLOBAL_STATUS, (GLOBAL_PERF_STATUS *) &Overflow)) != -1);
+			if(Overflow.Overflow_CTR1) {
+				sprintf(warning, "Notice CPU#%02d: UCC Counter #1 is overflowed.\n", cpu);
+				Output(A, warning);
+				OvfControl.Clear_Ovf_CTR1=1;
+			}
+			if(Overflow.Overflow_CTR2) {
+				sprintf(warning, "Notice CPU#%02d: URC Counter #1 is overflowed.\n", cpu);
+				Output(A, warning);
+				OvfControl.Clear_Ovf_CTR2=1;
+			}
+			if(Overflow.Overflow_CTR1|Overflow.Overflow_CTR2) {
+				sprintf(warning, "Notice CPU#%02d: Resetting Counters.\n", cpu);
+				Output(A, warning);
+				rc=((retval=Write_MSR(A->P.Core[cpu].FD, IA32_PERF_GLOBAL_OVF_CTRL, (GLOBAL_PERF_OVF_CTRL *) &OvfControl)) != -1);
+			}
+
 			// Retreive the Thermal Junction Max. Fallback to 100°C if not available.
 			rc=((retval=Read_MSR(A->P.Core[cpu].FD, MSR_TEMPERATURE_TARGET, (TJMAX *) &A->P.Core[cpu].TjMax)) != -1);
-			if(A->P.Core[cpu].TjMax.Target == 0)
+			if(A->P.Core[cpu].TjMax.Target == 0) {
+				Output(A, "Warning : Thermal Junction Max unavailable.\n");
 				A->P.Core[cpu].TjMax.Target=100;
-			Read_MSR(A->P.Core[cpu].FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->P.Core[cpu].ThermIntr);
+			}
+			rc=((retval=Read_MSR(A->P.Core[cpu].FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->P.Core[cpu].ThermIntr)) != -1);
 		}
 		else	// Fallback to an arbitrary & commom value.
 		{
+			sprintf(warning, "Notice CPU#%02d: Thermal Junction Max defaults to 100.\n", cpu);
+			Output(A, warning);
 			A->P.Core[cpu].TjMax.Target=100;
 		}
 	}
@@ -330,13 +365,13 @@ int	Read_SMBIOS(int structure, int instance, off_t offset, void *buf, size_t nby
 }
 
 // Estimate the Bus Clock Frequency from the TSC.
-double	Compute_ExtClock()
+double	Compute_ExtClock(int exp)
 {
 	unsigned long long TSC[2];
 	TSC[0]=RDTSC();
-	usleep(1<<17);
+	usleep(1<<exp);
 	TSC[1]=RDTSC();
-	return((double)(TSC[1]-TSC[0])/(1<<17));
+	return((double)(TSC[1]-TSC[0])/(1<<exp));
 }
 
 // Read the Bus Clock Frequency from the BIOS.
@@ -538,7 +573,6 @@ void IMC_Free_Info(struct IMCINFO *imc)
 
 void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 {
-//	XSetForeground(A->display, A->W[G].gc, (A->L.Play.flashPulse=!A->L.Play.flashPulse) ? PULSE_COLOR : A->W[G].background);
 	XDrawArc(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
 		wButton->x,
 		wButton->y,
@@ -763,12 +797,12 @@ void	WidgetButtonPress(uARG *A, int G, XEvent *E)
 		}
 }
 
-// Draw the Cursor shape,
+// Draw the TextCursor shape,
 void	DrawCursor(uARG *A, int G, XPoint *Origin)
 {
-	A->L.Cursor[0].x=Origin->x;
-	A->L.Cursor[0].y=Origin->y;
-	XFillPolygon(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Cursor, 3, Nonconvex, CoordModePrevious);
+	A->L.TextCursor[0].x=Origin->x;
+	A->L.TextCursor[0].y=Origin->y;
+	XFillPolygon(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.TextCursor, 3, Nonconvex, CoordModePrevious);
 }
 
 // All-in-One function to print a string filled with some New Line terminated texts.
@@ -789,15 +823,16 @@ MaxText XPrint(Display *display, Drawable drawable, GC gc, int x, int y, char *N
 	return(Text);
 }
 
-// Scale the MDI window.
+// Scale the MDI window = MAIN Widget.
 void	ScaleMDI(uARG *A)
 {
-	int G=0, RightMost=0, BottomMost=0;
-	for(G=FIRST_WIDGET; G <= LAST_WIDGET; G++) {
-		if((A->W[RightMost].x + A->W[RightMost].width) < (A->W[G].x + A->W[G].width))
+	int G=FIRST_WIDGET, RightMost=LAST_WIDGET, BottomMost=LAST_WIDGET;
+	while(G <= LAST_WIDGET) {
+		if((A->W[G].x + A->W[G].width)  > (A->W[RightMost].x + A->W[RightMost].width))
 			RightMost=G;
-		if((A->W[BottomMost].y + A->W[BottomMost].height) < (A->W[G].y + A->W[G].height))
+		if((A->W[G].y + A->W[G].height) > (A->W[BottomMost].y + A->W[BottomMost].height))
 			BottomMost=G;
+		G++ ;
 	}
 	A->W[MAIN].width=A->W[RightMost].x + A->W[RightMost].width + A->L.Margin.H;
 	A->W[MAIN].height=A->W[BottomMost].y + A->W[BottomMost].height + A->L.Margin.V + Footer_Height(G);
@@ -820,6 +855,7 @@ void	ReSizeWidget(uARG *A, int G)
 	}
 	XWindowAttributes xwa={0};
 	XGetWindowAttributes(A->display, A->W[G].window, &xwa);
+	// Did the Window Manager really resize the Window ?
 	if((xwa.width != A->W[G].width) || (xwa.height != A->W[G].height))
 		XResizeWindow(A->display, A->W[G].window, A->W[G].width, A->W[G].height);
 }
@@ -829,24 +865,80 @@ void	MoveWidget(uARG *A, XEvent *E)
 {
 	switch(E->type) {
 		case ButtonPress:
-			if(!A->T.S) {
-				for(A->T.S=LAST_WIDGET; A->T.S >= FIRST_WIDGET; A->T.S--)
-					if( E->xbutton.subwindow == A->W[A->T.S].window)
-						break;
-				A->T.dx=E->xbutton.x - A->W[A->T.S].x;
-				A->T.dy=E->xbutton.y - A->W[A->T.S].y;
+			if(!A->T.Locked) {
+				// Which Widget is the target ?
+				if(_IS_MDI_ && E->xbutton.subwindow) {
+					for(A->T.S=LAST_WIDGET; A->T.S >= FIRST_WIDGET; A->T.S--)
+						if( E->xbutton.subwindow == A->W[A->T.S].window) {
+							A->T.Locked=true;
+							break;
+						}
+				} else {
+					for(A->T.S=LAST_WIDGET; A->T.S >= MAIN; A->T.S--)
+						if( E->xbutton.window == A->W[A->T.S].window) {
+							A->T.Locked=true;
+							break;
+						}
+				}
+				if(A->T.Locked) {
+					// A Widget is locked then store delta between the mouse position and its window origin.
+					if(_IS_MDI_ && (A->T.S != MAIN)) {
+						A->T.dx=E->xbutton.x - A->W[A->T.S].x;
+						A->T.dy=E->xbutton.y - A->W[A->T.S].y;
+					} else {
+						A->T.dx=E->xbutton.x_root - A->W[A->T.S].x;
+						A->T.dy=E->xbutton.y_root - A->W[A->T.S].y;
+					}
+					XDefineCursor(A->display, A->W[A->T.S].window, A->MouseCursor[MC_MOVE]);
+				}
 			}
 			break;
 		case ButtonRelease:
-			if(A->T.S) {
-				A->W[A->T.S].x=E->xbutton.x - A->T.dx;
-				A->W[A->T.S].y=E->xbutton.y - A->T.dy;
+			if(A->T.Locked) {
+				// Target is released so refresh the Widget position & size settings.
+				if(_IS_MDI_ && (A->T.S != MAIN)) {
+					A->W[A->T.S].x=E->xbutton.x - A->T.dx;
+					A->W[A->T.S].y=E->xbutton.y - A->T.dy;
+				} else {
+					XWindowAttributes wa={0};
+					XGetWindowAttributes(A->display, A->W[A->T.S].window, &wa);
+					A->W[A->T.S].x=wa.x;
+					A->W[A->T.S].y=wa.y;
+					A->W[A->T.S].width=wa.width;
+					A->W[A->T.S].height=wa.height;
+					A->W[A->T.S].border_width=wa.border_width;
+				}
+				XDefineCursor(A->display, A->W[A->T.S].window, A->MouseCursor[MC_DEFAULT]);
 				A->T.S=0;
+				A->T.Locked=false;
 			}
 			break;
 		case MotionNotify:
-			if(A->T.S)
-				XMoveWindow(A->display, A->W[A->T.S].window, E->xmotion.x - A->T.dx, E->xmotion.y - A->T.dy);
+			if(A->T.Locked) {
+				// Move the Widget until the button is released.
+				int	tx=0,
+					ty=0,
+					tw=0,
+					th=0;
+				if(_IS_MDI_ && (A->T.S != MAIN)) {
+					tx=E->xmotion.x - A->T.dx,
+					ty=E->xmotion.y - A->T.dy,
+					tw=A->W[MAIN].width  - (A->W[A->T.S].width + (A->W[A->T.S].border_width << 1)),
+					th=A->W[MAIN].height - (A->W[A->T.S].height + (A->W[A->T.S].border_width << 1));
+				}
+				else {
+					tx=E->xmotion.x_root - A->T.dx,
+					ty=E->xmotion.y_root - A->T.dy,
+					tw=WidthOfScreen(A->screen)  - (A->W[A->T.S].width + (A->W[A->T.S].border_width << 1)),
+					th=HeightOfScreen(A->screen) - (A->W[A->T.S].height + (A->W[A->T.S].border_width << 1));
+				}
+				// Stick the widget position to the Screen borders.
+				if(tx > tw)	tx=tw;
+				if(tx < 0)	tx=0;
+				if(ty > th)	ty=th;
+				if(ty < 0)	ty=0;
+				XMoveWindow(A->display, A->W[A->T.S].window, tx, ty);
+			}
 			break;
 	}
 }
@@ -855,6 +947,7 @@ void	IconifyWidget(uARG *A, int G, XEvent *E)
 {
 	switch(E->type) {
 		case UnmapNotify: {
+			// When a Widget is iconified, minimized or unmapped, create an associated button in the MAIN window.
 			RESOURCE Resource[WIDGETS]={{Label:'M'}, {Label:'C'}, {Label:'S'}, {Label:'T'}, {Label:'I'}, {Label:'D'}};
 
 			int 	length=One_Half_Char_Width(MAIN) + Quarter_Char_Width(MAIN),
@@ -870,6 +963,7 @@ void	IconifyWidget(uARG *A, int G, XEvent *E)
 		}
 			break;
 		case MapNotify: {
+			// Remove the button when the Widget is restored on screen.
 			DestroyButton(A, MAIN, (ID_NULL + G));
 		}
 			break;
@@ -891,7 +985,7 @@ void	RestoreWidget(uARG *A, int G)
 	XMapWindow(A->display, A->W[G].window);
 }
 
-// Create the X-Window Widget.
+// Create the X-Window Widgets.
 int	OpenWidgets(uARG *A)
 {
 	int noerr=true;
@@ -904,6 +998,33 @@ int	OpenWidgets(uARG *A)
 
 	if((A->display=XOpenDisplay(NULL)) && (A->screen=DefaultScreenOfDisplay(A->display)) )
 		{
+		switch(A->xACL) {
+		case 'Y':
+		case 'y':
+			XEnableAccessControl(A->display);
+			break;
+		case 'N':
+		case 'n':
+			XDisableAccessControl(A->display);
+			break;
+		}
+
+		// Try to load the requested font.
+		if(strlen(A->fontName) == 0)
+			strcpy(A->fontName, "Fixed");
+
+		if((A->xfont=XLoadQueryFont(A->display, A->fontName)) == NULL)
+			noerr=false;
+		else {
+			// Adjust margins using the font size.
+			A->L.Margin.H=(A->xfont->max_bounds.rbearing - A->xfont->min_bounds.lbearing) << 1;
+			A->L.Margin.V=(A->xfont->ascent + A->xfont->descent) + ((A->xfont->ascent + A->xfont->descent) >> 2);
+		}
+		if(noerr) {
+			A->MouseCursor[MC_DEFAULT]=XCreateFontCursor(A->display, XC_left_ptr);
+			A->MouseCursor[MC_MOVE]=XCreateFontCursor(A->display, XC_fleur);
+			A->MouseCursor[MC_WAIT]=XCreateFontCursor(A->display, XC_watch);
+		}
 		XSetWindowAttributes swa={
 	/* Pixmap: background, None, or ParentRelative	*/	background_pixmap:None,
 	/* unsigned long: background pixel		*/	background_pixel:A->L.globalBackground,
@@ -919,35 +1040,68 @@ int	OpenWidgets(uARG *A)
 	/* long: set of events that should not propagate */	do_not_propagate_mask:0,
 	/* Bool: boolean value for override_redirect */		override_redirect:False,
 	/* Colormap: color map to be associated with window */	colormap:DefaultColormap(A->display, DefaultScreen(A->display)),
-	/* Cursor: cursor to be displayed (or None) */		cursor:None};
-
-		// Try to load the requested font.
-		if(strlen(A->fontName) == 0)
-			strcpy(A->fontName, "Fixed");
-
-		if((A->xfont=XLoadQueryFont(A->display, A->fontName)) == NULL)
-			noerr=false;
+	/* Cursor: Cursor to be displayed (or None) */		cursor:A->MouseCursor[MC_DEFAULT]};
 
 		int G=0;
-		for(G=0; noerr && (G < WIDGETS); G++) {
+		for(G=MAIN; noerr && (G < WIDGETS); G++)
+		{
 			// Dispose Widgets from each other : [Right & Bottom + width & height] Or -[1,-1] = X,Y origin + Margins.
 			int U=A->W[G].x;
 			int V=A->W[G].y;
-			A->W[G].x=(U == -1) ? A->W[MAIN].x + A->L.Margin.H : A->W[U].x + A->W[U].width + A->L.Margin.H;
-			A->W[G].y=(V == -1) ? A->W[MAIN].y + A->L.Margin.V : A->W[V].y + A->W[V].height + A->L.Margin.V;
+			if(_IS_MDI_) {
+				if(G != MAIN) {
+					switch(U) {
+						case -1:
+							A->W[G].x=A->L.Margin.H;
+							break;
+						case MAIN:
+							A->W[G].x=A->L.Margin.H + A->W[U].width;
+							break;
+						default:
+							A->W[G].x=A->L.Margin.H + A->W[U].x + A->W[U].width;
+							break;
+					}
+					switch(V) {
+						case -1:
+							A->W[G].y=A->L.Margin.V;
+							break;
+						case MAIN:
+							A->W[G].y=A->L.Margin.V + A->W[V].height;
+							break;
+						default:
+							A->W[G].y=A->L.Margin.V + A->W[V].y + A->W[V].height;
+							break;
+					}
+				}
+				else {
+					A->W[G].x=A->L.Start.H;
+					A->W[G].y=A->L.Start.V;
+				}
+			}
+			else {
+				if(U == -1)
+					A->W[G].x=A->L.Start.H;
+				else
+					A->W[G].x=A->L.Margin.H + A->W[U].x + A->W[U].width;
+				if(V == -1)
+					A->W[G].y=A->L.Start.V;
+				else
+					A->W[G].y=A->L.Margin.V + A->W[V].y + A->W[V].height;
+			}
+
 			// Override default colors if values supplied in the command line.
 			if(A->L.globalBackground != GLOBAL_BACKGROUND)
 				A->W[G].background=A->L.globalBackground;
 			if(A->L.globalForeground != GLOBAL_FOREGROUND)
 				A->W[G].foreground=A->L.globalForeground;
-			// Define the Widgets.
+
+			// Create the Widgets.
 			if((A->W[G].window=XCreateWindow(A->display,
 							_IS_MDI_ && (G != MAIN) ?
 							A->W[MAIN].window
 							: DefaultRootWindow(A->display),
-							A->W[G].x, A->W[G].y, A->W[G].width, A->W[G].height,
-							_IS_MDI_ ? 1 : 0,
-							CopyFromParent, InputOutput, CopyFromParent, CWOverrideRedirect, &swa)) )
+							A->W[G].x, A->W[G].y, A->W[G].width, A->W[G].height, A->W[G].border_width,
+							CopyFromParent, InputOutput, CopyFromParent, CWBorderPixel|CWOverrideRedirect|CWCursor, &swa)) )
 				{
 				if((A->W[G].gc=XCreateGC(A->display, A->W[G].window, 0, NULL)))
 					{
@@ -963,7 +1117,7 @@ int	OpenWidgets(uARG *A)
 							A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
 										- A->xfont->min_bounds.lbearing;
 							A->W[G].extents.charHeight=A->W[G].extents.ascent
-											+ A->W[G].extents.descent;
+										+ A->W[G].extents.descent;
 							A->W[G].width=	A->W[G].extents.overall.width;
 							A->W[G].height=	Half_Char_Width(G) + One_Char_Height(G) * MAIN_TEXT_HEIGHT;
 
@@ -980,21 +1134,13 @@ int	OpenWidgets(uARG *A)
 							A->L.Axes[G].Segment[1].y1=A->W[G].height;
 							A->L.Axes[G].Segment[1].x2=A->L.Axes[G].Segment[0].x2;
 							A->L.Axes[G].Segment[1].y2=A->L.Axes[G].Segment[1].y1;
-
-							// First run : adjust the global margins with the font size. Don't overlap axes.
-							A->L.Margin.H=Twice_Char_Width(G);
-							A->L.Margin.V=One_Char_Height(G) + Quarter_Char_Height(G);
 							A->W[G].height+=Footer_Height(G);
 
-							// First run : if MAIN defined as the MDI then reset its position.
-							if(_IS_MDI_) {
-								A->W[G].x=0;
-								A->W[G].y=0;
-							}
-							else {
+							// First run if MAIN is not defined as MDI then create buttons.
+							if(!_IS_MDI_) {
 								CreateButton(	A, DECORATION, ID_MIN, G,
-										A->W[G].width - Twice_Char_Width(G),
-										A->W[G].height - Twice_Char_Width(G),
+										A->W[G].width - One_Half_Char_Width(G),
+										Half_Char_Width(G),
 										One_Char_Width(G),
 										One_Char_Width(G),
 										CallBackMinimizeWidget,
@@ -1073,8 +1219,8 @@ int	OpenWidgets(uARG *A)
 							A->W[G].height+=Footer_Height(G);
 
 							CreateButton(	A, DECORATION, ID_MIN, G,
-									A->W[G].width - Twice_Char_Width(G),
-									A->W[G].height - Twice_Char_Width(G),
+									A->W[G].width - One_Half_Char_Width(G),
+									Half_Char_Width(G),
 									One_Char_Width(G),
 									One_Char_Width(G),
 									CallBackMinimizeWidget,
@@ -1140,8 +1286,8 @@ int	OpenWidgets(uARG *A)
 							A->W[G].height+=Footer_Height(G);
 
 							CreateButton(	A, DECORATION, ID_MIN, G,
-									A->W[G].width - Twice_Char_Width(G),
-									A->W[G].height - Twice_Char_Width(G),
+									A->W[G].width - One_Half_Char_Width(G),
+									Half_Char_Width(G),
 									One_Char_Width(G),
 									One_Char_Width(G),
 									CallBackMinimizeWidget,
@@ -1175,7 +1321,7 @@ int	OpenWidgets(uARG *A)
 							A->W[G].extents.charHeight=A->W[G].extents.ascent
 											+ A->W[G].extents.descent;
 							A->W[G].width= A->W[G].extents.overall.width + (One_Char_Width(G) * 5);
-							A->W[G].height=Half_Char_Width(G)	+ One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1);
+							A->W[G].height=Half_Char_Width(G) + One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1);
 
 							// Prepare the chart axes.
 							A->L.Axes[G].N=TEMPS_TEXT_WIDTH + 2;
@@ -1205,8 +1351,8 @@ int	OpenWidgets(uARG *A)
 							A->W[G].height+=Footer_Height(G);
 
 							CreateButton(	A, DECORATION, ID_MIN, G,
-									A->W[G].width - Twice_Char_Width(G),
-									A->W[G].height - Twice_Char_Width(G),
+									A->W[G].width - One_Half_Char_Width(G),
+									Half_Char_Width(G),
 									One_Char_Width(G),
 									One_Char_Width(G),
 									CallBackMinimizeWidget,
@@ -1237,7 +1383,7 @@ int	OpenWidgets(uARG *A)
 							A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
 										- A->xfont->min_bounds.lbearing;
 							A->W[G].extents.charHeight=A->W[G].extents.ascent
-											+ A->W[G].extents.descent;
+										+ A->W[G].extents.descent;
 							A->W[G].width=A->W[G].extents.overall.width;
 							A->W[G].height=Half_Char_Width(G) + One_Char_Height(G) * SYSINFO_TEXT_HEIGHT;
 
@@ -1257,8 +1403,8 @@ int	OpenWidgets(uARG *A)
 							A->W[G].height+=Footer_Height(G);
 
 							CreateButton(	A, DECORATION, ID_MIN, G,
-									A->W[G].width - Twice_Char_Width(G),
-									A->W[G].height - Twice_Char_Width(G),
+									A->W[G].width - One_Half_Char_Width(G),
+									Half_Char_Width(G),
 									One_Char_Width(G),
 									One_Char_Width(G),
 									CallBackMinimizeWidget,
@@ -1298,6 +1444,36 @@ int	OpenWidgets(uARG *A)
 									square,
 									CallBackButton,
 									NULL);
+
+							struct {
+								char		ID;
+								RESOURCE 	RSC;
+							} Loader[]={	{ID:ID_PAUSE,     RSC:{Text:RSC_PAUSE}},
+									{ID:ID_WALLBOARD, RSC:{Text:RSC_WALLBOARD}},
+									{ID:ID_INCLOOP,   RSC:{Text:RSC_INCLOOP}},
+									{ID:ID_RECLOCK,   RSC:{Text:RSC_RECLOCK}},
+									{ID:ID_DECLOOP,   RSC:{Text:RSC_DECLOOP}},
+									{ID:ID_NULL ,     RSC:{Text:NULL}}
+								};
+							int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
+							int i=0;
+							for(i=0; Loader[i].ID != ID_NULL; i++, spacing+=One_Char_Width(G) * (2 + strlen(Loader[i-1].RSC.Text)))
+								CreateButton(	A, TEXT, Loader[i].ID, G,
+											spacing,
+											A->W[G].height - Footer_Height(G) + 2,
+											One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
+											One_Char_Height(G),
+											CallBackButton,
+											&Loader[i].RSC);
+
+							// Prepare a Wallboard string with the Processor information.
+							int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
+							sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Platform.MaxNonTurboRatio * A->P.ClockSpeed);
+							A->L.WB.Length=strlen(str) + (padding << 1);
+							A->L.WB.String=calloc(A->L.WB.Length, 1);
+							memset(A->L.WB.String, 0x20, A->L.WB.Length);
+							A->L.WB.Scroll=padding;//(A->P.Platform.MaxNonTurboRatio << 1);
+							A->L.WB.Length=strlen(str) + A->L.WB.Scroll;
 						}
 							break;
 						case DUMP: {
@@ -1328,8 +1504,8 @@ int	OpenWidgets(uARG *A)
 							A->W[G].height+=Footer_Height(G);
 
 							CreateButton(	A, DECORATION, ID_MIN, G,
-									A->W[G].width - Twice_Char_Width(G),
-									A->W[G].height - Twice_Char_Width(G),
+									A->W[G].width - One_Half_Char_Width(G),
+									Half_Char_Width(G),
 									One_Char_Width(G),
 									One_Char_Width(G),
 									CallBackMinimizeWidget,
@@ -1390,7 +1566,6 @@ int	OpenWidgets(uARG *A)
 							break;
 					}
 					ReSizeWidget(A, G);
-					XSetWindowBorder(A->display, A->W[G].window, LABEL_COLOR);
 				}
 				else	noerr=false;
 			}
@@ -1438,7 +1613,7 @@ int	OpenWidgets(uARG *A)
 					CallBackButton,
 					NULL);
 		}
-		for(G=0; noerr && (G < WIDGETS); G++)
+		for(G=MAIN; noerr && (G < WIDGETS); G++)
 			if((A->W[G].pixmap.B=XCreatePixmap(A->display, A->W[G].window,
 								A->W[G].width, A->W[G].height,
 								DefaultDepthOfScreen(A->screen)))
@@ -1451,22 +1626,13 @@ int	OpenWidgets(uARG *A)
 					if(G == MAIN)
 						EventProfile=EventProfile | CLICK_EVENTS | MOVE_EVENTS;
 				}
-				else	EventProfile=EventProfile | CLICK_EVENTS;
+				else	EventProfile=EventProfile | CLICK_EVENTS | MOVE_EVENTS;
 
 				XSelectInput(A->display, A->W[G].window, EventProfile);
 			}
 			else	noerr=false;
 	}
 	else	noerr=false;
-
-	// Prepare a Wallboard string with the Processor information.
-	sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Platform.MaxNonTurboRatio * A->P.ClockSpeed);
-	A->L.WB.Length=strlen(str) + (A->P.Platform.MaxNonTurboRatio << 2);
-	A->L.WB.String=calloc(A->L.WB.Length, 1);
-	memset(A->L.WB.String, 0x20, A->L.WB.Length);
-	memcpy(&A->L.WB.String[A->P.Platform.MaxNonTurboRatio << 1], str, strlen(str));
-	A->L.WB.Scroll=(A->P.Platform.MaxNonTurboRatio << 1);
-	A->L.WB.Length=strlen(str) + A->L.WB.Scroll;
 
 	// Store some Ratios into a string for future chart drawing.
 	sprintf(A->P.Bump, "%02d%02d%02d",	A->P.Platform.MinimumRatio,
@@ -1604,7 +1770,8 @@ void	BuildLayout(uARG *A, int G)
 			XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
 			XDrawImageString(A->display, A->W[G].pixmap.B, A->W[G].gc,
 					A->W[G].width - One_Half_Char_Width(G) - Quarter_Char_Width(G),
-					One_Char_Height(G),
+					One_Char_Height(G)
+					+ (One_Char_Height(G) * CSTATES_TEXT_HEIGHT),
 					"%", 1 );
 			XDrawImageString(A->display, A->W[G].pixmap.B, A->W[G].gc,
 					A->W[G].width - Twice_Char_Width(G) - Quarter_Char_Width(G),
@@ -1672,7 +1839,7 @@ void	BuildLayout(uARG *A, int G)
 				sprintf(str, CORE_NUM, cpu);
 				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 						(One_Char_Width(G) * 5)
-						+ Half_Char_Width(G)
+						+ Quarter_Char_Width(G)
 						+ (cpu << 1) * Twice_Char_Width(G),
 						One_Char_Height(G),
 						str, strlen(str) );
@@ -1689,6 +1856,17 @@ void	BuildLayout(uARG *A, int G)
 					strlen(A->L.Page[G].Title) );
 
 			char items[8192]={0}, str[SYSINFO_TEXT_WIDTH]={0};
+
+			int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
+			sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Platform.MaxNonTurboRatio * A->P.ClockSpeed);
+			memcpy(&A->L.WB.String[padding], str, strlen(str));
+
+			sprintf(str, "Loop(%d usecs)", (1 << A->P.IdleTime) );
+			XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+			XDrawImageString(A->display, A->W[G].pixmap.B, A->W[G].gc,
+					A->W[G].width - (20 * One_Char_Width(G)),
+					A->W[G].height - Quarter_Char_Height(G),
+					str, strlen(str) );
 
 			const char	powered[2]={'N', 'Y'},
 					*enabled[2]={"OFF", "ON"};
@@ -1768,8 +1946,10 @@ void	BuildLayout(uARG *A, int G)
 					powered[A->P.Features.ExtFunc.ECX.LAHFSAHF],
 					powered[A->P.Features.ExtFunc.EDX.SYSCALL],
 					powered[A->P.Features.ExtFunc.EDX.RDTSCP],
-					powered[A->P.Features.ExtFunc.EDX.IA64] );
-
+					powered[A->P.Features.ExtFunc.EDX.IA64],
+					A->P.Features.Perf_Monitoring_Leaf.EAX.MonCtrs, A->P.Features.Perf_Monitoring_Leaf.EAX.MonWidth,
+					A->P.Features.Perf_Monitoring_Leaf.EDX.FixCtrs, A->P.Features.Perf_Monitoring_Leaf.EDX.FixWidth
+			);
 			strcat(items, RAM_SECTION);
 			strcat(items, CHA_FORMAT);
 			if(A->M != NULL) {
@@ -1835,13 +2015,18 @@ void	BuildLayout(uARG *A, int G)
 // Release the Widget ressources.
 void	CloseWidgets(uARG *A)
 {
-	if(A->L.Output)
-		free(A->L.Output);
+	if(A->L.Output)		free(A->L.Output);
 
-	XUnloadFont(A->display, A->xfont->fid);
+	if(A->xfont->fid)	XUnloadFont(A->display, A->xfont->fid);
+
+	int MC=MC_COUNT;
+	do {
+		MC-- ;
+		if(A->MouseCursor[MC])	XFreeCursor(A->display, A->MouseCursor[MC]);
+	} while(MC);
 
 	int G=0;
-	for(G=LAST_WIDGET; G >= 0 ; G--) {
+	for(G=LAST_WIDGET; G >= MAIN ; G--) {
 		XFreePixmap(A->display, A->W[G].pixmap.B);
 		XFreePixmap(A->display, A->W[G].pixmap.F);
 		XFreeGC(A->display, A->W[G].gc);
@@ -1871,21 +2056,6 @@ void	FlushLayout(uARG *A, int G)
 	XFlush(A->display);
 }
 
-// Scroll the Wallboard.
-void	DrawWB(uARG *A, int G)
-{
-	if(A->L.WB.Scroll < A->L.WB.Length)
-		A->L.WB.Scroll++;
-	else
-		A->L.WB.Scroll=0;
-	// Display the Wallboard.
-	XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
-	XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-			One_Char_Width(G) * 6,
-			One_Char_Height(G),
-			&A->L.WB.String[A->L.WB.Scroll], (A->P.Platform.MaxNonTurboRatio << 1));
-}
-
 // Draw the layout foreground.
 void	DrawLayout(uARG *A, int G)
 {
@@ -1902,7 +2072,7 @@ void	DrawLayout(uARG *A, int G)
 						edline - Quarter_Char_Height(G),
 						A->L.Input.KeyBuffer, A->L.Input.KeyLength);
 			}
-			// Flash the cursor.
+			// Flash the TextCursor.
 			A->L.Play.flashCursor=!A->L.Play.flashCursor;
 			XSetForeground(A->display, A->W[G].gc, A->L.Play.flashCursor ? CURSOR_COLOR : A->W[G].background);
 
@@ -1980,8 +2150,6 @@ void	DrawLayout(uARG *A, int G)
 							str, strlen(str) );
 				}
 			}
-			if(A->L.Play.wallboard)
-				DrawWB(A, G);
 		}
 			break;
 		case CSTATES:
@@ -2080,7 +2248,7 @@ void	DrawLayout(uARG *A, int G)
 				XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 				sprintf(str, TEMPERATURE, A->P.Core[cpu].TjMax.Target - A->P.Core[cpu].ThermStat.DTS);
 				XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-						(One_Char_Width(G) * 5) + Half_Char_Width(G) + (cpu << 1) * Twice_Char_Width(G),
+						(One_Char_Width(G) * 5) + Quarter_Char_Width(G) + (cpu << 1) * Twice_Char_Width(G),
 						One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1),
 						str, strlen(str));
 			}
@@ -2130,6 +2298,23 @@ void	DrawLayout(uARG *A, int G)
 					U->y2,
 					str, 3);
 		}
+			break;
+		case SYSINFO:
+			// Display the Wallboard.
+			if(A->L.Play.wallboard) {
+				// Scroll the Wallboard.
+				if(A->L.WB.Scroll < A->L.WB.Length)
+					A->L.WB.Scroll++;
+				else
+					A->L.WB.Scroll=0;
+				int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
+
+				XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+				XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+						One_Char_Width(G) * (strlen(A->L.Page[G].Title) + 2),
+						One_Char_Height(G),
+						&A->L.WB.String[A->L.WB.Scroll], padding);
+			}
 			break;
 		case DUMP:
 		{
@@ -2220,7 +2405,7 @@ static void *uDraw(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
 	int G=0;
-	for(G=0; G < WIDGETS; G++) {
+	for(G=MAIN; G < WIDGETS; G++) {
 		if(!A->PAUSE[G]) {
 			MapLayout(A, G);
 			DrawLayout(A, G);
@@ -2279,8 +2464,34 @@ void	Play(uARG *A, int G, char ID)
 				fDraw(G, false, true, false);
 			}
 			break;
-		case ID_PAUSE:
+		case ID_PAUSE: {
 			A->PAUSE[G]=!A->PAUSE[G];
+			XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT * A->PAUSE[G]]);
+			}
+			break;
+		case ID_INCLOOP:
+			if(A->P.IdleTime < 22) {
+				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
+				pthread_mutex_lock(&uDraw_mutex);
+				A->P.IdleTime++;
+				if(A->P.Platform.MaxNonTurboRatio != 0)
+					A->P.ClockSpeed=Compute_ExtClock(A->P.IdleTime) / A->P.Platform.MaxNonTurboRatio;
+				fDraw(G, false, true, false);
+				pthread_mutex_unlock(&uDraw_mutex);
+				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
+			}
+			break;
+		case ID_DECLOOP:
+			if(A->P.IdleTime > 16) {
+				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
+				pthread_mutex_lock(&uDraw_mutex);
+				A->P.IdleTime--;
+				if(A->P.Platform.MaxNonTurboRatio != 0)
+					A->P.ClockSpeed=Compute_ExtClock(A->P.IdleTime) / A->P.Platform.MaxNonTurboRatio;
+				fDraw(G, false, true, false);
+				pthread_mutex_unlock(&uDraw_mutex);
+				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
+			}
 			break;
 		case ID_FREQ:
 			A->L.Play.freqHertz=!A->L.Play.freqHertz;
@@ -2293,6 +2504,19 @@ void	Play(uARG *A, int G, char ID)
 			break;
 		case ID_STATE:
 			A->L.Play.cStatePercent=!A->L.Play.cStatePercent;
+			break;
+		case ID_RECLOCK:
+			if(A->P.Platform.MaxNonTurboRatio != 0) {
+				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
+				pthread_mutex_lock(&uDraw_mutex);
+				A->P.ClockSpeed=Compute_ExtClock(A->P.IdleTime) / A->P.Platform.MaxNonTurboRatio;
+				fDraw(G, true, true, false);
+				pthread_mutex_unlock(&uDraw_mutex);
+				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
+			}
+			break;
+		case ID_WALLBOARD:
+			A->L.Play.wallboard=!A->L.Play.wallboard;
 			break;
 	}
 }
@@ -2377,7 +2601,7 @@ static void *uLoop(uARG *A)
 		XNextEvent(A->display, &E);
 
 		int G=0;
-		for(G=0; G < WIDGETS; G++)
+		for(G=MAIN; G < WIDGETS; G++)
 			if(E.xany.window == A->W[G].window)
 				break;
 
@@ -2485,7 +2709,7 @@ static void *uLoop(uARG *A)
 					case XK_w:
 					case XK_W:
 						if(E.xkey.state & ControlMask)
-							A->L.Play.wallboard=!A->L.Play.wallboard;
+							Play(A, G, ID_WALLBOARD);
 						break;
 					case XK_y:
 					case XK_Y:
@@ -2516,28 +2740,11 @@ static void *uLoop(uARG *A)
 					case XK_KP_Page_Down:
 						Play(A, G, ID_PGDW);
 						break;
-					case XK_KP_Add: {
-						char str[32];
-						if(A->P.IdleTime > 16)
-							A->P.IdleTime--;
-						sprintf(str, "[%d usecs]", (1 << A->P.IdleTime) );
-						XSetForeground(A->display, A->W[G].gc, PULSE_COLOR);
-						XDrawImageString(A->display, A->W[G].window, A->W[G].gc,
-								A->W[G].width - (15 * One_Char_Width(G)),
-								A->W[G].height - Quarter_Char_Height(G),
-								str, strlen(str) );
-					}
+					case XK_KP_Add:
+						Play(A, G, ID_DECLOOP);
 						break;
-					case XK_KP_Subtract: {
-						char str[32];
-						A->P.IdleTime++;
-						sprintf(str, "[%d usecs]", (1 << A->P.IdleTime) );
-						XSetForeground(A->display, A->W[G].gc, PULSE_COLOR);
-						XDrawImageString(A->display, A->W[G].window, A->W[G].gc,
-								A->W[G].width - (15 * One_Char_Width(G)),
-								A->W[G].height - Quarter_Char_Height(G),
-								str, strlen(str) );
-					}
+					case XK_KP_Subtract:
+						Play(A, G, ID_INCLOOP);
 						break;
 					case XK_F1: {
 						Proc_Menu(A);
@@ -2574,10 +2781,7 @@ static void *uLoop(uARG *A)
 						WidgetButtonPress(A, G, &E);
 						break;
 					case Button3:
-						if(_IS_MDI_)
-							MoveWidget(A, &E);
-						else
-							WidgetButtonPress(A, G, &E);
+						MoveWidget(A, &E);
 						break;
 					case Button4: {
 						int T=G;
@@ -2604,8 +2808,7 @@ static void *uLoop(uARG *A)
 			case ButtonRelease:
 				switch(E.xbutton.button) {
 					case Button3:
-						if(_IS_MDI_)
-							MoveWidget(A, &E);
+						MoveWidget(A, &E);
 						break;
 				}
 				break;
@@ -2658,20 +2861,21 @@ static void *uLoop(uARG *A)
 int	Args(uARG *A, int argc, char *argv[])
 {
 	OPTION	options[] = {
-				{"-D", "%d", &A->MDI,                  "Enable MDI Window (0/1)"      },
-				{"-F", "%s", A->fontName,              "Font name"                    },
-				{"-x", "%d", &A->L.Margin.H,           "Left position"                },
-				{"-y", "%d", &A->L.Margin.V,           "Top position"                 },
-				{"-b", "%x", &A->L.globalBackground,   "Background color"             },
-				{"-f", "%x", &A->L.globalForeground,   "Foreground color"             },
-				{"-c", "%ud",&A->P.PerCore,            "Monitor per Thread/Core (0/1)"},
-				{"-s", "%ld",&A->P.IdleTime,           "Idle time (usec) where 2^N"   },
-				{"-h", "%ud",&A->L.Play.freqHertz,     "CPU frequency (0/1)"          },
-				{"-l", "%ud",&A->L.Play.cycleValues,   "Cycle Values (0/1)"           },
-				{"-r", "%ud",&A->L.Play.ratioValues,   "Ratio Values (0/1)"           },
-				{"-p", "%ud",&A->L.Play.cStatePercent, "C-STATE percentage (0/1)"     },
-				{"-t", "%ud",&A->L.Play.alwaysOnTop,   "Always On Top (0/1)"          },
-				{"-w", "%ud",&A->L.Play.wallboard,     "Scroll wallboard (0/1)"       },
+				{"-D", "%d", &A->MDI,                  "Enable MDI Window (0/1)"       },
+				{"-F", "%s", A->fontName,              "Font name"                     },
+				{"-a", "%c", &A->xACL,                 "Enable or disable X ACL (Y/N)" },
+				{"-x", "%d", &A->L.Start.H,            "Left position"                 },
+				{"-y", "%d", &A->L.Start.V,            "Top position"                  },
+				{"-b", "%x", &A->L.globalBackground,   "Background color"              },
+				{"-f", "%x", &A->L.globalForeground,   "Foreground color"              },
+				{"-c", "%ud",&A->P.PerCore,            "Monitor per Thread/Core (0/1)" },
+				{"-s", "%ld",&A->P.IdleTime,           "Idle time (usec) where 2^N"    },
+				{"-h", "%ud",&A->L.Play.freqHertz,     "CPU frequency (0/1)"           },
+				{"-l", "%ud",&A->L.Play.cycleValues,   "Cycle Values (0/1)"            },
+				{"-r", "%ud",&A->L.Play.ratioValues,   "Ratio Values (0/1)"            },
+				{"-p", "%ud",&A->L.Play.cStatePercent, "C-STATE percentage (0/1)"      },
+				{"-t", "%ud",&A->L.Play.alwaysOnTop,   "Always On Top (0/1)"           },
+				{"-w", "%ud",&A->L.Play.wallboard,     "Scroll wallboard (0/1)"        },
 		};
 	const int s=sizeof(options)/sizeof(OPTION);
 	int i=0, j=0, noerr=true;
@@ -2709,6 +2913,8 @@ int main(int argc, char *argv[])
 			display:NULL,
 			screen:NULL,
 			fontName:malloc(sizeof(char)*256),
+			xfont:NULL,
+			MouseCursor:{0},
 			P: {
 				ArchID:-1,
 				ClockSpeed:0,
@@ -2733,6 +2939,7 @@ int main(int argc, char *argv[])
 				y:-1,
 				width:300,
 				height:150,
+				border_width:1,
 				extents: {
 					overall:{0},
 					dir:0,
@@ -2757,6 +2964,7 @@ int main(int argc, char *argv[])
 				y:MAIN,
 				width:300,
 				height:150,
+				border_width:1,
 				extents: {
 					overall:{0},
 					dir:0,
@@ -2781,6 +2989,7 @@ int main(int argc, char *argv[])
 				y:MAIN,
 				width:300,
 				height:175,
+				border_width:1,
 				extents: {
 					overall:{0},
 					dir:0,
@@ -2805,6 +3014,7 @@ int main(int argc, char *argv[])
 				y:CSTATES,
 				width:225,
 				height:150,
+				border_width:1,
 				extents: {
 					overall:{0},
 					dir:0,
@@ -2829,6 +3039,7 @@ int main(int argc, char *argv[])
 				y:CSTATES,
 				width:500,
 				height:300,
+				border_width:1,
 				extents: {
 					overall:{0},
 					dir:0,
@@ -2853,6 +3064,7 @@ int main(int argc, char *argv[])
 				y:TEMPS,
 				width:675,
 				height:200,
+				border_width:1,
 				extents: {
 					overall:{0},
 					dir:0,
@@ -2867,6 +3079,7 @@ int main(int argc, char *argv[])
 				},
 			},
 			T: {
+				Locked:false,
 				S:0,
 				dx:0,
 				dy:0,
@@ -2876,6 +3089,10 @@ int main(int argc, char *argv[])
 				globalForeground:GLOBAL_FOREGROUND,
 				// Margins must be initialized with a zero size.
 				Margin: {
+					H:0,
+					V:0,
+				},
+				Start: {
 					H:0,
 					V:0,
 				},
@@ -2937,7 +3154,7 @@ int main(int argc, char *argv[])
 					},
 					// DUMP
 					{
-						Pageable:true,
+						Pageable:false,
 						Title:DUMP_SECTION,
 						Text: {
 							cols:0,
@@ -2965,7 +3182,7 @@ int main(int argc, char *argv[])
 				DumpTable: {
 					{"IA32_PERF_STATUS", IA32_PERF_STATUS},
 					{"IA32_CLOCK_MODULATION", IA32_CLOCK_MODULATION},
-					{"IA32_THERM_INTERRUPT", IA32_THERM_INTERRUPT},
+					{"IA32_PKG_THERM_INTERRUP", IA32_PKG_THERM_INTERRUPT},
 					{"IA32_THERM_STATUS", IA32_THERM_STATUS},
 					{"IA32_MISC_ENABLE", IA32_MISC_ENABLE},
 					{"IA32_FIXED_CTR1", IA32_FIXED_CTR1},
@@ -2976,8 +3193,8 @@ int main(int argc, char *argv[])
 					{"MSR_TEMPERATURE_TARGET", MSR_TEMPERATURE_TARGET},
 				},
 				Axes:{{0, NULL}},
-				// Design the Cursor
-				Cursor:{{x:+0, y:+0},
+				// Design the TextCursor
+				TextCursor:{{x:+0, y:+0},
 					{x:+4, y:-4},
 					{x:+4, y:+4}},
 				Input:{KeyBuffer:"", KeyLength:0,},
@@ -3047,7 +3264,7 @@ int main(int argc, char *argv[])
 			Output(&A, "Warning : can not read the MSR registers\nCheck if 'msr' kernel module is loaded\n");
 
 		if(MSR)
-			A.P.ClockSpeed=Compute_ExtClock() / A.P.Platform.MaxNonTurboRatio;
+			A.P.ClockSpeed=Compute_ExtClock(17) / A.P.Platform.MaxNonTurboRatio;
 		else {
 			// Read the bus clock frequency from the BIOS.
 			if(BIOS)
@@ -3080,7 +3297,7 @@ int main(int argc, char *argv[])
 			Output(&A, "Welcome to X-Freq\n");
 
 			int G=0;
-			for(G=0; G < WIDGETS; G++) {
+			for(G=MAIN; G < WIDGETS; G++) {
 				BuildLayout(&A, G);
 				MapLayout(&A, G);
 				UpdateTitle(&A, G);

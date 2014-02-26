@@ -23,6 +23,7 @@
 		<Compiler>
 			<Add option="-Wall" />
 		</Compiler>
+		<Unit filename="README" />
 		<Unit filename="xfreq.c">
 			<Option compilerVar="CC" />
 		</Unit>

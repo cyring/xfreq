@@ -29,40 +29,71 @@
  * + GPU sensors.
  *     compile with the NVIDIA (first), the AMD & Intel frameworks (seconds) ?
  *
- * + other processors ...
+ * + other processors are claimed. Call to beta testers.
+ * + implement the procstat API to trace high cpu load processes.
+ * + scripting, editor, push alarms.
  *
- * + procstat
- *
- * + scripting, alarm
  *
  *  Graphical
  * -----------
  *
- * + a new energy Widget.
+ * + power energy Widget.
  * + some button-switchs & sliders to enable/disable/set the PKG/Core features in the System Info Widget.
  * + full transparency & opacity.
  * + integrate XCB, wayland ?
  * + handle skins :
- *     second layout should provide processor usage history.
+ * + provide a processor usage history.
  * + gradiant coloring.
  * + screenshot key.
+ * + resize footer separator w/ MDI.
+ * + give a better disposal of the Widgets using % of screen size and absolute positions.
+ * + save and load settings.
  *
  *
  *  Source code
  * -------------
  * + clean makefile : remove my previous Raspberry instructions.
  * + clang compliant : rewrite code to remove any "warning: use of GNU old-style ..."
- * + provide some configure and install scripts.
+ * + provide some configure and install scripts, especially an ArchLinux PKGBUILD.
+ * + split the code between GUI and hardware parts.
+ * + release candidate.
  *
  *
  *   Issues
  * ----------
- * + Turbo ratios now show up : must be enhanced with 48 bits overflow tests.
- *
  * + The live CD is too big (up to 500 MB).
+ *
+ * + Kernel NMI Watchdog interferes with counters. Disable the watchdog as follow :
+ *     Append the Kernel parameter nmi_watchdog=0
+ *     or into Shell, echo "0" > /proc/sys/kernel/nmi_watchdog
+ *
+ * + The Widgets moving does not work fine with some Desktops, such as KDE.
+ *     Mouse grabbing should be the answer.
+ *
+ * + The temperature thresholds MSR does not return any value.
+ *     Need to investigate ACPI.
  *
  *
  * [HISTORY]
+ *
+ * R 0.18 : 02/27 2014 SR-3
+ *        - The semaphore locks the drawing thread when increasing, decreasing the loop idle time.
+ *        - The loop idle time is displayed in the System Info Widget.
+ *        - The Processor Brand name is now shown beside the System Info title :
+ *            a new button [Brand] starts and stops this wallboard.
+ *        - An new argument "-a" is provided to enable or disable X Access Control List".
+ *
+ * R 0.18 : 02/26 2014 SR-2
+ *        - The decoration is now put on the top-right corner.
+ *        - A message is output when Counters are reset.
+ *
+ * R 0.18 : 02/24 2014 SR-1
+ *        - In case of counters overflowed, reset them.
+ *        - In the System Info Widget, two buttons are added to increase, decrease the sleep time.
+ *        - A "ReClock" button in the System Info Widget allows to re-estimate the Base Clock.
+ *        - The Mouse Cursors are implemented.
+ *        - Moving the Widgets is managed in both cases, with or without the MDI mode.
+ *          Thus, no Window Manager is required. Use right mouse button to move a Widget.
  *
  * R 0.17 : 02/22 2014 SR-5
  *        - Clean up some code.
