@@ -31,13 +31,17 @@
  *
  * + other processors are claimed. Call to beta testers.
  * + implement the procstat API to trace high cpu load processes.
- * + scripting, editor, push alarms.
+ * + scripting, editor, push alarms : write user defined bit values in MSR.
  *
  *
  *  Graphical
  * -----------
  *
- * + power energy Widget.
+ * + power energy Widget using a slider to:
+ *     select a Policy Preference in IA32_ENERGY_PERF_BIAS , MSR_MISC_PWR_MGMT(0x1aa),
+ *     set On-Demand Clock Modulation in IA32_CLOCK_MODULATION(0x19a) (duplicated for each Thread),
+ *     enable / disable C1E in MSR_POWER_CTL(0x1fc),
+ *     C-State auto demotion with MSR_PKG_CST_CONFIG_CONTROL(0xe2).
  * + some button-switchs & sliders to enable/disable/set the PKG/Core features in the System Info Widget.
  * + full transparency & opacity.
  * + integrate XCB, wayland ?
@@ -48,6 +52,7 @@
  * + resize footer separator w/ MDI.
  * + give a better disposal of the Widgets using % of screen size and absolute positions.
  * + save and load settings.
+ * + show the minimum value in the Temp Widget : on the graphic, left side=min & right side=max
  *
  *
  *  Source code
@@ -62,21 +67,55 @@
  *   Issues
  * ----------
  * + The live CD is too big (up to 500 MB).
- *
- * + Kernel NMI Watchdog interferes with counters. Disable the watchdog as follow :
- *     Append the Kernel parameter nmi_watchdog=0
- *     or into Shell, echo "0" > /proc/sys/kernel/nmi_watchdog
- *
- * + The Widgets moving does not work fine with some Desktops, such as KDE.
- *     Mouse grabbing should be the answer.
+ *     So I packed other benchmark tools inside ;-)
  *
  * + The temperature thresholds MSR does not return any value.
  *     Need to investigate ACPI.
  *
+ * + Using the TWM manager, the first disposal of the Widgets is not applied.
+ *
+ * + Program freeze after a long run. Probably due to a semaphore lock overload.
+ *
+ * + XFreq tested ok with a 3770K, however BIOS DMI is not reliable.
+ *     Thus, the number of active Cores or Threads will be count from CPUID and the appropriate MSR.
+ *     Solved with Processor topology enumeration.
+ *
  *
  * [HISTORY]
  *
+ * R 0.21 : 03/14 2014 SR-1
+ *        - Fix the Topology algorithm to get a list of enabled CPU and show if HTT is enabled.
+ *        - Fix a Graphic regression in the Widget Temperature. Now displays the coldest value.
+ *
+ * R 0.21 : 03/12 2014
+ *        - Implemented an enumeration of the Processor topology to get a list of the activated Threads and Cores;
+ *            and conclude if Hyperthreading is actually enabled.
+ *
+ * R 0.20 : 03/07 2014
+ *        - Provide an option to select the Clock source between the TSC, BIOS, Specifications, ROM, and an user defined value.
+ *            Use the '-S' command line argument or one of the buttons in the System Info Widget.
+ *            The current source is displayed beside the Base Clock.
+ *
+ * R 0.19 : 03/06 2014 SR-2
+ *        - Added a new Quit decoration button.
+ *        - Modified the Minimize decoration button.
+ *        - Fix the scrolling boundaries & the icon names updates.
+ *
+ * R 0.19 : 03/05 2014 SR-1
+ *        - Fix the icons size & position.
+ *        - To get a smoother motion, the Scrolling code has been reprogrammed using an additional pixmap.
+ *
+ * R 0.19 : 03/01 2014
+ *        - Allow the Widget title to be still refreshed when the window is minimized, iconified or paused.
+ *            By the way, when MDI is enabled, the title of the main window is updated with the top frequency & temperature.
+ *        - Solved the Widgets moving issue using the 'ConfigureNotify' event.
+ *            However the top frame border added by the WM is not counted in the Window position.
+ *
  * R 0.18 : 02/27 2014 SR-3
+ *        - Kernel NMI Watchdog must be disabled because it interferes XFreq when reading UNC & URC counters.
+ *            to disable the watchdog, append the Kernel parameter nmi_watchdog=0
+ *            or into Shell, echo "0" > /proc/sys/kernel/nmi_watchdog before starting XFreq.
+ *
  *        - The semaphore locks the drawing thread when increasing, decreasing the loop idle time.
  *        - The loop idle time is displayed in the System Info Widget.
  *        - The Processor Brand name is now shown beside the System Info title :

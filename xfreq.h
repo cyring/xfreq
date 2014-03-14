@@ -1,9 +1,14 @@
 /*
- * XFreq.h #0.18 SR3 by CyrIng
+ * XFreq.h #0.21 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  */
+
+#define _MAJOR   "0"
+#define _MINOR   "21"
+#define _NIGHTLY "1"
+#define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #define MAX(M, m)	((M) > (m) ? (M) : (m))
 #define MIN(m, M)	((m) < (M) ? (m) : (M))
@@ -216,7 +221,47 @@ typedef struct
 		} EDX;
 	} ExtFunc;
 	char		BrandString[48+1];
+	bool		HTT_enabled;
 } FEATURES;
+
+typedef	struct {
+		union {
+			struct
+			{
+				unsigned
+				SHRbits	:  5-0,
+				Unused1	: 32-5;
+			};
+			unsigned Register;
+		} EAX;
+		union {
+			struct
+			{
+				unsigned
+				Threads	: 16-0,
+				Unused1	: 32-16;
+			};
+			unsigned Register;
+		} EBX;
+		union {
+			struct
+			{
+				unsigned
+				Level	:  8-0,
+				Type	: 16-8,
+				Unused1 : 32-16;
+			};
+			unsigned Register;
+		} ECX;
+		union {
+			struct
+			{
+				unsigned
+				 x2APIC_ID: 32-0;
+			};
+			unsigned Register;
+		} EDX;
+} CPUID_TOPOLOGY;
 
 // Read data from the PCI bus.
 #define PCI_CONFIG_ADDRESS(bus, dev, fn, reg) \
@@ -476,16 +521,9 @@ const struct {
 				{ Haswell_46,            4, 100.00, "Haswell" },
 			};
 
-typedef struct {
-		signed int			ArchID;
-		FEATURES			Features;
-		MISC_PROC_FEATURES		MiscFeatures;
-		PLATFORM			Platform;
-		TURBO				Turbo;
-		double				ClockSpeed;
-		unsigned int			CPU;
-		char				Bump[2+2+2+1];
-		struct THREADS {
+enum	{SRC_TSC, SRC_BIOS, SRC_SPEC, SRC_ROM, SRC_USER, SRC_COUNT};
+
+typedef	struct {
 			signed int		FD;
 			GLOBAL_PERF_COUNTER	GlobalPerfCounter;
 			FIXED_PERF_COUNTER	FixedPerfCounter;
@@ -522,7 +560,32 @@ typedef struct {
 			TJMAX			TjMax;
 			THERM_INTERRUPT		ThermIntr;
 			THERM_STATUS		ThermStat;
-		} *Core;
+} SMT;
+
+#define	LEVEL_INVALID	0
+#define	LEVEL_THREAD	1
+#define	LEVEL_CORE	2
+
+typedef	struct
+{
+	unsigned
+		APIC_ID	 : 32-0,
+		Core_ID	 : 32-0,
+		Thread_ID: 32-0;
+	SMT	*Core;
+} TOPOLOGY;
+
+typedef struct {
+		signed int			ArchID;
+		FEATURES			Features;
+		TOPOLOGY			*Topology;
+		MISC_PROC_FEATURES		MiscFeatures;
+		PLATFORM			Platform;
+		TURBO				Turbo;
+		double				ClockSpeed;
+		unsigned int			CPU;
+		char				Bump[2+2+2+1];
+
 		struct {
 			double			Turbo,
 						C0,
@@ -531,13 +594,16 @@ typedef struct {
 		} Avg;
 		unsigned int			Top,
 						Hot,
-						PerCore;
+						Cold,
+						PerCore,
+						ClockSrc;
 		useconds_t			IdleTime;
 } PROCESSOR;
 
+
 #define	GLOBAL_BACKGROUND	0x333333
 #define	GLOBAL_FOREGROUND	0x8fcefa
-#define	MAIN_BACKGROUND		0x333333
+#define	MAIN_BACKGROUND		0x11114c
 #define	MAIN_FOREGROUND		0x8fcefa
 #define	CORES_BACKGROUND	0x191970
 #define	CORES_FOREGROUND	0x8fcefa
@@ -571,18 +637,27 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 
 #define	ID_NULL		'\0'
 #define	ID_MIN		'm'
+#define	ID_QUIT		'Q'
 #define	ID_NORTH	'N'
 #define	ID_SOUTH	'S'
 #define	ID_EAST		'E'
 #define	ID_WEST		'W'
 #define	ID_PGUP		'U'
 #define	ID_PGDW		'D'
+#define	ID_PGHOME	'['
+#define	ID_PGEND	']'
+#define	ID_CTRLHOME	'{'
+#define	ID_CTRLEND	'}'
 #define	ID_PAUSE	'I'
 #define	ID_FREQ		'H'
 #define	ID_CYCLE	'Y'
 #define	ID_RATIO	'R'
 #define	ID_STATE	'P'
-#define	ID_RECLOCK	'C'
+#define	ID_TSC		't'
+#define	ID_BIOS		'b'
+#define	ID_SPEC		'a'
+#define	ID_ROM		'r'
+#define	ID_USER		'u'
 #define	ID_INCLOOP	'+'
 #define	ID_DECLOOP	'-'
 #define	ID_WALLBOARD	'B'
@@ -592,10 +667,15 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 #define	RSC_CYCLE	"Cycle"
 #define	RSC_STATE	"States"
 #define	RSC_RATIO	"Ratio"
-#define	RSC_RECLOCK	"ReClock"
+#define	RSC_TSC		"TSC"
+#define	RSC_BIOS	"BIOS"
+#define	RSC_SPEC	"SPEC"
+#define	RSC_ROM		"ROM"
 #define	RSC_INCLOOP	"<<"
 #define	RSC_DECLOOP	">>"
 #define	RSC_WALLBOARD	"Brand"
+
+#define	ICON_LABELS	{{Label:'M'}, {Label:'C'}, {Label:'S'}, {Label:'T'}, {Label:'I'}, {Label:'D'}}
 
 typedef	enum	{DECORATION, SCROLLING, TEXT, ICON} WBTYPE;
 
@@ -667,6 +747,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 
 #define	FIRST_WIDGET	(MAIN + 1)
 #define	LAST_WIDGET	(WIDGETS - 1)
+#define	MESSAGE		MAIN
 
 #define	Quarter_Char_Width(N)		(A->W[N].extents.charWidth >> 2)
 #define	Half_Char_Width(N)		(A->W[N].extents.charWidth >> 1)
@@ -688,15 +769,17 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	MAIN_TEXT_WIDTH		49
 #define	MAIN_TEXT_HEIGHT	14
 
+#define	MAIN_SECTION		"X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" CyrIng"
+
 #define	CORES_TEXT_WIDTH	(A->P.Turbo.MaxRatio_1C)
 #define	CORES_TEXT_HEIGHT	(A->P.CPU)
-
-#define	TEMPS_TEXT_HEIGHT	18
-#define	TEMPS_TEXT_WIDTH	(A->P.Features.ThreadCount << 2)
 
 #define	CSTATES_TEXT_SPACING	3
 #define	CSTATES_TEXT_WIDTH	( MAX(A->P.CPU, 7) * CSTATES_TEXT_SPACING )
 #define	CSTATES_TEXT_HEIGHT	10
+
+#define	TEMPS_TEXT_WIDTH	(A->P.Features.ThreadCount << 2)
+#define	TEMPS_TEXT_HEIGHT	18
 
 #define	SYSINFO_TEXT_WIDTH	80
 #define	SYSINFO_TEXT_HEIGHT	20
@@ -709,7 +792,6 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 // WIDTH: PRE_TEXT + BIN64 w/ 15 interspaces + ']' + ScrollButtons
 #define	DUMP_TEXT_WIDTH		PRE_TEXT + BIN64_STR + 15 + 1 + 2
 #define	DUMP_TEXT_HEIGHT	13
-#define	DUMP_TABLE_ROWS		11
 
 #define	MENU_FORMAT	"[F1]     Help             [F2]     Core\n"               \
 			"[F3]     C-States         [F4]     Temps \n"             \
@@ -719,10 +801,11 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"                                [Down]\n"                \
 			"[Pause]  Suspend/Resume\n"                               \
 			"[PgDw]   Page Down        [PgUp]   Page Up\n"            \
-			"[Home]   Keep on top      [End]    Keep below\n"         \
+			"[Home]   Line Begin       [End]    Line End\n"           \
 			"KPad [+] Faster Loop      KPad [-] Slower Loop\n\n"      \
 			"With the [Control] key, activate the followings :\n"     \
-			"[L][l]   Refresh page     [C][c]   Center page\n"        \
+			"[Home]   Page Begin       [End]    Page End\n"           \
+			"[L][l]   Refresh page     \n"                            \
 			"[Y][y]   Cycles           [W][w]   Wallboard\n"          \
 			"[H][h]   Frequency Hz     [P][p]   C-States %\n"         \
 			"[R][r]   Ratio values     [Q][q]   Quit\n\n"             \
@@ -731,8 +814,8 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"[Erase] Suppress the full Command line\n"                \
 			"[Enter] Submit the Command\n\n"                          \
 			"Mouse buttons :\n"                                       \
-			"[Left]   Click any Button [Right] Grab & Move Widget\n"  \
-			"[WheelUp] Page Scroll Up  [WheelDw] Page Scroll Down\n"
+			"[Left]  Activate Button   [Right] Grab & Move Widget\n"  \
+			"[Wheel Down] Page Down    [Wheel Up] Page Up\n"
 
 #define	CORE_NUM	"#%-2d"
 #define	CORE_FREQ	"%4.0fMHz"
@@ -743,65 +826,68 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	OVERCLOCK	"%s [%4.0f MHz]"
 #define	TEMPERATURE	"%3d"
 
-#define	PROC_FORMAT	"Processor [%s]  Architecture [%s]\n"                                       \
-			"Base Clock [%5.2f MHz]\n\n"                                                  \
-			" Family               Model             Stepping             Max# of\n"    \
-			"  Code                 No.                 ID                Threads\n"    \
-			"[%6X]            [%6X]            [%6d]            [%6d]\n\n"              \
-			"Virtual Mode Extension                                         VME [%c]\n" \
-			"Debugging Extension                                             DE [%c]\n" \
-			"Page Size Extension                                            PSE [%c]\n" \
-			"Time Stamp Counter                                             TSC [%c]\n" \
-			"Model Specific Registers                                       MSR [%c]\n" \
-			"Physical Address Extension                                     PAE [%c]\n" \
-			"Advanced Programmable Interrupt Controller                    APIC [%c]\n" \
-			"Memory Type Range Registers                                   MTRR [%c]\n" \
-			"Page Global Enable                                             PGE [%c]\n" \
-			"Machine-Check Architecture                                     MCA [%c]\n" \
-			"Page Attribute Table                                           PAT [%c]\n" \
-			"36-bit Page Size Extension                                   PSE36 [%c]\n" \
-			"Processor Serial Number                                        PSN [%c]\n" \
-			"Debug Store & Precise Event Based Sampling                DS, PEBS [%c]   [%s]\n" \
-			"Advanced Configuration & Power Interface                      ACPI [%c]\n" \
-			"Self-Snoop                                                      SS [%c]\n" \
-			"Hyper-Threading                                                HTT [%c]\n" \
-			"Thermal Monitor                                 TM1 [%c]        TM2 [%c]\n" \
-			"Pending Break Enable                                           PBE [%c]\n" \
-			"64-Bit Debug Store                                          DTES64 [%c]\n" \
-			"CPL Qualified Debug Store                                   DS-CPL [%c]\n" \
-			"Virtual Machine Extensions                                     VMX [%c]\n" \
-			"Safer Mode Extensions                                          SMX [%c]\n" \
-			"SpeedStep                                                     EIST [%c]   [%s]\n" \
-			"L1 Data Cache Context ID                                   CNXT-ID [%c]\n" \
-			"Fused Multiply Add                                             FMA [%c]\n" \
-			"xTPR Update Control                                           xTPR [%c]   [%s]\n" \
-			"Perfmon and Debug Capability                                  PDCM [%c]\n" \
-			"Process Context Identifiers                                   PCID [%c]\n" \
-			"Direct Cache Access                                            DCA [%c]\n" \
-			"Extended xAPIC Support                                      x2APIC [%c]\n" \
-			"Time Stamp Counter Deadline                           TSC-DEADLINE [%c]\n" \
-			"XSAVE/XSTOR States                                           XSAVE [%c]\n" \
-			"OS-Enabled Ext. State Management                           OSXSAVE [%c]\n" \
-			"Execution Disable Bit Support                               XD-Bit [%c]   [%s]\n" \
-			"1 GB Pages Support                                       1GB-PAGES [%c]\n" \
-			"Fast-Strings                                       REP MOVSB/STOSB [%c]   [%s]\n" \
-			"Automatic Thermal Control Circuit Enable                       TCC       [%s]\n" \
-			"Performance Monitoring Available                                PM       [%s]\n" \
-			"Branch Trace Storage Unavailable                               BTS       [%s]\n" \
-			"Limit CPUID Maxval                                     Limit-CPUID       [%s]\n" \
-			"Turbo Mode                                                   TURBO [%c]   [%s]\n" \
-			"\nInstruction set:\n"                              \
-			"FPU [%c]                CX8 [%c]             SEP [%c]   CMOV [%c]    CLFSH [%c]\n" \
-			"MMX [%c]               FXSR [%c]             SSE [%c]   SSE2 [%c]     SSE3 [%c]\n" \
-			"SSSE3 [%c]           SSE4.1 [%c]          SSE4.2 [%c]            PCLMULDQ [%c]\n" \
-			"MONITOR [%c] [%s]      CX16 [%c]           MOVBE [%c]              POPCNT [%c]\n" \
-			"AES [%c]                AVX [%c]            F16C [%c]              RDRAND [%c]\n" \
-			"LAHF/SAHF [%c]      SYSCALL [%c]          RDTSCP [%c]                IA64 [%c]\n"\
-			"\nPerformance:\n" \
-			"Monitoring Counters                                       %-3ux%3u bits\n" \
-			"Fixed Counters                                            %-3ux%3u bits\n" \
+#define	PROC_FORMAT	"Processor [%s] Arch. [%s]\n"								\
+			"Base Clock [%5.2f MHz]           Source [%s]\n\n"					\
+			" Family               Model             Stepping             Max# of\n"		\
+			"  Code                 No.                 ID                Threads\n"		\
+			"[%6X]            [%6X]            [%6d]            [%6d]\n\n"				\
+			"Virtual Mode Extension                                        VME [%c]\n"		\
+			"Debugging Extension                                            DE [%c]\n"		\
+			"Page Size Extension                                           PSE [%c]\n"		\
+			"Time Stamp Counter                                            TSC [%c]\n"		\
+			"Model Specific Registers                                      MSR [%c]\n"		\
+			"Physical Address Extension                                    PAE [%c]\n"		\
+			"Advanced Programmable Interrupt Controller                   APIC [%c]\n"		\
+			"Memory Type Range Registers                                  MTRR [%c]\n"		\
+			"Page Global Enable                                            PGE [%c]\n"		\
+			"Machine-Check Architecture                                    MCA [%c]\n"		\
+			"Page Attribute Table                                          PAT [%c]\n"		\
+			"36-bit Page Size Extension                                  PSE36 [%c]\n"		\
+			"Processor Serial Number                                       PSN [%c]\n"		\
+			"Debug Store & Precise Event Based Sampling               DS, PEBS [%c]   [%s]\n"	\
+			"Advanced Configuration & Power Interface                     ACPI [%c]\n"		\
+			"Self-Snoop                                                     SS [%c]\n"		\
+			"Hyper-Threading                                               HTT [%c]   [%s]\n"	\
+			"Thermal Monitor                                TM1 [%c]        TM2 [%c]\n"		\
+			"Pending Break Enable                                          PBE [%c]\n"		\
+			"64-Bit Debug Store                                         DTES64 [%c]\n"		\
+			"CPL Qualified Debug Store                                  DS-CPL [%c]\n"		\
+			"Virtual Machine Extensions                                    VMX [%c]\n"		\
+			"Safer Mode Extensions                                         SMX [%c]\n"		\
+			"SpeedStep                                                    EIST [%c]   [%s]\n"	\
+			"L1 Data Cache Context ID                                  CNXT-ID [%c]\n"		\
+			"Fused Multiply Add                                            FMA [%c]\n"		\
+			"xTPR Update Control                                          xTPR [%c]   [%s]\n"	\
+			"Perfmon and Debug Capability                                 PDCM [%c]\n"		\
+			"Process Context Identifiers                                  PCID [%c]\n"		\
+			"Direct Cache Access                                           DCA [%c]\n"		\
+			"Extended xAPIC Support                                     x2APIC [%c]\n"		\
+			"Time Stamp Counter Deadline                          TSC-DEADLINE [%c]\n"		\
+			"XSAVE/XSTOR States                                          XSAVE [%c]\n"		\
+			"OS-Enabled Ext. State Management                          OSXSAVE [%c]\n"		\
+			"Execution Disable Bit Support                              XD-Bit [%c]   [%s]\n"	\
+			"1 GB Pages Support                                      1GB-PAGES [%c]\n"		\
+			"Fast-Strings                                      REP MOVSB/STOSB [%c]   [%s]\n"	\
+			"Automatic Thermal Control Circuit Enable                      TCC       [%s]\n"	\
+			"Performance Monitoring Available                               PM       [%s]\n"	\
+			"Branch Trace Storage Unavailable                              BTS       [%s]\n"	\
+			"Limit CPUID Maxval                                    Limit-CPUID       [%s]\n"	\
+			"Turbo Mode                                                  TURBO [%c]   [%s]\n"	\
+			"\nInstruction set:\n"									\
+			"FPU [%c]                CX8 [%c]             SEP [%c]   CMOV [%c]    CLFSH [%c]\n"	\
+			"MMX [%c]               FXSR [%c]             SSE [%c]   SSE2 [%c]     SSE3 [%c]\n"	\
+			"SSSE3 [%c]           SSE4.1 [%c]          SSE4.2 [%c]            PCLMULDQ [%c]\n"	\
+			"MONITOR [%c] [%s]      CX16 [%c]           MOVBE [%c]              POPCNT [%c]\n"	\
+			"AES [%c]                AVX [%c]            F16C [%c]              RDRAND [%c]\n"	\
+			"LAHF/SAHF [%c]      SYSCALL [%c]          RDTSCP [%c]                IA64 [%c]\n"	\
+			"\nPerformance:\n"									\
+			"Monitoring Counters                                       %-3ux%3u bits\n"		\
+			"Fixed Counters                                            %-3ux%3u bits\n"		\
+			"\nProcessor Topology:                                       %-3ux CPU enabled\n"	\
+			"\n  x2APIC    Core  Thread\n"
 
 #define	RAM_SECTION	"\nMemory Controler:\n"
+#define	TOPOLOGY_FORMAT	"%8u%8u%8u\n"
 #define	CHA_FORMAT	"Channel   tCL   tRCD  tRP   tRAS  tRRD  tRFC  tWR   tRTPr tWTPr tFAW  B2B\n"
 #define	CAS_FORMAT	"   #%1i   |%4d%6d%6d%6d%6d%6d%6d%6d%6d%6d%6d\n"
 
@@ -811,11 +897,43 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	REG_HEXVAL	"%016llX"
 #define	REG_FORMAT	"%02d %05X %s%%%zdc["
 
+#define	TITLE_MDI_FMT		"X-Freq %.0fMHz %dC"
 #define	TITLE_MAIN_FMT		"X-Freq %s.%s-%s"
-#define	TITLE_CORES_FMT		"Core#%d @ %4.0fMHz"
+#define	TITLE_CORES_FMT		"Core#%d @ %.0f MHz"
 #define	TITLE_CSTATES_FMT	"C-States [%.2f%%] [%.2f%%]"
 #define	TITLE_TEMPS_FMT		"Core#%d @ %dC"
 #define	TITLE_SYSINFO_FMT	"Clock @ %5.2f MHz"
+
+#define	SCROLLED_ROWS_PER_ONCE	1
+#define	SCROLLED_ROWS_PER_PAGE	(MAIN_TEXT_HEIGHT >> 1)
+#define	SCROLLED_COLS_PER_ONCE	1
+
+#define	SetHScrolling(N, col)	A->L.Page[N].hScroll=col
+#define	SetVScrolling(N, row)	A->L.Page[N].vScroll=row
+#define	GetHScrolling(N)	A->L.Page[N].hScroll
+#define	GetVScrolling(N)	A->L.Page[N].vScroll
+
+#define	SetHViewport(N, col)	A->L.Page[N].Visible.cols=col
+#define	SetVViewport(N, row)	A->L.Page[N].Visible.rows=row
+#define	GetHViewport(N)		A->L.Page[N].Visible.cols
+#define	GetVViewport(N)		A->L.Page[N].Visible.rows
+
+#define	SetHListing(N, col)	A->L.Page[N].Listing.cols=col
+#define	SetVListing(N, row)	A->L.Page[N].Listing.rows=row
+#define	GetHListing(N)		A->L.Page[N].Listing.cols
+#define	GetVListing(N)		A->L.Page[N].Listing.rows
+
+#define	SetHFrame(N, col)	A->L.Page[N].FrameSize.cols=col
+#define	SetVFrame(N, row)	A->L.Page[N].FrameSize.rows=row
+#define	GetHFrame(N)		A->L.Page[N].FrameSize.cols
+#define	GetVFrame(N)		A->L.Page[N].FrameSize.rows
+
+#define	MAIN_FRAME_VIEW_HSHIFT		1
+#define	MAIN_FRAME_VIEW_VSHIFT		4
+#define	SYSINFO_FRAME_VIEW_HSHIFT	1
+#define	SYSINFO_FRAME_VIEW_VSHIFT	3
+#define	DUMP_FRAME_VIEW_HSHIFT		1
+#define	DUMP_FRAME_VIEW_VSHIFT		1
 
 typedef struct {
 	int	cols,
@@ -829,10 +947,15 @@ typedef struct {
 	} Margin, Start;
 	struct	{
 		bool		Pageable;
-		char		*Title;
-		MaxText 	Text;
+		MaxText		Visible,
+				Listing,
+				FrameSize;
 		int		hScroll,
 				vScroll;
+		Pixmap		Pixmap;
+		int		width,
+				height;
+		char		*Title;
 	} Page[WIDGETS];
 	struct {
 		bool
@@ -857,7 +980,7 @@ typedef struct {
 	struct {
 		char		*Name;
 		unsigned int	Addr;
-	} DumpTable[DUMP_TABLE_ROWS];
+	} DumpTable[DUMP_TEXT_HEIGHT - 2];
 	struct {;
 		int		N;
 		XSegment	*Segment;
@@ -875,9 +998,8 @@ typedef struct {
 #define	_IS_MDI_	(A->MDI != false)
 
 // Misc drawing macro.
-#define	fDraw(N, DoCenter, DoBuild, DoDraw) {	\
-	if(DoCenter) CenterLayout(A, N);	\
-	if(DoBuild)  BuildLayout(A, N);	\
+#define	fDraw(N, DoBuild, DoDraw) {		\
+	if(DoBuild)  BuildLayout(A, N);		\
 	MapLayout(A, N);			\
 	if(DoDraw)   DrawLayout(A, N);		\
 	FlushLayout(A, N);			\
@@ -897,9 +1019,17 @@ typedef struct {
 	bool		MDI;
 	LAYOUT		L;
 	bool		LOOP,
-			PAUSE[WIDGETS];
+			PAUSE[WIDGETS],
+			MSR,
+			BIOS;
 	pthread_t	TID_Draw;
 } uARG;
+
+typedef struct {
+	int		cpu;
+	pthread_t	TID;
+	uARG		*A;
+} uAPIC;
 
 typedef struct {
 	char *argument;
