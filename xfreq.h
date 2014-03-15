@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.21 SR1 by CyrIng
+ * XFreq.h #0.21 SR2 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,7 +7,7 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "21"
-#define _NIGHTLY "1"
+#define _NIGHTLY "2"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #define MAX(M, m)	((M) > (m) ? (M) : (m))
@@ -262,6 +262,9 @@ typedef	struct {
 			unsigned Register;
 		} EDX;
 } CPUID_TOPOLOGY;
+
+// Memory address of the Base Clock in the ROM of the ASUS Rampage II GENE.
+#define	BCLK_ROM_ADDR	0xf08d9 + 0x12
 
 // Read data from the PCI bus.
 #define PCI_CONFIG_ADDRESS(bus, dev, fn, reg) \
@@ -582,6 +585,7 @@ typedef struct {
 		MISC_PROC_FEATURES		MiscFeatures;
 		PLATFORM			Platform;
 		TURBO				Turbo;
+		off_t				BClockROMaddr;
 		double				ClockSpeed;
 		unsigned int			CPU;
 		char				Bump[2+2+2+1];
@@ -884,7 +888,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"Monitoring Counters                                       %-3ux%3u bits\n"		\
 			"Fixed Counters                                            %-3ux%3u bits\n"		\
 			"\nProcessor Topology:                                       %-3ux CPU enabled\n"	\
-			"\n  x2APIC    Core  Thread\n"
+			"\nID: APIC    Core  Thread\n"
 
 #define	RAM_SECTION	"\nMemory Controler:\n"
 #define	TOPOLOGY_FORMAT	"%8u%8u%8u\n"

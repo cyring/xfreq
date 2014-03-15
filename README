@@ -23,7 +23,7 @@
  *
  * + memory fetch : to remove dependancies with the dmi_sysfs & msr Linux modules.
  *     using a R/O mmap to "/dev/mem".
- *     base clock is a 2 bytes word found at address 0xf08d9 + 0x12 (Rampage II GENE).
+ *     base clock is a 2 bytes word found at address 0xf08d9 + 0x12 (Rampage II GENE) : done.
  *     rather use the msr assembler instruction.
  *
  * + GPU sensors.
@@ -52,7 +52,7 @@
  * + resize footer separator w/ MDI.
  * + give a better disposal of the Widgets using % of screen size and absolute positions.
  * + save and load settings.
- * + show the minimum value in the Temp Widget : on the graphic, left side=min & right side=max
+ * + show the minimum value in the Temp Widget : on the graphic, left side=min & right side=max : done.
  *
  *
  *  Source code
@@ -76,12 +76,17 @@
  *
  * + Program freeze after a long run. Probably due to a semaphore lock overload.
  *
- * + XFreq tested ok with a 3770K, however BIOS DMI is not reliable.
+ * + XFreq tested ok with a 3770K, however BIOS DMI is not reliable : solved.
  *     Thus, the number of active Cores or Threads will be count from CPUID and the appropriate MSR.
  *     Solved with Processor topology enumeration.
  *
  *
  * [HISTORY]
+ *
+ * R 0.21 : 03/15 2014 SR-2
+ *        - Allows to read the Base Clock frequency at a user's specified address in ROM memory.
+ *            use the new command line argument '-M'
+ *            defaults to 0xf08d9 + 0x12 which is the ASUS Rampage II GENE motherboard address.
  *
  * R 0.21 : 03/14 2014 SR-1
  *        - Fix the Topology algorithm to get a list of enabled CPU and show if HTT is enabled.

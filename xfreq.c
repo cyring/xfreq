@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.21 SR1 by CyrIng
+ * XFreq.c #0.21 SR2 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -406,6 +406,23 @@ int	Get_ExternalClock()
 		return(0);
 }
 
+// Read the Base Clock in ROM memory.
+int	Read_ROM_BCLK(off_t addr)
+{
+	int	fd=-1;
+	ssize_t	br=1;
+	char	buf[2]={0};
+	int	bclk=0;
+
+	if( (fd=open("/dev/mem", O_RDONLY)) != -1 )
+	{
+		if( (lseek(fd, addr, SEEK_SET ) != -1) && ((br=read(fd, buf, 2)) != 1) )
+			bclk=((unsigned char) (buf[0])) + ((unsigned char) (buf[1] << 8));
+		close(fd);
+	}
+	return(bclk);
+}
+
 // Read the number of logical Cores activated in the BIOS.
 int	Get_ThreadCount()
 {
@@ -433,7 +450,7 @@ int	Get_CoreCount()
 }
 
 // Call the CPUID instruction.
-void	CPUID(FEATURES *features)
+void	Read_Features(FEATURES *features)
 {
 	__asm__ volatile
 	(
@@ -726,6 +743,10 @@ void	SelectBaseClock(uARG *A)
 				Output(A, defaultClock);
 			}
 		case SRC_ROM:	// Read the Bus Clock Frequency at a specified memory address.
+			if((A->P.ClockSpeed=Read_ROM_BCLK(A->P.BClockROMaddr)) !=0 ) {
+				A->P.ClockSrc=SRC_ROM;
+				break;
+			}
 		case SRC_USER:{	// Set the Base Clock from the first row in the architecture array.
 			A->P.ClockSpeed=ARCH[0].ClockSpeed;
 			A->P.ClockSrc=SRC_USER;
@@ -3338,22 +3359,23 @@ static void *uLoop(uARG *A)
 int	Args(uARG *A, int argc, char *argv[])
 {
 	OPTION	options[] = {
-				{"-D", "%d", &A->MDI,                  "Enable MDI Window (0/1)"       },
-				{"-F", "%s", A->fontName,              "Font name"                     },
-				{"-a", "%c", &A->xACL,                 "Enable or disable X ACL (Y/N)" },
-				{"-x", "%d", &A->L.Start.H,            "Left position"                 },
-				{"-y", "%d", &A->L.Start.V,            "Top position"                  },
-				{"-b", "%x", &A->L.globalBackground,   "Background color"              },
-				{"-f", "%x", &A->L.globalForeground,   "Foreground color"              },
-				{"-c", "%ud",&A->P.PerCore,            "Monitor per Thread/Core (0/1)" },
+				{"-D", "%d", &A->MDI,                  "Enable MDI Window (0/1)"                            },
+				{"-F", "%s", A->fontName,              "Font name"                                          },
+				{"-a", "%c", &A->xACL,                 "Enable or disable X ACL (Y/N)"                      },
+				{"-x", "%d", &A->L.Start.H,            "Left position (Pixel value)"                        },
+				{"-y", "%d", &A->L.Start.V,            "Top position (Pixel value)"                         },
+				{"-b", "%x", &A->L.globalBackground,   "Background color (Hex. value)"                      },
+				{"-f", "%x", &A->L.globalForeground,   "Foreground color (Hex. value)"                      },
+				{"-c", "%ud",&A->P.PerCore,            "Monitor per Thread/Core (0/1)"                      },
 				{"-S", "%ud",&A->P.ClockSrc,           "Clock source TSC(0) BIOS(1) SPEC(2) ROM(3) USER(4)" },
-				{"-s", "%ud",&A->P.IdleTime,           "Idle time (usec) where 2^N"    },
-				{"-h", "%ud",&A->L.Play.freqHertz,     "CPU frequency (0/1)"           },
-				{"-l", "%ud",&A->L.Play.cycleValues,   "Cycle Values (0/1)"            },
-				{"-r", "%ud",&A->L.Play.ratioValues,   "Ratio Values (0/1)"            },
-				{"-p", "%ud",&A->L.Play.cStatePercent, "C-STATE percentage (0/1)"      },
-				{"-t", "%ud",&A->L.Play.alwaysOnTop,   "Always On Top (0/1)"           },
-				{"-w", "%ud",&A->L.Play.wallboard,     "Scroll wallboard (0/1)"        },
+				{"-M", "%x", &A->P.BClockROMaddr,      "ROM memory address of the Base Clock (Hex. value)"  },
+				{"-s", "%ud",&A->P.IdleTime,           "Idle time (usec) where 2^N"                         },
+				{"-h", "%ud",&A->L.Play.freqHertz,     "CPU frequency (0/1)"                                },
+				{"-l", "%ud",&A->L.Play.cycleValues,   "Cycle Values (0/1)"                                 },
+				{"-r", "%ud",&A->L.Play.ratioValues,   "Ratio Values (0/1)"                                 },
+				{"-p", "%ud",&A->L.Play.cStatePercent, "C-STATE percentage (0/1)"                           },
+				{"-t", "%ud",&A->L.Play.alwaysOnTop,   "Always On Top (0/1)"                                },
+				{"-w", "%ud",&A->L.Play.wallboard,     "Scroll wallboard (0/1)"                             },
 		};
 	const int s=sizeof(options)/sizeof(OPTION);
 	int i=0, j=0, noerr=true;
@@ -3410,6 +3432,7 @@ int main(int argc, char *argv[])
 				MiscFeatures:{0},
 				Platform:{0},
 				Turbo:{0},
+				BClockROMaddr:BCLK_ROM_ADDR,
 				ClockSpeed:0,
 				CPU:0,
 				Bump:{0},
@@ -3703,7 +3726,7 @@ int main(int argc, char *argv[])
 			Output(&A, "Warning: root permission is denied.\n");
 
 		// Read the CPU Features.
-		CPUID(&A.P.Features);
+		Read_Features(&A.P.Features);
 
 		// Find the Processor Architecture.
 		for(A.P.ArchID=ARCHITECTURES; A.P.ArchID >=0 ; A.P.ArchID--)
@@ -3716,7 +3739,7 @@ int main(int argc, char *argv[])
 		if(!A.P.PerCore)
 		{
 			if(!(A.P.CPU=A.P.Features.ThreadCount)) {
-				Output(&A, "Warning: can not count the Thread number from CPUID.\n");
+				Output(&A, "Warning: can not read the maximum number of Cores from CPUID.\n");
 
 				if(!(A.BIOS=(A.P.CPU=Get_ThreadCount()) != 0))
 					Output(&A, "Warning: can not read the BIOS DMI\nCheck if 'dmi' kernel module is loaded.\n");
@@ -3725,7 +3748,7 @@ int main(int argc, char *argv[])
 		else if(A.P.Features.Std.EDX.HTT)
 		{
 			if(!(A.P.CPU=A.P.Features.ThreadCount)) {
-				Output(&A, "Warning: can not count the physical Core number from CPUID.\n");
+				Output(&A, "Warning: can not read the maximum number of Cores from CPUID.\n");
 
 				if(!(A.BIOS=(A.P.CPU=Get_CoreCount()) != 0))
 				Output(&A, "Warning: can not read the BIOS DMI\nCheck if 'dmi' kernel module is loaded\n");
@@ -3733,7 +3756,7 @@ int main(int argc, char *argv[])
 			else A.P.CPU>>=1;
 		}
 		if(!A.P.CPU) {
-			Output(&A, "Remark: count the Core number from the ");
+			Output(&A, "Remark: get the maximum number of Cores from the ");
 			if(A.P.ArchID != -1)
 			{
 				// Fallback to architecture specifications.
