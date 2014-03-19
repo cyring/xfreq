@@ -72,7 +72,7 @@
  * + The temperature thresholds MSR does not return any value.
  *     Need to investigate ACPI.
  *
- * + Using the TWM manager, the first disposal of the Widgets is not applied.
+ * + Using the TWM manager, the first disposal of the Widgets is not applied : solved.
  *
  * + Program freeze after a long run. Probably due to a semaphore lock overload.
  *
@@ -80,8 +80,25 @@
  *     Thus, the number of active Cores or Threads will be count from CPUID and the appropriate MSR.
  *     Solved with Processor topology enumeration.
  *
+ * + Fast-Strings reported as not available in CPUID but enabled in MSR.
+ *
  *
  * [HISTORY]
+ *
+ * R 0.22 : 03/19 2014
+ *        - The initial disposal of the Widgets is corrected.
+ *        - Change the scale of the temperature graphic.
+ *        - Added a splash screen during the initialization.
+ *        - Postponed the Thermal thresholds treatment.
+ *        - Display the followings into the System Info Widget:
+ *            Hardware Lock Elision (HLE)
+ *            Restricted Transactional Memory (RTE)
+ *            All Turbo Boost Ratios
+ *            BM1 / BM2
+ *            Topology & State of CPU
+ *            Performance Counters matrix
+ *        - Removed the '-c' (per Core) argument.
+ *            AnyThread Counters are now automatically set just after the Processor topology enumeration function.
  *
  * R 0.21 : 03/15 2014 SR-2
  *        - Allows to read the Base Clock frequency at a user's specified address in ROM memory.

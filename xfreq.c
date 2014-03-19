@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.21 SR2 by CyrIng
+ * XFreq.c #0.22 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -21,6 +21,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <errno.h>
+
 #include "xfreq.h"
 
 static  char    Version[] = AutoDate;
@@ -141,44 +142,45 @@ int	Open_MSR(uARG *A)
 	}
 	char	pathname[]="/dev/cpu/999/msr", warning[64];
 	int	cpu=0;
-	for(cpu=0; cpu < A->P.CPU; cpu++) {
+	for(cpu=0; cpu < A->P.CPU; cpu++)
+	  if(A->P.Topology[cpu].CPU != NULL) {
 		sprintf(pathname, "/dev/cpu/%d/msr", cpu);
-		if( (rc=((A->P.Topology[cpu].Core->FD=open(pathname, O_RDWR)) != -1)) ) {
+		if( (rc=((A->P.Topology[cpu].CPU->FD=open(pathname, O_RDWR)) != -1)) ) {
 			// Enable the Performance Counters 1 and 2 :
 			// - Set the global counter bits
-			rc=((retval=Read_MSR(A->P.Topology[cpu].Core->FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Topology[cpu].Core->GlobalPerfCounter)) != -1);
-			if(A->P.Topology[cpu].Core->GlobalPerfCounter.EN_FIXED_CTR1 != 0) {
+			rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Topology[cpu].CPU->GlobalPerfCounter)) != -1);
+			if(A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR1 != 0) {
 				sprintf(warning, "Warning: CPU#%02d: Fixed Counter #1 is already activated.\n", cpu);
 				Output(A, warning);
 			}
-			if(A->P.Topology[cpu].Core->GlobalPerfCounter.EN_FIXED_CTR2 != 0) {
+			if(A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR2 != 0) {
 				sprintf(warning, "Warning: CPU#%02d: Fixed Counter #2 is already activated.\n", cpu);
 				Output(A, warning);
 			}
-			A->P.Topology[cpu].Core->GlobalPerfCounter.EN_FIXED_CTR1=1;
-			A->P.Topology[cpu].Core->GlobalPerfCounter.EN_FIXED_CTR2=1;
-			rc=((retval=Write_MSR(A->P.Topology[cpu].Core->FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Topology[cpu].Core->GlobalPerfCounter)) != -1);
+			A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR1=1;
+			A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR2=1;
+			rc=((retval=Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Topology[cpu].CPU->GlobalPerfCounter)) != -1);
 
 			// - Set the fixed counter bits
-			rc=((retval=Read_MSR(A->P.Topology[cpu].Core->FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Topology[cpu].Core->FixedPerfCounter)) != -1);
-			A->P.Topology[cpu].Core->FixedPerfCounter.EN1_OS=1;
-			A->P.Topology[cpu].Core->FixedPerfCounter.EN2_OS=1;
-			A->P.Topology[cpu].Core->FixedPerfCounter.EN1_Usr=1;
-			A->P.Topology[cpu].Core->FixedPerfCounter.EN2_Usr=1;
+			rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Topology[cpu].CPU->FixedPerfCounter)) != -1);
+			A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_OS=1;
+			A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_OS=1;
+			A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_Usr=1;
+			A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_Usr=1;
 			if(A->P.PerCore) {
-				A->P.Topology[cpu].Core->FixedPerfCounter.AnyThread_EN1=1;
-				A->P.Topology[cpu].Core->FixedPerfCounter.AnyThread_EN2=1;
+				A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN1=1;
+				A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN2=1;
 			}
 			else {
-				A->P.Topology[cpu].Core->FixedPerfCounter.AnyThread_EN1=0;
-				A->P.Topology[cpu].Core->FixedPerfCounter.AnyThread_EN2=0;
+				A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN1=0;
+				A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN2=0;
 			}
-			rc=((retval=Write_MSR(A->P.Topology[cpu].Core->FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Topology[cpu].Core->FixedPerfCounter)) != -1);
+			rc=((retval=Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Topology[cpu].CPU->FixedPerfCounter)) != -1);
 
 			// Check & fixe Counter Overflow.
 			GLOBAL_PERF_STATUS Overflow={0};
 			GLOBAL_PERF_OVF_CTRL OvfControl={0};
-			rc=((retval=Read_MSR(A->P.Topology[cpu].Core->FD, IA32_PERF_GLOBAL_STATUS, (GLOBAL_PERF_STATUS *) &Overflow)) != -1);
+			rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_STATUS, (GLOBAL_PERF_STATUS *) &Overflow)) != -1);
 			if(Overflow.Overflow_CTR1) {
 				sprintf(warning, "Remark CPU#%02d: UCC Counter #1 is overflowed.\n", cpu);
 				Output(A, warning);
@@ -192,22 +194,22 @@ int	Open_MSR(uARG *A)
 			if(Overflow.Overflow_CTR1|Overflow.Overflow_CTR2) {
 				sprintf(warning, "Remark CPU#%02d: Resetting Counters.\n", cpu);
 				Output(A, warning);
-				rc=((retval=Write_MSR(A->P.Topology[cpu].Core->FD, IA32_PERF_GLOBAL_OVF_CTRL, (GLOBAL_PERF_OVF_CTRL *) &OvfControl)) != -1);
+				rc=((retval=Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_OVF_CTRL, (GLOBAL_PERF_OVF_CTRL *) &OvfControl)) != -1);
 			}
 
 			// Retreive the Thermal Junction Max. Fallback to 100°C if not available.
-			rc=((retval=Read_MSR(A->P.Topology[cpu].Core->FD, MSR_TEMPERATURE_TARGET, (TJMAX *) &A->P.Topology[cpu].Core->TjMax)) != -1);
-			if(A->P.Topology[cpu].Core->TjMax.Target == 0) {
+			rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_TEMPERATURE_TARGET, (TJMAX *) &A->P.Topology[cpu].CPU->TjMax)) != -1);
+			if(A->P.Topology[cpu].CPU->TjMax.Target == 0) {
 				Output(A, "Warning: Thermal Junction Max unavailable.\n");
-				A->P.Topology[cpu].Core->TjMax.Target=100;
+				A->P.Topology[cpu].CPU->TjMax.Target=100;
 			}
-			rc=((retval=Read_MSR(A->P.Topology[cpu].Core->FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->P.Topology[cpu].Core->ThermIntr)) != -1);
+			rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->P.Topology[cpu].CPU->ThermIntr)) != -1);
 		}
 		else	// Fallback to an arbitrary & commom value.
 		{
 			sprintf(warning, "Remark CPU#%02d: Thermal Junction Max defaults to 100C.\n", cpu);
 			Output(A, warning);
-			A->P.Topology[cpu].Core->TjMax.Target=100;
+			A->P.Topology[cpu].CPU->TjMax.Target=100;
 		}
 	}
 	return(rc);
@@ -217,22 +219,23 @@ int	Open_MSR(uARG *A)
 void	Close_MSR(uARG *A)
 {
 	int	cpu=0;
-	for(cpu=0; cpu < A->P.CPU; cpu++) {
+	for(cpu=0; cpu < A->P.CPU; cpu++)
+	  if(A->P.Topology[cpu].CPU != NULL) {
 		// Reset the fixed counters.
-		A->P.Topology[cpu].Core->FixedPerfCounter.EN1_Usr=0;
-		A->P.Topology[cpu].Core->FixedPerfCounter.EN2_Usr=0;
-		A->P.Topology[cpu].Core->FixedPerfCounter.EN1_OS=0;
-		A->P.Topology[cpu].Core->FixedPerfCounter.EN2_OS=0;
-		A->P.Topology[cpu].Core->FixedPerfCounter.AnyThread_EN1=0;
-		A->P.Topology[cpu].Core->FixedPerfCounter.AnyThread_EN2=0;
-		Write_MSR(A->P.Topology[cpu].Core->FD, IA32_FIXED_CTR_CTRL, &A->P.Topology[cpu].Core->FixedPerfCounter);
+		A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_Usr=0;
+		A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_Usr=0;
+		A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_OS=0;
+		A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_OS=0;
+		A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN1=0;
+		A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN2=0;
+		Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR_CTRL, &A->P.Topology[cpu].CPU->FixedPerfCounter);
 		// Reset the global counters.
-		A->P.Topology[cpu].Core->GlobalPerfCounter.EN_FIXED_CTR1=0;
-		A->P.Topology[cpu].Core->GlobalPerfCounter.EN_FIXED_CTR2=0;
-		Write_MSR(A->P.Topology[cpu].Core->FD, IA32_PERF_GLOBAL_CTRL, &A->P.Topology[cpu].Core->GlobalPerfCounter);
+		A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR1=0;
+		A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR2=0;
+		Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_CTRL, &A->P.Topology[cpu].CPU->GlobalPerfCounter);
 		// Release the MSR handle associated to the Core.
-		if(A->P.Topology[cpu].Core->FD != -1)
-			close(A->P.Topology[cpu].Core->FD);
+		if(A->P.Topology[cpu].CPU->FD != -1)
+			close(A->P.Topology[cpu].CPU->FD);
 	}
 }
 
@@ -250,105 +253,108 @@ static __inline__ unsigned long long RDTSC(void)
 	return ((unsigned long long) Lo) | (((unsigned long long) Hi) << 32);
 }
 
-// The Processor thread which updates the Core values.
+// The function thread which updates the Core values.
 static void *uCycle(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
 
 	unsigned int cpu=0;
-	for(cpu=0; cpu < A->P.CPU; cpu++) {
+	for(cpu=0; cpu < A->P.CPU; cpu++)
+	  if(A->P.Topology[cpu].CPU != NULL) {
 		// Initial read of the Unhalted Core & Reference Cycles.
-		Read_MSR(A->P.Topology[cpu].Core->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].Core->Cycles.C0[0].UCC);
-		Read_MSR(A->P.Topology[cpu].Core->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].Core->Cycles.C0[0].URC);
+		Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].UCC);
+		Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].URC);
 		// Initial read of the TSC in relation to the Logical Core.
-		Read_MSR(A->P.Topology[cpu].Core->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].Core->Cycles.TSC[0]);
+		Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[0]);
 		// Initial read of other C-States.
-		Read_MSR(A->P.Topology[cpu].Core->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].Core->Cycles.C3[0]);
-		Read_MSR(A->P.Topology[cpu].Core->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].Core->Cycles.C6[0]);
+		Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C3[0]);
+		Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C6[0]);
 	}
 
 	while(A->LOOP) {
-		// Settle down 2 ^ N microseconds as specified by the command argument.
-		usleep(1 << A->P.IdleTime);
+		// Settle down N x 50000 microseconds as specified by the command argument.
+		usleep(IDLE_BASE_USEC * A->P.IdleTime);
 
 /* CRITICAL_IN  */
-		for(cpu=0; cpu < A->P.CPU; cpu++) {
+		for(cpu=0; cpu < A->P.CPU; cpu++)
+		  if(A->P.Topology[cpu].CPU != NULL) {
 			// Update the Unhalted Core & the Reference Cycles.
-			Read_MSR(A->P.Topology[cpu].Core->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].Core->Cycles.C0[1].UCC);
-			Read_MSR(A->P.Topology[cpu].Core->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].Core->Cycles.C0[1].URC);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].UCC);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
 			// Update TSC.
-			Read_MSR(A->P.Topology[cpu].Core->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].Core->Cycles.TSC[1]);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[1]);
 			// Update C-States.
-			Read_MSR(A->P.Topology[cpu].Core->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].Core->Cycles.C3[1]);
-			Read_MSR(A->P.Topology[cpu].Core->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].Core->Cycles.C6[1]);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C3[1]);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C6[1]);
 		}
 /* CRITICAL_OUT */
 
 		// Reset C-States average.
 		A->P.Avg.Turbo=A->P.Avg.C0=A->P.Avg.C3=A->P.Avg.C6=0;
 
-		unsigned int maxFreq=0, maxTemp=A->P.Topology[0].Core->TjMax.Target;
-		for(cpu=0; cpu < A->P.CPU; cpu++) {
+		unsigned int maxFreq=0, maxTemp=A->P.Topology[0].CPU->TjMax.Target;
+		for(cpu=0; cpu < A->P.CPU; cpu++)
+		  if(A->P.Topology[cpu].CPU != NULL) {
 			// Compute the absolute Delta of Unhalted (Core & Ref) C0 Cycles = Current[1] - Previous[0].
-			A->P.Topology[cpu].Core->Delta.C0.UCC=	(A->P.Topology[cpu].Core->Cycles.C0[0].UCC > A->P.Topology[cpu].Core->Cycles.C0[1].UCC) ?
-							 A->P.Topology[cpu].Core->Cycles.C0[0].UCC - A->P.Topology[cpu].Core->Cycles.C0[1].UCC
-							:A->P.Topology[cpu].Core->Cycles.C0[1].UCC - A->P.Topology[cpu].Core->Cycles.C0[0].UCC;
+			A->P.Topology[cpu].CPU->Delta.C0.UCC=	(A->P.Topology[cpu].CPU->Cycles.C0[0].UCC > A->P.Topology[cpu].CPU->Cycles.C0[1].UCC) ?
+							 A->P.Topology[cpu].CPU->Cycles.C0[0].UCC - A->P.Topology[cpu].CPU->Cycles.C0[1].UCC
+							:A->P.Topology[cpu].CPU->Cycles.C0[1].UCC - A->P.Topology[cpu].CPU->Cycles.C0[0].UCC;
 
-			A->P.Topology[cpu].Core->Delta.C0.URC=	A->P.Topology[cpu].Core->Cycles.C0[1].URC - A->P.Topology[cpu].Core->Cycles.C0[0].URC;
+			A->P.Topology[cpu].CPU->Delta.C0.URC=	A->P.Topology[cpu].CPU->Cycles.C0[1].URC - A->P.Topology[cpu].CPU->Cycles.C0[0].URC;
 
-			A->P.Topology[cpu].Core->Delta.C3=	A->P.Topology[cpu].Core->Cycles.C3[1] - A->P.Topology[cpu].Core->Cycles.C3[0];
+			A->P.Topology[cpu].CPU->Delta.C3=	A->P.Topology[cpu].CPU->Cycles.C3[1] - A->P.Topology[cpu].CPU->Cycles.C3[0];
 
-			A->P.Topology[cpu].Core->Delta.C6=	A->P.Topology[cpu].Core->Cycles.C6[1] - A->P.Topology[cpu].Core->Cycles.C6[0];
+			A->P.Topology[cpu].CPU->Delta.C6=	A->P.Topology[cpu].CPU->Cycles.C6[1] - A->P.Topology[cpu].CPU->Cycles.C6[0];
 
-			A->P.Topology[cpu].Core->Delta.TSC=	A->P.Topology[cpu].Core->Cycles.TSC[1] - A->P.Topology[cpu].Core->Cycles.TSC[0];
+			A->P.Topology[cpu].CPU->Delta.TSC=	A->P.Topology[cpu].CPU->Cycles.TSC[1] - A->P.Topology[cpu].CPU->Cycles.TSC[0];
 
 			// Compute Turbo State per Cycles Delta. (Protect against a division by zero)
-			A->P.Topology[cpu].Core->State.Turbo=(double) (A->P.Topology[cpu].Core->Delta.C0.URC != 0) ?
-						  (double) (A->P.Topology[cpu].Core->Delta.C0.UCC) / (double) A->P.Topology[cpu].Core->Delta.C0.URC
+			A->P.Topology[cpu].CPU->State.Turbo=(double) (A->P.Topology[cpu].CPU->Delta.C0.URC != 0) ?
+						  (double) (A->P.Topology[cpu].CPU->Delta.C0.UCC) / (double) A->P.Topology[cpu].CPU->Delta.C0.URC
 						 : 0.0f;
 			// Compute C-States.
-			A->P.Topology[cpu].Core->State.C0=(double) (A->P.Topology[cpu].Core->Delta.C0.URC) / (double) (A->P.Topology[cpu].Core->Delta.TSC);
-			A->P.Topology[cpu].Core->State.C3=(double) (A->P.Topology[cpu].Core->Delta.C3)  / (double) (A->P.Topology[cpu].Core->Delta.TSC);
-			A->P.Topology[cpu].Core->State.C6=(double) (A->P.Topology[cpu].Core->Delta.C6)  / (double) (A->P.Topology[cpu].Core->Delta.TSC);
+			A->P.Topology[cpu].CPU->State.C0=(double) (A->P.Topology[cpu].CPU->Delta.C0.URC) / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
+			A->P.Topology[cpu].CPU->State.C3=(double) (A->P.Topology[cpu].CPU->Delta.C3)  / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
+			A->P.Topology[cpu].CPU->State.C6=(double) (A->P.Topology[cpu].CPU->Delta.C6)  / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
 
-			A->P.Topology[cpu].Core->RelativeRatio=A->P.Topology[cpu].Core->State.Turbo * A->P.Topology[cpu].Core->State.C0 * (double) A->P.Platform.MaxNonTurboRatio;
+			A->P.Topology[cpu].CPU->RelativeRatio=A->P.Topology[cpu].CPU->State.Turbo * A->P.Topology[cpu].CPU->State.C0 * (double) A->P.Platform.MaxNonTurboRatio;
 
 			// Relative Frequency = Relative Ratio x Bus Clock Frequency
-			A->P.Topology[cpu].Core->RelativeFreq=A->P.Topology[cpu].Core->RelativeRatio * A->P.ClockSpeed;
+			A->P.Topology[cpu].CPU->RelativeFreq=A->P.Topology[cpu].CPU->RelativeRatio * A->P.ClockSpeed;
 
 			// Save TSC.
-			A->P.Topology[cpu].Core->Cycles.TSC[0]=A->P.Topology[cpu].Core->Cycles.TSC[1];
+			A->P.Topology[cpu].CPU->Cycles.TSC[0]=A->P.Topology[cpu].CPU->Cycles.TSC[1];
 			// Save the Unhalted Core & Reference Cycles for next iteration.
-			A->P.Topology[cpu].Core->Cycles.C0[0].UCC=A->P.Topology[cpu].Core->Cycles.C0[1].UCC;
-			A->P.Topology[cpu].Core->Cycles.C0[0].URC =A->P.Topology[cpu].Core->Cycles.C0[1].URC;
+			A->P.Topology[cpu].CPU->Cycles.C0[0].UCC=A->P.Topology[cpu].CPU->Cycles.C0[1].UCC;
+			A->P.Topology[cpu].CPU->Cycles.C0[0].URC =A->P.Topology[cpu].CPU->Cycles.C0[1].URC;
 			// Save also the C-State Reference Cycles.
-			A->P.Topology[cpu].Core->Cycles.C3[0]=A->P.Topology[cpu].Core->Cycles.C3[1];
-			A->P.Topology[cpu].Core->Cycles.C6[0]=A->P.Topology[cpu].Core->Cycles.C6[1];
+			A->P.Topology[cpu].CPU->Cycles.C3[0]=A->P.Topology[cpu].CPU->Cycles.C3[1];
+			A->P.Topology[cpu].CPU->Cycles.C6[0]=A->P.Topology[cpu].CPU->Cycles.C6[1];
 
 			// Sum the C-States before the average.
-			A->P.Avg.Turbo+=A->P.Topology[cpu].Core->State.Turbo;
-			A->P.Avg.C0+=A->P.Topology[cpu].Core->State.C0;
-			A->P.Avg.C3+=A->P.Topology[cpu].Core->State.C3;
-			A->P.Avg.C6+=A->P.Topology[cpu].Core->State.C6;
+			A->P.Avg.Turbo+=A->P.Topology[cpu].CPU->State.Turbo;
+			A->P.Avg.C0+=A->P.Topology[cpu].CPU->State.C0;
+			A->P.Avg.C3+=A->P.Topology[cpu].CPU->State.C3;
+			A->P.Avg.C6+=A->P.Topology[cpu].CPU->State.C6;
 
 			// Index the Top CPU speed.
-			if(maxFreq < A->P.Topology[cpu].Core->RelativeFreq) {
-				maxFreq=A->P.Topology[cpu].Core->RelativeFreq;
+			if(maxFreq < A->P.Topology[cpu].CPU->RelativeFreq) {
+				maxFreq=A->P.Topology[cpu].CPU->RelativeFreq;
 				A->P.Top=cpu;
 			}
 
 			// Update the Digital Thermal Sensor.
-			if( (Read_MSR(A->P.Topology[cpu].Core->FD, IA32_THERM_STATUS, (THERM_STATUS *) &A->P.Topology[cpu].Core->ThermStat)) == -1)
-				A->P.Topology[cpu].Core->ThermStat.DTS=0;
+			if( (Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_THERM_STATUS, (THERM_STATUS *) &A->P.Topology[cpu].CPU->ThermStat)) == -1)
+				A->P.Topology[cpu].CPU->ThermStat.DTS=0;
 
 			// Index which Core is hot.
-			if(A->P.Topology[cpu].Core->ThermStat.DTS < maxTemp) {
-				maxTemp=A->P.Topology[cpu].Core->ThermStat.DTS;
+			if(A->P.Topology[cpu].CPU->ThermStat.DTS < maxTemp) {
+				maxTemp=A->P.Topology[cpu].CPU->ThermStat.DTS;
 				A->P.Hot=cpu;
 			}
 			// Store the coldest temperature.
-			if(A->P.Topology[cpu].Core->ThermStat.DTS > A->P.Cold)
-				A->P.Cold=A->P.Topology[cpu].Core->ThermStat.DTS;
+			if(A->P.Topology[cpu].CPU->ThermStat.DTS > A->P.Cold)
+				A->P.Cold=A->P.Topology[cpu].CPU->ThermStat.DTS;
 		}
 		// Average the C-States.
 		A->P.Avg.Turbo/=A->P.CPU;
@@ -384,13 +390,13 @@ int	Read_SMBIOS(int structure, int instance, off_t offset, void *buf, size_t nby
 }
 
 // Estimate the Bus Clock Frequency from the TSC.
-double	Compute_ExtClock(int exp)
+double	Compute_ExtClock(int ratio)
 {
 	unsigned long long TSC[2];
 	TSC[0]=RDTSC();
-	usleep(1<<exp);
+	usleep(IDLE_BASE_USEC * ratio);
 	TSC[1]=RDTSC();
-	return((double)(TSC[1]-TSC[0])/(1<<exp));
+	return((double) (TSC[1] - TSC[0]) / (IDLE_BASE_USEC * ratio));
 }
 
 // Read the Bus Clock Frequency from the BIOS.
@@ -612,8 +618,8 @@ static void *uReadAPIC(void *uApic)
 
 		A->P.Topology[cpu].APIC_ID=ExtTopology.EDX.x2APIC_ID;
 
-		if(A->P.Topology[cpu].Core == NULL)
-			A->P.Topology[cpu].Core=calloc(1, sizeof(SMT));
+		if(A->P.Topology[cpu].CPU == NULL)
+			A->P.Topology[cpu].CPU=calloc(1, sizeof(CPU_STRUCT));
 		}
 	else
 		A->P.Topology[cpu].APIC_ID=-1;
@@ -638,10 +644,8 @@ unsigned int Create_Topology(uARG *A)
 		{
 		pthread_join(uApic[cpu].TID, NULL);
 
-		if(A->P.Topology[cpu].Core != NULL)  {
-			A->P.Topology[cpu].Core=calloc(1, sizeof(SMT));
+		if(A->P.Topology[cpu].CPU != NULL)
 			CountEnabledCPU++;
-			}
 		}
 	free(uApic);
 
@@ -652,8 +656,8 @@ void	Delete_Topology(uARG *A)
 {
 	int	cpu=0;
 	for(cpu=0; cpu < A->P.CPU; cpu++)
-		if(A->P.Topology[cpu].Core != NULL)
-			free(A->P.Topology[cpu].Core);
+		if(A->P.Topology[cpu].CPU != NULL)
+			free(A->P.Topology[cpu].CPU);
 	free(A->P.Topology);
 }
 
@@ -717,7 +721,7 @@ void	SelectBaseClock(uARG *A)
 		default:
 		case SRC_TSC:	// Base Clock = TSC divided by the maximum ratio (without Turbo).
 			if(A->MSR) {
-				A->P.ClockSpeed=Compute_ExtClock(17) / A->P.Platform.MaxNonTurboRatio;
+				A->P.ClockSpeed=Compute_ExtClock(IDLE_RATIO_DEF) / A->P.Platform.MaxNonTurboRatio;
 				A->P.ClockSrc=SRC_TSC;
 				break;
 			}
@@ -755,8 +759,7 @@ void	SelectBaseClock(uARG *A)
 	}
 }
 
-// Draw buttons.
-
+// Drawing Button functions.
 void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 {
 	switch(wButton->ID) {
@@ -1052,9 +1055,11 @@ void	ReSizeWidget(uARG *A, int G)
 {
 	XSizeHints *hints=NULL;
 	if((hints=XAllocSizeHints()) != NULL) {
+		hints->x=A->W[G].x;
+		hints->y=A->W[G].y;
 		hints->min_width= hints->max_width= A->W[G].width;
 		hints->min_height=hints->max_height=A->W[G].height;
-		hints->flags=PMinSize|PMaxSize;
+		hints->flags=USPosition|USSize|PMinSize|PMaxSize;
 		XSetWMNormalHints(A->display, A->W[G].window, hints);
 		XFree(hints);
 	}
@@ -1183,28 +1188,137 @@ void	SetWidgetName(uARG *A, int G, char *name)
 	XSetIconName(A->display, A->W[G].window, name);
 }
 
-// Create the X-Window Widgets.
-int	OpenWidgets(uARG *A)
+static void *uSplash(void *uArg)
+{
+	uARG *A=(uARG *) uArg;
+	XEvent	E={0};
+	while(A->LOOP) {
+		XNextEvent(A->display, &E);
+		switch(E.type) {
+			case ClientMessage:
+				if(E.xclient.send_event)
+					A->LOOP=false;
+				break;
+			case Expose:
+				if(!E.xexpose.count)
+					{
+					XSetForeground(A->display, A->Splash.gc, A->L.globalForeground);
+					XCopyPlane(	A->display,
+							A->Splash.bitmap,
+							A->Splash.window,
+							A->Splash.gc,
+							0,
+							0,
+							splash_width,
+							splash_height,
+							(A->Splash.w - splash_width) >> 1,
+							(A->Splash.h - splash_height) >> 1,
+							1);
+					}
+				break;
+		}
+	}
+	return(NULL);
+}
+
+void	StartSplash(uARG *A)
+{
+	A->Splash.x=(WidthOfScreen(A->screen) >> 1)  - (A->Splash.w >> 1);
+	A->Splash.y=(HeightOfScreen(A->screen) >> 1) - (A->Splash.h >> 1);
+	if((A->Splash.window=XCreateSimpleWindow(A->display,
+						DefaultRootWindow(A->display),
+						A->Splash.x,
+						A->Splash.y,
+						A->Splash.w,
+						A->Splash.h,
+						0,
+						0x0,
+						0)) != 0
+	&& (A->Splash.gc=XCreateGC(A->display, A->Splash.window, 0, NULL)) != 0)
+		{
+		A->Splash.bitmap=XCreateBitmapFromData(A->display, A->Splash.window, (const char *) splash_bits, splash_width, splash_height);
+
+		XSizeHints *hints=NULL;
+		if((hints=XAllocSizeHints()) != NULL)
+			{
+			hints->x=A->Splash.x;
+			hints->y=A->Splash.y;
+			hints->min_width= hints->max_width= A->Splash.w;
+			hints->min_height=hints->max_height=A->Splash.h;
+			hints->flags=USPosition|USSize|PMinSize|PMaxSize;
+			XSetWMNormalHints(A->display, A->Splash.window, hints);
+			XFree(hints);
+			}
+		else
+			XMoveWindow(A->display, A->Splash.window, A->Splash.x, A->Splash.y);
+
+		struct {
+			unsigned long	flags,
+					functions,
+					decorations;
+			long		inputMode;
+			unsigned long	status;
+			} data={flags:2, functions:0, decorations:0, inputMode:0, status:0};
+
+		Atom property=XInternAtom(A->display, "_MOTIF_WM_HINTS", true);
+		XChangeProperty(A->display, A->Splash.window, property, property, 32, PropModeReplace, (unsigned char *) &data, 5);
+
+		XSelectInput(A->display, A->Splash.window, ExposureMask);
+		XMapWindow(A->display, A->Splash.window);
+
+		pthread_create(&A->TID_Draw, NULL, uSplash, A);
+		}
+}
+
+void	StopSplash(uARG *A)
+{
+	XClientMessageEvent E={type:ClientMessage, window:A->Splash.window, format:32};
+	XSendEvent(A->display, A->Splash.window, 0, 0, (XEvent *)&E);
+	XFlush(A->display);
+
+	pthread_join(A->TID_Draw, NULL);
+
+	XUnmapWindow(A->display, A->Splash.window);
+	XFreePixmap(A->display, A->Splash.bitmap);
+	XFreeGC(A->display, A->Splash.gc);
+	XDestroyWindow(A->display, A->Splash.window);
+
+	A->TID_Draw=0;
+	A->LOOP=true;
+}
+
+// Release the X-Window resources.
+void	CloseDisplay(uARG *A)
+{
+	int MC=MC_COUNT;
+	do {
+		MC-- ;
+		if(A->MouseCursor[MC])
+			XFreeCursor(A->display, A->MouseCursor[MC]);
+	} while(MC);
+
+	if(A->xfont->fid)
+		XUnloadFont(A->display, A->xfont->fid);
+	free(A->fontName);
+
+	XCloseDisplay(A->display);
+}
+
+// Initialize a new X-Window display.
+int	OpenDisplay(uARG *A)
 {
 	int noerr=true;
-	char str[sizeof(HDSIZE)];
-
-	// Allocate memory for chart elements.
-	A->L.Usage.C0=malloc(A->P.CPU * sizeof(XRectangle));
-	A->L.Usage.C3=malloc(A->P.CPU * sizeof(XRectangle));
-	A->L.Usage.C6=malloc(A->P.CPU * sizeof(XRectangle));
-
 	if((A->display=XOpenDisplay(NULL)) && (A->screen=DefaultScreenOfDisplay(A->display)) )
-		{
+	{
 		switch(A->xACL) {
-		case 'Y':
-		case 'y':
-			XEnableAccessControl(A->display);
-			break;
-		case 'N':
-		case 'n':
-			XDisableAccessControl(A->display);
-			break;
+			case 'Y':
+			case 'y':
+				XEnableAccessControl(A->display);
+				break;
+			case 'N':
+			case 'n':
+				XDisableAccessControl(A->display);
+				break;
 		}
 
 		// Try to load the requested font.
@@ -1223,7 +1337,47 @@ int	OpenWidgets(uARG *A)
 			A->MouseCursor[MC_MOVE]=XCreateFontCursor(A->display, XC_fleur);
 			A->MouseCursor[MC_WAIT]=XCreateFontCursor(A->display, XC_watch);
 		}
-		XSetWindowAttributes swa={
+	}
+	else	noerr=false;
+	return(noerr);
+}
+
+// Release the Widget resources.
+void	CloseWidgets(uARG *A)
+{
+	if(A->L.Output)
+		free(A->L.Output);
+
+	int G=0;
+	for(G=LAST_WIDGET; G >= MAIN ; G--)
+		{
+		XFreePixmap(A->display, A->W[G].pixmap.B);
+		XFreePixmap(A->display, A->W[G].pixmap.F);
+		if(A->L.Page[G].Pageable)
+			XFreePixmap(A->display, A->L.Page[G].Pixmap);
+		XFreeGC(A->display, A->W[G].gc);
+		XDestroyWindow(A->display, A->W[G].window);
+		free(A->L.Axes[G].Segment);
+		DestroyAllButtons(A, G);
+		}
+	free(A->L.WB.String);
+	free(A->L.Usage.C0);
+	free(A->L.Usage.C3);
+	free(A->L.Usage.C6);
+}
+
+// Create the Widgets.
+int	OpenWidgets(uARG *A)
+{
+	int noerr=true;
+	char str[sizeof(HDSIZE)];
+
+	// Allocate memory for chart elements.
+	A->L.Usage.C0=malloc(A->P.CPU * sizeof(XRectangle));
+	A->L.Usage.C3=malloc(A->P.CPU * sizeof(XRectangle));
+	A->L.Usage.C6=malloc(A->P.CPU * sizeof(XRectangle));
+
+	XSetWindowAttributes swa={
 	/* Pixmap: background, None, or ParentRelative	*/	background_pixmap:None,
 	/* unsigned long: background pixel		*/	background_pixel:A->L.globalBackground,
 	/* Pixmap: border of the window or CopyFromParent */	border_pixmap:CopyFromParent,
@@ -1240,8 +1394,8 @@ int	OpenWidgets(uARG *A)
 	/* Colormap: color map to be associated with window */	colormap:DefaultColormap(A->display, DefaultScreen(A->display)),
 	/* Cursor: Cursor to be displayed (or None) */		cursor:A->MouseCursor[MC_DEFAULT]};
 
-		int G=0;
-		for(G=MAIN; noerr && (G < WIDGETS); G++)
+	int G=0;
+	for(G=MAIN; noerr && (G < WIDGETS); G++)
 		{
 			// Dispose Widgets from each other : [Right & Bottom + width & height] Or -[1,-1] = X,Y origin + Margins.
 			int U=A->W[G].x;
@@ -1924,11 +2078,9 @@ int	OpenWidgets(uARG *A)
 				XSelectInput(A->display, A->W[G].window, EventProfile);
 			}
 			else	noerr=false;
-	}
-	else	noerr=false;
 
 	// Store some Ratios into a string for future chart drawing.
-	sprintf(A->P.Bump, "%02d%02d%02d",	A->P.Platform.MinimumRatio,
+	sprintf(A->P.Boost, "%02d%02d%02d",	A->P.Platform.MinimumRatio,
 						A->P.Platform.MaxNonTurboRatio,
 						A->P.Turbo.MaxRatio_1C);
 	return(noerr);
@@ -2057,21 +2209,21 @@ void	BuildLayout(uARG *A, int G)
 					A->W[G].gc,
 					One_Char_Width(G) * ((A->P.Platform.MinimumRatio + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
-					&A->P.Bump[0], 2);
+					&A->P.Boost[0], 2);
 			XSetForeground(A->display, A->W[G].gc, MED_VALUE_COLOR);
 			XDrawString(	A->display,
 					A->W[G].pixmap.B,
 					A->W[G].gc,
 					One_Char_Width(G) * ((A->P.Platform.MaxNonTurboRatio + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
-					&A->P.Bump[2], 2);
+					&A->P.Boost[2], 2);
 			XSetForeground(A->display, A->W[G].gc, HIGH_VALUE_COLOR);
 			XDrawString(	A->display,
 					A->W[G].pixmap.B,
 					A->W[G].gc,
 					One_Char_Width(G) * ((A->P.Turbo.MaxRatio_1C + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
-					&A->P.Bump[4], 2);
+					&A->P.Boost[4], 2);
 		}
 			break;
 		case CSTATES:
@@ -2115,14 +2267,22 @@ void	BuildLayout(uARG *A, int G)
 					"~", 1 );
 
 			// Draw the Core identifiers.
-			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++) {
+				XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 				sprintf(str, CORE_NUM, cpu);
 				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 						Twice_Char_Width(G) + ((cpu * CSTATES_TEXT_SPACING) * One_Half_Char_Width(G)),
 						One_Char_Height(G),
 						str, strlen(str) );
+				if(A->P.Topology[cpu].CPU == NULL) {
+					XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+					XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+							One_Half_Char_Width(G) + ((cpu * CSTATES_TEXT_SPACING) * One_Half_Char_Width(G)),
+							One_Char_Height(G)
+							+ (One_Char_Height(G) * CSTATES_TEXT_HEIGHT),
+							"OFF", 3 );
+				}
 			}
 		}
 			break;
@@ -2166,13 +2326,13 @@ void	BuildLayout(uARG *A, int G)
 					A->L.Page[G].Title,
 					strlen(A->L.Page[G].Title) );
 
-			char str[sizeof(CHA_FORMAT)]={0};
+			char str[256]={0};
 
 			int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
 			sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Platform.MaxNonTurboRatio * A->P.ClockSpeed);
 			memcpy(&A->L.WB.String[padding], str, strlen(str));
 
-			sprintf(str, "Loop(%d usecs)", (1 << A->P.IdleTime) );
+			sprintf(str, "Loop(%d usecs)", (IDLE_BASE_USEC * A->P.IdleTime) );
 			XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
 			XDrawImageString(A->display, A->W[G].pixmap.B, A->W[G].gc,
 					A->W[G].width - (24 * One_Char_Width(G)),
@@ -2187,17 +2347,17 @@ void	BuildLayout(uARG *A, int G)
 
 				sprintf(items, PROC_FORMAT,
 					A->P.Features.BrandString,
-					ARCH[A->P.ArchID].Architecture,
 					A->P.ClockSpeed,					ClockSrcStr[A->P.ClockSrc],
 					A->P.Features.Std.EAX.ExtFamily + A->P.Features.Std.EAX.Family,
 					(A->P.Features.Std.EAX.ExtModel << 4) + A->P.Features.Std.EAX.Model,
 					A->P.Features.Std.EAX.Stepping,
 					A->P.Features.ThreadCount,
+					ARCH[A->P.ArchID].Architecture,
 					powered[A->P.Features.Std.EDX.VME],
 					powered[A->P.Features.Std.EDX.DE],
 					powered[A->P.Features.Std.EDX.PSE],
 					powered[A->P.Features.Std.EDX.TSC],
-					powered[A->P.Features.Std.EDX.MSR],
+					powered[A->P.Features.Std.EDX.MSR],			enabled[A->MSR],
 					powered[A->P.Features.Std.EDX.PAE],
 					powered[A->P.Features.Std.EDX.APIC],
 					powered[A->P.Features.Std.EDX.MTRR],
@@ -2230,12 +2390,17 @@ void	BuildLayout(uARG *A, int G)
 					powered[A->P.Features.Std.ECX.OSXSAVE],
 					powered[A->P.Features.ExtFunc.EDX.XD_Bit],		enabled[!A->P.MiscFeatures.XD_Bit],
 					powered[A->P.Features.ExtFunc.EDX.PG_1GB],
+					powered[A->P.Features.ExtFeature.EBX.HLE],
+					powered[A->P.Features.ExtFeature.EBX.RTM],
 					powered[A->P.Features.ExtFeature.EBX.FastStrings],	enabled[A->P.MiscFeatures.FastStrings],
 												enabled[A->P.MiscFeatures.TCC],
 												enabled[A->P.MiscFeatures.PerfMonitoring],
 												enabled[!A->P.MiscFeatures.BTS],
 												enabled[A->P.MiscFeatures.CPUID_MaxVal],
+
+					A->P.Turbo.MaxRatio_4C, A->P.Turbo.MaxRatio_3C, A->P.Turbo.MaxRatio_2C, A->P.Turbo.MaxRatio_1C,
 					powered[A->P.Features.Thermal_Power_Leaf.EAX.Turbo],	enabled[!A->P.MiscFeatures.Turbo],
+
 					powered[A->P.Features.Std.EDX.FPU],
 					powered[A->P.Features.Std.EDX.CX8],
 					powered[A->P.Features.Std.EDX.SEP],
@@ -2255,20 +2420,52 @@ void	BuildLayout(uARG *A, int G)
 					powered[A->P.Features.Std.ECX.MOVBE],
 					powered[A->P.Features.Std.ECX.POPCNT],
 					powered[A->P.Features.Std.ECX.AES],
-					powered[A->P.Features.Std.ECX.AVX],
+					powered[A->P.Features.Std.ECX.AVX], powered[A->P.Features.ExtFeature.EBX.AVX2],
 					powered[A->P.Features.Std.ECX.F16C],
 					powered[A->P.Features.Std.ECX.RDRAND],
 					powered[A->P.Features.ExtFunc.ECX.LAHFSAHF],
 					powered[A->P.Features.ExtFunc.EDX.SYSCALL],
 					powered[A->P.Features.ExtFunc.EDX.RDTSCP],
 					powered[A->P.Features.ExtFunc.EDX.IA64],
-					A->P.Features.Perf_Monitoring_Leaf.EAX.MonCtrs, A->P.Features.Perf_Monitoring_Leaf.EAX.MonWidth,
-					A->P.Features.Perf_Monitoring_Leaf.EDX.FixCtrs, A->P.Features.Perf_Monitoring_Leaf.EDX.FixWidth,
-					A->P.CPU
-				);
+					powered[A->P.Features.ExtFeature.EBX.BMI1], powered[A->P.Features.ExtFeature.EBX.BMI2]);
+
+				sprintf(str, TOPOLOGY_SECTION, A->P.OnLine);
+				strcat(items, str);
 				int cpu=0;
 				for(cpu=0; cpu < A->P.CPU; cpu++) {
-					sprintf(str, TOPOLOGY_FORMAT, A->P.Topology[cpu].APIC_ID, A->P.Topology[cpu].Core_ID, A->P.Topology[cpu].Thread_ID);
+					if(A->P.Topology[cpu].CPU != NULL)
+						sprintf(str, TOPOLOGY_FORMAT,
+							cpu,
+							A->P.Topology[cpu].APIC_ID,
+							A->P.Topology[cpu].Core_ID,
+							A->P.Topology[cpu].Thread_ID,
+							enabled[1]);
+					else
+						sprintf(str, "     #%02u       -       -       -   [%3s]\n",
+							cpu,
+							enabled[0]);
+					strcat(items, str);
+				}
+
+				sprintf(str, PERF_SECTION,
+						A->P.Features.Perf_Monitoring_Leaf.EAX.MonCtrs, A->P.Features.Perf_Monitoring_Leaf.EAX.MonWidth,
+						A->P.Features.Perf_Monitoring_Leaf.EDX.FixCtrs, A->P.Features.Perf_Monitoring_Leaf.EDX.FixWidth);
+				strcat(items, str);
+				for(cpu=0; cpu < A->P.CPU; cpu++) {
+					if(A->P.Topology[cpu].CPU != NULL)
+						sprintf(str, PERF_FORMAT,
+							cpu,
+							A->P.Topology[cpu].CPU->FixedPerfCounter.EN0_OS,
+							A->P.Topology[cpu].CPU->FixedPerfCounter.EN0_Usr,
+							A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN0,
+							A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_OS,
+							A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_Usr,
+							A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN1,
+							A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_OS,
+							A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_Usr,
+							A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN2);
+					else
+						sprintf(str, " - \n");
 					strcat(items, str);
 				}
 
@@ -2337,42 +2534,6 @@ void	BuildLayout(uARG *A, int G)
 	}
 }
 
-// Release the Widget ressources.
-void	CloseWidgets(uARG *A)
-{
-	if(A->L.Output)
-		free(A->L.Output);
-
-	if(A->xfont->fid)
-		XUnloadFont(A->display, A->xfont->fid);
-
-	int MC=MC_COUNT;
-	do {
-		MC-- ;
-		if(A->MouseCursor[MC])
-			XFreeCursor(A->display, A->MouseCursor[MC]);
-	} while(MC);
-
-	int G=0;
-	for(G=LAST_WIDGET; G >= MAIN ; G--) {
-		XFreePixmap(A->display, A->W[G].pixmap.B);
-		XFreePixmap(A->display, A->W[G].pixmap.F);
-		if(A->L.Page[G].Pageable)
-			XFreePixmap(A->display, A->L.Page[G].Pixmap);
-		XFreeGC(A->display, A->W[G].gc);
-		XDestroyWindow(A->display, A->W[G].window);
-		free(A->L.Axes[G].Segment);
-		DestroyAllButtons(A, G);
-	}
-	XCloseDisplay(A->display);
-
-	free(A->L.WB.String);
-	free(A->L.Usage.C0);
-	free(A->L.Usage.C3);
-	free(A->L.Usage.C6);
-	free(A->fontName);
-}
-
 // Fusion in one map the background and the foreground layouts.
 void	MapLayout(uARG *A, int G)
 {
@@ -2428,16 +2589,16 @@ void	DrawLayout(uARG *A, int G)
 			char str[16];
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++)
-			{
+			  if(A->P.Topology[cpu].CPU != NULL) {
 				// Select a color based ratio.
 				unsigned long BarBg, BarFg;
-				if(A->P.Topology[cpu].Core->RelativeRatio <= A->P.Platform.MinimumRatio)
+				if(A->P.Topology[cpu].CPU->RelativeRatio <= A->P.Platform.MinimumRatio)
 					{ BarBg=INIT_VALUE_COLOR; BarFg=DYNAMIC_COLOR; }
-				if(A->P.Topology[cpu].Core->RelativeRatio >  A->P.Platform.MinimumRatio)
+				if(A->P.Topology[cpu].CPU->RelativeRatio >  A->P.Platform.MinimumRatio)
 					{ BarBg=LOW_VALUE_COLOR; BarFg=CORES_BACKGROUND; }
-				if(A->P.Topology[cpu].Core->RelativeRatio >= A->P.Platform.MaxNonTurboRatio)
+				if(A->P.Topology[cpu].CPU->RelativeRatio >= A->P.Platform.MaxNonTurboRatio)
 					{ BarBg=MED_VALUE_COLOR; BarFg=CORES_BACKGROUND; }
-				if(A->P.Topology[cpu].Core->RelativeRatio >= A->P.Turbo.MaxRatio_4C)
+				if(A->P.Topology[cpu].CPU->RelativeRatio >= A->P.Turbo.MaxRatio_4C)
 					{ BarBg=HIGH_VALUE_COLOR; BarFg=CORES_BACKGROUND; }
 
 				// Draw the Core frequency.
@@ -2445,13 +2606,13 @@ void	DrawLayout(uARG *A, int G)
 				XFillRectangle(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 						One_Char_Width(G) * 3,
 						3 + ( One_Char_Height(G) * (cpu + 1) ),
-						(A->W[G].extents.overall.width * A->P.Topology[cpu].Core->RelativeRatio) / CORES_TEXT_WIDTH,
+						(A->W[G].extents.overall.width * A->P.Topology[cpu].CPU->RelativeRatio) / CORES_TEXT_WIDTH,
 						One_Char_Height(G) - 3);
 
 				// For each Core, display its frequency, C-STATE & ratio.
-				if(A->L.Play.freqHertz && (A->P.Topology[cpu].Core->RelativeRatio >= 5.0f) ) {
+				if(A->L.Play.freqHertz && (A->P.Topology[cpu].CPU->RelativeRatio >= 5.0f) ) {
 					XSetForeground(A->display, A->W[G].gc, BarFg);
-					sprintf(str, CORE_FREQ, A->P.Topology[cpu].Core->RelativeFreq);
+					sprintf(str, CORE_FREQ, A->P.Topology[cpu].CPU->RelativeFreq);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							One_Char_Width(G) * 5,
 							One_Char_Height(G) * (cpu + 1 + 1),
@@ -2461,11 +2622,11 @@ void	DrawLayout(uARG *A, int G)
 				XSetForeground(A->display, A->W[G].gc, DYNAMIC_COLOR);
 				if(A->L.Play.cycleValues) {
 					sprintf(str, CORE_DELTA,
-							A->P.Topology[cpu].Core->Delta.C0.UCC >> A->P.IdleTime,
-							A->P.Topology[cpu].Core->Delta.C0.URC >> A->P.IdleTime,
-							A->P.Topology[cpu].Core->Delta.C3 >> A->P.IdleTime,
-							A->P.Topology[cpu].Core->Delta.C6 >> A->P.IdleTime,
-							A->P.Topology[cpu].Core->Delta.TSC >> A->P.IdleTime);
+							A->P.Topology[cpu].CPU->Delta.C0.UCC / (IDLE_BASE_USEC * A->P.IdleTime),
+							A->P.Topology[cpu].CPU->Delta.C0.URC / (IDLE_BASE_USEC * A->P.IdleTime),
+							A->P.Topology[cpu].CPU->Delta.C3 / (IDLE_BASE_USEC * A->P.IdleTime),
+							A->P.Topology[cpu].CPU->Delta.C6 / (IDLE_BASE_USEC * A->P.IdleTime),
+							A->P.Topology[cpu].CPU->Delta.TSC / (IDLE_BASE_USEC * A->P.IdleTime));
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							One_Char_Width(G) * 13,
 							One_Char_Height(G) * (cpu + 1 + 1),
@@ -2473,8 +2634,8 @@ void	DrawLayout(uARG *A, int G)
 				}
 				else if(!A->L.Play.ratioValues) {
 					sprintf(str, CORE_CYCLES,
-							A->P.Topology[cpu].Core->Cycles.C0[1].UCC,
-							A->P.Topology[cpu].Core->Cycles.C0[1].URC);
+							A->P.Topology[cpu].CPU->Cycles.C0[1].UCC,
+							A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							One_Char_Width(G) * 13,
 							One_Char_Height(G) * (cpu + 1 + 1),
@@ -2482,12 +2643,18 @@ void	DrawLayout(uARG *A, int G)
 				}
 
 				if(A->L.Play.ratioValues) {
-					sprintf(str, CORE_RATIO, A->P.Topology[cpu].Core->RelativeRatio);
+					sprintf(str, CORE_RATIO, A->P.Topology[cpu].CPU->RelativeRatio);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							Twice_Char_Width(G) * A->P.Turbo.MaxRatio_1C,
 							One_Char_Height(G) * (cpu + 1 + 1),
 							str, strlen(str) );
 				}
+			} else {
+					XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+							Twice_Char_Width(G) * A->P.Turbo.MaxRatio_1C,
+							One_Char_Height(G) * (cpu + 1 + 1),
+							"OFF", 3 );
 			}
 		}
 			break;
@@ -2496,30 +2663,30 @@ void	DrawLayout(uARG *A, int G)
 			char str[32];
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			int cpu=0;
-			for(cpu=0; cpu < A->P.CPU; cpu++) {
+			for(cpu=0; cpu < A->P.CPU; cpu++)
+			  if(A->P.Topology[cpu].CPU != NULL) {
 				// Prepare the C0 chart.
 				A->L.Usage.C0[cpu].x=Half_Char_Width(G) + ((cpu * CSTATES_TEXT_SPACING) * One_Half_Char_Width(G));
 				A->L.Usage.C0[cpu].y=One_Char_Height(G)
-							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->P.Topology[cpu].Core->State.C0);
+							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->P.Topology[cpu].CPU->State.C0);
 				A->L.Usage.C0[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 3;
 				A->L.Usage.C0[cpu].height=One_Char_Height(G)
-							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->P.Topology[cpu].Core->State.C0;
+							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->P.Topology[cpu].CPU->State.C0;
 				// Prepare the C3 chart.
 				A->L.Usage.C3[cpu].x=Half_Char_Width(G) + A->L.Usage.C0[cpu].x + A->L.Usage.C0[cpu].width;
 				A->L.Usage.C3[cpu].y=One_Char_Height(G)
-							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->P.Topology[cpu].Core->State.C3);
+							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->P.Topology[cpu].CPU->State.C3);
 				A->L.Usage.C3[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 3;
 				A->L.Usage.C3[cpu].height=One_Char_Height(G)
-							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->P.Topology[cpu].Core->State.C3;
+							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->P.Topology[cpu].CPU->State.C3;
 				// Prepare the C6 chart.
 				A->L.Usage.C6[cpu].x=Half_Char_Width(G) + A->L.Usage.C3[cpu].x + A->L.Usage.C3[cpu].width;
 				A->L.Usage.C6[cpu].y=One_Char_Height(G)
-							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->P.Topology[cpu].Core->State.C6);
+							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->P.Topology[cpu].CPU->State.C6);
 				A->L.Usage.C6[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 3;
 				A->L.Usage.C6[cpu].height=One_Char_Height(G)
-							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->P.Topology[cpu].Core->State.C6;
-			}
-			// Display the C-State averages.
+							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->P.Topology[cpu].CPU->State.C6;
+			}			// Display the C-State averages.
 			sprintf(str, CSTATES_PERCENT,	100.f * A->P.Avg.Turbo,
 							100.f * A->P.Avg.C0,
 							100.f * A->P.Avg.C3,
@@ -2538,7 +2705,8 @@ void	DrawLayout(uARG *A, int G)
 			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C6, A->P.CPU);
 
 			if(A->L.Play.cStatePercent)
-				for(cpu=0; cpu < A->P.CPU; cpu++) {
+				for(cpu=0; cpu < A->P.CPU; cpu++)
+				  if(A->P.Topology[cpu].CPU != NULL) {
 					XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 					sprintf(str, CORE_NUM, cpu);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
@@ -2547,10 +2715,10 @@ void	DrawLayout(uARG *A, int G)
 							str, strlen(str) );
 
 					XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
-					sprintf(str, CSTATES_PERCENT,	100.f * A->P.Topology[cpu].Core->State.Turbo,
-									100.f * A->P.Topology[cpu].Core->State.C0,
-									100.f * A->P.Topology[cpu].Core->State.C3,
-									100.f * A->P.Topology[cpu].Core->State.C6);
+					sprintf(str, CSTATES_PERCENT,	100.f * A->P.Topology[cpu].CPU->State.Turbo,
+									100.f * A->P.Topology[cpu].CPU->State.C0,
+									100.f * A->P.Topology[cpu].CPU->State.C3,
+									100.f * A->P.Topology[cpu].CPU->State.C6);
 
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							Twice_Half_Char_Width(G),
@@ -2575,29 +2743,41 @@ void	DrawLayout(uARG *A, int G)
 			U->x1=(TEMPS_TEXT_WIDTH + 2) * One_Char_Width(G);
 			U->y1=V->y2;
 			U->x2=U->x1 + One_Char_Width(G);
-			U->y2=(( (TEMPS_TEXT_HEIGHT * A->P.Topology[A->P.Hot].Core->ThermStat.DTS)
-				/ A->P.Topology[A->P.Hot].Core->TjMax.Target) + 2) * One_Char_Height(G);
+/*
+			U->y2=(( (TEMPS_TEXT_HEIGHT * A->P.Topology[A->P.Hot].CPU->ThermStat.DTS)
+				/ A->P.Topology[A->P.Hot].CPU->TjMax.Target) + 2) * One_Char_Height(G);
+*/
+			U->y2=(A->W[G].height * A->P.Topology[A->P.Hot].CPU->ThermStat.DTS)
+				/ A->P.Topology[A->P.Hot].CPU->TjMax.Target;
 
 			XSetForeground(A->display, A->W[G].gc, GRAPH1_COLOR);
 			XDrawSegments(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Axes[G].Segment, A->L.Axes[G].N - 2);
 
 			// Display the Core temperature.
 			int cpu=0;
-			for(cpu=0; cpu < A->P.CPU; cpu++) {
+			for(cpu=0; cpu < A->P.CPU; cpu++)
+			  if(A->P.Topology[cpu].CPU != NULL) {
 				XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
-				sprintf(str, TEMPERATURE, A->P.Topology[cpu].Core->TjMax.Target - A->P.Topology[cpu].Core->ThermStat.DTS);
+				sprintf(str, TEMPERATURE, A->P.Topology[cpu].CPU->TjMax.Target - A->P.Topology[cpu].CPU->ThermStat.DTS);
 				XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 						(One_Char_Width(G) * 5) + Quarter_Char_Width(G) + (cpu << 1) * Twice_Char_Width(G),
 						One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1),
 						str, strlen(str));
+			} else {
+				XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+				XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+						(One_Char_Width(G) * 5) + Quarter_Char_Width(G) + (cpu << 1) * Twice_Char_Width(G),
+						One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1),
+						"OFF", 3);
 			}
 			// Show Temperature Thresholds
+/*
 			XSetForeground(A->display, A->W[G].gc, GRAPH2_COLOR);
 			int Threshold[2]={
-					(( (TEMPS_TEXT_HEIGHT * A->P.Topology[A->P.Hot].Core->ThermIntr.Threshold1)
-					/ A->P.Topology[A->P.Hot].Core->TjMax.Target) + 2) * One_Char_Height(G),
-					(( (TEMPS_TEXT_HEIGHT * A->P.Topology[A->P.Hot].Core->ThermIntr.Threshold2)
-					/ A->P.Topology[A->P.Hot].Core->TjMax.Target) + 2) * One_Char_Height(G)
+					(( (TEMPS_TEXT_HEIGHT * A->P.Topology[A->P.Hot].CPU->ThermIntr.Threshold1)
+					/ A->P.Topology[A->P.Hot].CPU->TjMax.Target) + 2) * One_Char_Height(G),
+					(( (TEMPS_TEXT_HEIGHT * A->P.Topology[A->P.Hot].CPU->ThermIntr.Threshold2)
+					/ A->P.Topology[A->P.Hot].CPU->TjMax.Target) + 2) * One_Char_Height(G)
 					};
 			XDrawLine(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 					Twice_Char_Width(G),
@@ -2617,9 +2797,9 @@ void	DrawLayout(uARG *A, int G)
 					TEMPS_TEXT_WIDTH * One_Char_Width(G),
 					Threshold[1],
 					"T#2", 3);
-
+*/
 			// Display the hottest temperature between all Cores, and the coldest since start up.
-			int	HotValue=A->P.Topology[A->P.Hot].Core->TjMax.Target - A->P.Topology[A->P.Hot].Core->ThermStat.DTS;
+			int	HotValue=A->P.Topology[A->P.Hot].CPU->TjMax.Target - A->P.Topology[A->P.Hot].CPU->ThermStat.DTS;
 
 			if(HotValue <= LOW_TEMP_VALUE)
 				XSetForeground(A->display, A->W[G].gc, INIT_VALUE_COLOR);
@@ -2637,9 +2817,9 @@ void	DrawLayout(uARG *A, int G)
 					U->y2,
 					str, 3);
 
-			int	ColdValue=A->P.Topology[A->P.Hot].Core->TjMax.Target - A->P.Cold,
+			int	ColdValue=A->P.Topology[A->P.Hot].CPU->TjMax.Target - A->P.Cold,
 				yCold=(( (TEMPS_TEXT_HEIGHT * A->P.Cold)
-					/ A->P.Topology[A->P.Hot].Core->TjMax.Target) + 2) * One_Char_Height(G);
+					/ A->P.Topology[A->P.Hot].CPU->TjMax.Target) + 2) * One_Char_Height(G);
 
 			if(ColdValue <= LOW_TEMP_VALUE)
 				XSetForeground(A->display, A->W[G].gc, INIT_VALUE_COLOR);
@@ -2689,7 +2869,7 @@ void	DrawLayout(uARG *A, int G)
 			for(row=0; row < Rows; row++)
 			{
 				char binStr[BIN64_STR]={0};
-				DumpRegister(A->P.Topology[0].Core->FD, A->L.DumpTable[row].Addr, NULL, binStr);
+				DumpRegister(A->P.Topology[0].CPU->FD, A->L.DumpTable[row].Addr, NULL, binStr);
 
 				char mask[PRE_TEXT]={0}, str[PRE_TEXT]={0};
 				sprintf(mask, REG_FORMAT, row,
@@ -2745,13 +2925,13 @@ void	UpdateWidgetName(uARG *A, int G)
 		case MAIN:
 			if(_IS_MDI_) {
 				sprintf(str, TITLE_MDI_FMT,
-						A->P.Topology[A->P.Top].Core->RelativeFreq,
-						A->P.Topology[A->P.Hot].Core->TjMax.Target - A->P.Topology[A->P.Hot].Core->ThermStat.DTS);
+						A->P.Topology[A->P.Top].CPU->RelativeFreq,
+						A->P.Topology[A->P.Hot].CPU->TjMax.Target - A->P.Topology[A->P.Hot].CPU->ThermStat.DTS);
 				SetWidgetName(A, G, str);
 			}
 			break;
 		case CORES: {
-				sprintf(str, TITLE_CORES_FMT, A->P.Top, A->P.Topology[A->P.Top].Core->RelativeFreq);
+				sprintf(str, TITLE_CORES_FMT, A->P.Top, A->P.Topology[A->P.Top].CPU->RelativeFreq);
 				SetWidgetName(A, G, str);
 		}
 			break;
@@ -2762,7 +2942,7 @@ void	UpdateWidgetName(uARG *A, int G)
 			break;
 		case TEMPS: {
 				sprintf(str, TITLE_TEMPS_FMT,
-						A->P.Top, A->P.Topology[A->P.Hot].Core->TjMax.Target - A->P.Topology[A->P.Hot].Core->ThermStat.DTS);
+						A->P.Top, A->P.Topology[A->P.Hot].CPU->TjMax.Target - A->P.Topology[A->P.Hot].CPU->ThermStat.DTS);
 				SetWidgetName(A, G, str);
 		}
 			break;
@@ -2928,7 +3108,7 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_INCLOOP:
-			if(A->P.IdleTime < 22) {
+			if(A->P.IdleTime < IDLE_RATIO_MAX) {
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
 				A->P.IdleTime++;
@@ -2939,14 +3119,14 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_DECLOOP:
-			if(A->P.IdleTime > 16) {
+			if(A->P.IdleTime > IDLE_RATIO_MIN) {
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
 				A->P.IdleTime--;
 				SelectBaseClock(A);
 				pthread_mutex_unlock(&uDraw_mutex);
-				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 				fDraw(G, true, false);
+				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
 		case ID_FREQ:
@@ -3366,10 +3546,10 @@ int	Args(uARG *A, int argc, char *argv[])
 				{"-y", "%d", &A->L.Start.V,            "Top position (Pixel value)"                         },
 				{"-b", "%x", &A->L.globalBackground,   "Background color (Hex. value)"                      },
 				{"-f", "%x", &A->L.globalForeground,   "Foreground color (Hex. value)"                      },
-				{"-c", "%ud",&A->P.PerCore,            "Monitor per Thread/Core (0/1)"                      },
+/*				{"-c", "%ud",&A->P.PerCore,            "Monitor per Thread/Core (0/1)"                      },*/
 				{"-S", "%ud",&A->P.ClockSrc,           "Clock source TSC(0) BIOS(1) SPEC(2) ROM(3) USER(4)" },
 				{"-M", "%x", &A->P.BClockROMaddr,      "ROM memory address of the Base Clock (Hex. value)"  },
-				{"-s", "%ud",&A->P.IdleTime,           "Idle time (usec) where 2^N"                         },
+				{"-s", "%ud",&A->P.IdleTime,           "Idle time ratio where N x 50000 (usec)"             },
 				{"-h", "%ud",&A->L.Play.freqHertz,     "CPU frequency (0/1)"                                },
 				{"-l", "%ud",&A->L.Play.cycleValues,   "Cycle Values (0/1)"                                 },
 				{"-r", "%ud",&A->L.Play.ratioValues,   "Ratio Values (0/1)"                                 },
@@ -3435,14 +3615,15 @@ int main(int argc, char *argv[])
 				BClockROMaddr:BCLK_ROM_ADDR,
 				ClockSpeed:0,
 				CPU:0,
-				Bump:{0},
+				Boost:{0},
 				Top:0,
 				Hot:0,
 				Cold:0,
 				PerCore:false,
 				ClockSrc:SRC_TSC,
-				IdleTime:20,
+				IdleTime:IDLE_RATIO_DEF,
 			},
+			Splash: {window:0, gc:0, x:0, y:0, w:splash_width + (splash_width >> 2), h:splash_height << 1},
 			W: {
 				// MAIN
 				{
@@ -3719,106 +3900,118 @@ int main(int argc, char *argv[])
 
 	if(Args(&A, argc, argv))
 	{
-		bool ROOT=false;
+		// Initialize & run the Widget.
+		if(XInitThreads() && OpenDisplay(&A))
+		{
+			StartSplash(&A);
 
-		// Check root access.
-		if(!(ROOT=(geteuid() == 0)))
-			Output(&A, "Warning: root permission is denied.\n");
+			bool ROOT=false;
 
-		// Read the CPU Features.
-		Read_Features(&A.P.Features);
+			// Check root access.
+			if(!(ROOT=(geteuid() == 0)))
+				Output(&A, "Warning: root permission is denied.\n");
 
-		// Find the Processor Architecture.
-		for(A.P.ArchID=ARCHITECTURES; A.P.ArchID >=0 ; A.P.ArchID--)
+			// Read the CPU Features.
+			Read_Features(&A.P.Features);
+
+			// Find the Processor Architecture.
+			for(A.P.ArchID=ARCHITECTURES; A.P.ArchID >=0 ; A.P.ArchID--)
 				if(!(ARCH[A.P.ArchID].Signature.ExtFamily ^ A.P.Features.Std.EAX.ExtFamily)
 				&& !(ARCH[A.P.ArchID].Signature.Family ^ A.P.Features.Std.EAX.Family)
 				&& !(ARCH[A.P.ArchID].Signature.ExtModel ^ A.P.Features.Std.EAX.ExtModel)
 				&& !(ARCH[A.P.ArchID].Signature.Model ^ A.P.Features.Std.EAX.Model))
 					break;
 
-		if(!A.P.PerCore)
-		{
-			if(!(A.P.CPU=A.P.Features.ThreadCount)) {
+			if(!(A.P.CPU=A.P.Features.ThreadCount))
+			{
 				Output(&A, "Warning: can not read the maximum number of Cores from CPUID.\n");
 
-				if(!(A.BIOS=(A.P.CPU=Get_ThreadCount()) != 0))
-					Output(&A, "Warning: can not read the BIOS DMI\nCheck if 'dmi' kernel module is loaded.\n");
+				if(A.P.Features.Std.EDX.HTT)
+				{
+					if(!(A.BIOS=(A.P.CPU=Get_ThreadCount()) != 0))
+						Output(&A, "Warning: can not read the maximum number of Threads from BIOS DMI\nCheck if 'dmi' kernel module is loaded.\n");
+				}
+				else
+				{
+					if(!(A.BIOS=(A.P.CPU=Get_CoreCount()) != 0))
+						Output(&A, "Warning: can not read the maximum number of Cores BIOS DMI\nCheck if 'dmi' kernel module is loaded\n");
+				}
 			}
-		}
-		else if(A.P.Features.Std.EDX.HTT)
-		{
-			if(!(A.P.CPU=A.P.Features.ThreadCount)) {
-				Output(&A, "Warning: can not read the maximum number of Cores from CPUID.\n");
+			if(!A.P.CPU)
+			{		// Fallback to architecture specifications.
+				Output(&A, "Remark: apply a maximum number of Cores from the ");
 
-				if(!(A.BIOS=(A.P.CPU=Get_CoreCount()) != 0))
-				Output(&A, "Warning: can not read the BIOS DMI\nCheck if 'dmi' kernel module is loaded\n");
-			}
-			else A.P.CPU>>=1;
-		}
-		if(!A.P.CPU) {
-			Output(&A, "Remark: get the maximum number of Cores from the ");
-			if(A.P.ArchID != -1)
-			{
-				// Fallback to architecture specifications.
-				A.P.CPU=ARCH[A.P.ArchID].MaxOfCores;
-				Output(&A, ARCH[A.P.ArchID].Architecture);
-			}
-			else
-			{
-				A.P.CPU=ARCH[0].MaxOfCores;
-				Output(&A, ARCH[0].Architecture);
-			}
+				if(A.P.ArchID != -1)
+				{
+					A.P.CPU=ARCH[A.P.ArchID].MaxOfCores;
+					Output(&A, ARCH[A.P.ArchID].Architecture);
+				}
+				else
+				{
+					A.P.CPU=ARCH[0].MaxOfCores;
+					Output(&A, ARCH[0].Architecture);
+				}
 				Output(&A, "specifications.\n");
-		}
-
-		// Allocate the Cores working structure.
-		pthread_mutex_init(&uDraw_mutex, NULL);
-
-		A.P.CPU=Create_Topology(&A);
-
-		// Open once the MSR gate.
-		if(!(A.MSR=(Open_MSR(&A) != 0)))
-			Output(&A, "Warning: can not read the MSR registers\nCheck if the 'msr' kernel module is loaded.\n");
-
-		SelectBaseClock(&A);
-
-		// Read the Integrated Memory Controler information.
-		A.M=IMC_Read_Info();
-		if(!A.M->ChannelCount)
-			Output(&A, "Warning: can not read the IMC controler.\n");
-
-		// Initialize & run the Widget.
-		if(XInitThreads() && OpenWidgets(&A))
-		{
-			Output(&A, "Welcome to X-Freq\n");
-
-			int G=0;
-			for(G=MAIN; G < WIDGETS; G++) {
-				BuildLayout(&A, G);
-				MapLayout(&A, G);
-				XMapWindow(A.display, A.W[G].window);
 			}
-			Output(&A, "Enter help to list commands.\n");
 
-			pthread_t TID_Cycle=0;
-			if(!pthread_create(&TID_Cycle, NULL, uCycle, &A)) {
-				uLoop(&A);
-				pthread_join(TID_Cycle, NULL);
+			// Allocate the Cores working structure.
+			pthread_mutex_init(&uDraw_mutex, NULL);
+
+			A.P.OnLine=Create_Topology(&A);
+
+			if(A.P.Features.HTT_enabled)
+				A.P.PerCore=false;
+			else
+				A.P.PerCore=true;
+
+			// Open once the MSR gate.
+			if(!(A.MSR=(Open_MSR(&A) != 0)))
+				Output(&A, "Warning: can not read the MSR registers\nCheck if the 'msr' kernel module is loaded.\n");
+
+			// Read the Integrated Memory Controler information.
+			A.M=IMC_Read_Info();
+			if(!A.M->ChannelCount)
+				Output(&A, "Warning: can not read the IMC controler.\n");
+
+			SelectBaseClock(&A);
+
+			StopSplash(&A);
+
+			if(OpenWidgets(&A))
+			{
+				Output(&A, "Welcome to X-Freq\n");
+
+				int G=0;
+				for(G=MAIN; G < WIDGETS; G++) {
+					BuildLayout(&A, G);
+					MapLayout(&A, G);
+					XMapWindow(A.display, A.W[G].window);
+				}
+				Output(&A, "Enter help to list commands.\n");
+
+				pthread_t TID_Cycle=0;
+				if(!pthread_create(&TID_Cycle, NULL, uCycle, &A)) {
+					uLoop(&A);
+					pthread_join(TID_Cycle, NULL);
+				}
+				else rc=2;
+
+				CloseWidgets(&A);
 			}
 			else rc=2;
 
-			CloseWidgets(&A);
+			// Release the ressources.
+			IMC_Free_Info(A.M);
+
+			Close_MSR(&A);
+
+			Delete_Topology(&A);
+
+			pthread_mutex_destroy(&uDraw_mutex);
+
+			CloseDisplay(&A);
 		}
 		else	rc=2;
-
-		// Release the ressources.
-		IMC_Free_Info(A.M);
-
-		Close_MSR(&A);
-
-		Delete_Topology(&A);
-
-		pthread_mutex_destroy(&uDraw_mutex);
 	}
 	else	rc=1;
 	return(rc);
