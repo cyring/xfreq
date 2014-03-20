@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.22 SR0 by CyrIng
+ * XFreq.c #0.22 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -121,7 +121,8 @@ int	Open_MSR(uARG *A)
 	int	tmpFD=open("/dev/cpu/0/msr", O_RDONLY);
 	int	rc=0;
 	// Read the minimum, maximum & the turbo ratios from Core number 0
-	if(tmpFD != -1) {
+	if(tmpFD != -1)
+	{
 		rc=((retval=Read_MSR(tmpFD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &A->P.MiscFeatures)) != -1);
 		rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM *) &A->P.Platform)) != -1);
 		rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->P.Turbo)) != -1);
@@ -143,75 +144,84 @@ int	Open_MSR(uARG *A)
 	char	pathname[]="/dev/cpu/999/msr", warning[64];
 	int	cpu=0;
 	for(cpu=0; cpu < A->P.CPU; cpu++)
-	  if(A->P.Topology[cpu].CPU != NULL) {
-		sprintf(pathname, "/dev/cpu/%d/msr", cpu);
-		if( (rc=((A->P.Topology[cpu].CPU->FD=open(pathname, O_RDWR)) != -1)) ) {
-			// Enable the Performance Counters 1 and 2 :
-			// - Set the global counter bits
-			rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Topology[cpu].CPU->GlobalPerfCounter)) != -1);
-			if(A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR1 != 0) {
-				sprintf(warning, "Warning: CPU#%02d: Fixed Counter #1 is already activated.\n", cpu);
-				Output(A, warning);
-			}
-			if(A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR2 != 0) {
-				sprintf(warning, "Warning: CPU#%02d: Fixed Counter #2 is already activated.\n", cpu);
-				Output(A, warning);
-			}
-			A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR1=1;
-			A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR2=1;
-			rc=((retval=Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Topology[cpu].CPU->GlobalPerfCounter)) != -1);
+		if(A->P.Topology[cpu].CPU != NULL)
+		{
+			sprintf(pathname, "/dev/cpu/%d/msr", cpu);
+			if( (rc=((A->P.Topology[cpu].CPU->FD=open(pathname, O_RDWR)) != -1)) )
+			{
+				// Enable the Performance Counters 1 and 2 :
+				// - Set the global counter bits
+				rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Topology[cpu].CPU->GlobalPerfCounter)) != -1);
+				if(A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR1 != 0)
+				{
+					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #1 is already activated.\n", cpu);
+					Output(A, warning);
+				}
+				if(A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR2 != 0)
+				{
+					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #2 is already activated.\n", cpu);
+					Output(A, warning);
+				}
+				A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR1=1;
+				A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR2=1;
+				rc=((retval=Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Topology[cpu].CPU->GlobalPerfCounter)) != -1);
 
-			// - Set the fixed counter bits
-			rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Topology[cpu].CPU->FixedPerfCounter)) != -1);
-			A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_OS=1;
-			A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_OS=1;
-			A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_Usr=1;
-			A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_Usr=1;
-			if(A->P.PerCore) {
-				A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN1=1;
-				A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN2=1;
-			}
-			else {
-				A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN1=0;
-				A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN2=0;
-			}
-			rc=((retval=Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Topology[cpu].CPU->FixedPerfCounter)) != -1);
+				// - Set the fixed counter bits
+				rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Topology[cpu].CPU->FixedPerfCounter)) != -1);
+				A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_OS=1;
+				A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_OS=1;
+				A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_Usr=1;
+				A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_Usr=1;
+				if(A->P.PerCore)
+				{
+					A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN1=1;
+					A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN2=1;
+				}
+				else {
+					A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN1=0;
+					A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN2=0;
+				}
+				rc=((retval=Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Topology[cpu].CPU->FixedPerfCounter)) != -1);
 
-			// Check & fixe Counter Overflow.
-			GLOBAL_PERF_STATUS Overflow={0};
-			GLOBAL_PERF_OVF_CTRL OvfControl={0};
-			rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_STATUS, (GLOBAL_PERF_STATUS *) &Overflow)) != -1);
-			if(Overflow.Overflow_CTR1) {
-				sprintf(warning, "Remark CPU#%02d: UCC Counter #1 is overflowed.\n", cpu);
-				Output(A, warning);
-				OvfControl.Clear_Ovf_CTR1=1;
-			}
-			if(Overflow.Overflow_CTR2) {
-				sprintf(warning, "Remark CPU#%02d: URC Counter #1 is overflowed.\n", cpu);
-				Output(A, warning);
-				OvfControl.Clear_Ovf_CTR2=1;
-			}
-			if(Overflow.Overflow_CTR1|Overflow.Overflow_CTR2) {
-				sprintf(warning, "Remark CPU#%02d: Resetting Counters.\n", cpu);
-				Output(A, warning);
-				rc=((retval=Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_OVF_CTRL, (GLOBAL_PERF_OVF_CTRL *) &OvfControl)) != -1);
-			}
+				// Check & fixe Counter Overflow.
+				GLOBAL_PERF_STATUS Overflow={0};
+				GLOBAL_PERF_OVF_CTRL OvfControl={0};
+				rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_STATUS, (GLOBAL_PERF_STATUS *) &Overflow)) != -1);
+				if(Overflow.Overflow_CTR1)
+				{
+					sprintf(warning, "Remark CPU#%02d: UCC Counter #1 is overflowed.\n", cpu);
+					Output(A, warning);
+					OvfControl.Clear_Ovf_CTR1=1;
+				}
+				if(Overflow.Overflow_CTR2)
+				{
+					sprintf(warning, "Remark CPU#%02d: URC Counter #1 is overflowed.\n", cpu);
+					Output(A, warning);
+					OvfControl.Clear_Ovf_CTR2=1;
+				}
+				if(Overflow.Overflow_CTR1|Overflow.Overflow_CTR2)
+				{
+					sprintf(warning, "Remark CPU#%02d: Resetting Counters.\n", cpu);
+					Output(A, warning);
+					rc=((retval=Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_OVF_CTRL, (GLOBAL_PERF_OVF_CTRL *) &OvfControl)) != -1);
+				}
 
-			// Retreive the Thermal Junction Max. Fallback to 100°C if not available.
-			rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_TEMPERATURE_TARGET, (TJMAX *) &A->P.Topology[cpu].CPU->TjMax)) != -1);
-			if(A->P.Topology[cpu].CPU->TjMax.Target == 0) {
-				Output(A, "Warning: Thermal Junction Max unavailable.\n");
+				// Retreive the Thermal Junction Max. Fallback to 100°C if not available.
+				rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_TEMPERATURE_TARGET, (TJMAX *) &A->P.Topology[cpu].CPU->TjMax)) != -1);
+				if(A->P.Topology[cpu].CPU->TjMax.Target == 0)
+				{
+					Output(A, "Warning: Thermal Junction Max unavailable.\n");
+					A->P.Topology[cpu].CPU->TjMax.Target=100;
+				}
+				rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->P.Topology[cpu].CPU->ThermIntr)) != -1);
+			}
+			else	// Fallback to an arbitrary & commom value.
+			{
+				sprintf(warning, "Remark CPU#%02d: Thermal Junction Max defaults to 100C.\n", cpu);
+				Output(A, warning);
 				A->P.Topology[cpu].CPU->TjMax.Target=100;
 			}
-			rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->P.Topology[cpu].CPU->ThermIntr)) != -1);
 		}
-		else	// Fallback to an arbitrary & commom value.
-		{
-			sprintf(warning, "Remark CPU#%02d: Thermal Junction Max defaults to 100C.\n", cpu);
-			Output(A, warning);
-			A->P.Topology[cpu].CPU->TjMax.Target=100;
-		}
-	}
 	return(rc);
 }
 
@@ -220,23 +230,24 @@ void	Close_MSR(uARG *A)
 {
 	int	cpu=0;
 	for(cpu=0; cpu < A->P.CPU; cpu++)
-	  if(A->P.Topology[cpu].CPU != NULL) {
-		// Reset the fixed counters.
-		A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_Usr=0;
-		A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_Usr=0;
-		A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_OS=0;
-		A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_OS=0;
-		A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN1=0;
-		A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN2=0;
-		Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR_CTRL, &A->P.Topology[cpu].CPU->FixedPerfCounter);
-		// Reset the global counters.
-		A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR1=0;
-		A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR2=0;
-		Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_CTRL, &A->P.Topology[cpu].CPU->GlobalPerfCounter);
-		// Release the MSR handle associated to the Core.
-		if(A->P.Topology[cpu].CPU->FD != -1)
-			close(A->P.Topology[cpu].CPU->FD);
-	}
+		if(A->P.Topology[cpu].CPU != NULL)
+		{
+			// Reset the fixed counters.
+			A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_Usr=0;
+			A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_Usr=0;
+			A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_OS=0;
+			A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_OS=0;
+			A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN1=0;
+			A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN2=0;
+			Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR_CTRL, &A->P.Topology[cpu].CPU->FixedPerfCounter);
+			// Reset the global counters.
+			A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR1=0;
+			A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR2=0;
+			Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_CTRL, &A->P.Topology[cpu].CPU->GlobalPerfCounter);
+			// Release the MSR handle associated to the Core.
+			if(A->P.Topology[cpu].CPU->FD != -1)
+				close(A->P.Topology[cpu].CPU->FD);
+		}
 }
 
 // Read the Time Stamp Counter.
@@ -260,33 +271,36 @@ static void *uCycle(void *uArg)
 
 	unsigned int cpu=0;
 	for(cpu=0; cpu < A->P.CPU; cpu++)
-	  if(A->P.Topology[cpu].CPU != NULL) {
-		// Initial read of the Unhalted Core & Reference Cycles.
-		Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].UCC);
-		Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].URC);
-		// Initial read of the TSC in relation to the Logical Core.
-		Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[0]);
-		// Initial read of other C-States.
-		Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C3[0]);
-		Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C6[0]);
-	}
+		if(A->P.Topology[cpu].CPU != NULL)
+		{
+			// Initial read of the Unhalted Core & Reference Cycles.
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].UCC);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].URC);
+			// Initial read of the TSC in relation to the Logical Core.
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[0]);
+			// Initial read of other C-States.
+			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C3[0]);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C6[0]);
+		}
 
-	while(A->LOOP) {
+	while(A->LOOP)
+	{
 		// Settle down N x 50000 microseconds as specified by the command argument.
 		usleep(IDLE_BASE_USEC * A->P.IdleTime);
 
 /* CRITICAL_IN  */
 		for(cpu=0; cpu < A->P.CPU; cpu++)
-		  if(A->P.Topology[cpu].CPU != NULL) {
-			// Update the Unhalted Core & the Reference Cycles.
-			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].UCC);
-			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
-			// Update TSC.
-			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[1]);
-			// Update C-States.
-			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C3[1]);
-			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C6[1]);
-		}
+			if(A->P.Topology[cpu].CPU != NULL)
+			{
+				// Update the Unhalted Core & the Reference Cycles.
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].UCC);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
+				// Update TSC.
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[1]);
+				// Update C-States.
+				Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C3[1]);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C6[1]);
+			}
 /* CRITICAL_OUT */
 
 		// Reset C-States average.
@@ -294,68 +308,69 @@ static void *uCycle(void *uArg)
 
 		unsigned int maxFreq=0, maxTemp=A->P.Topology[0].CPU->TjMax.Target;
 		for(cpu=0; cpu < A->P.CPU; cpu++)
-		  if(A->P.Topology[cpu].CPU != NULL) {
-			// Compute the absolute Delta of Unhalted (Core & Ref) C0 Cycles = Current[1] - Previous[0].
-			A->P.Topology[cpu].CPU->Delta.C0.UCC=	(A->P.Topology[cpu].CPU->Cycles.C0[0].UCC > A->P.Topology[cpu].CPU->Cycles.C0[1].UCC) ?
-							 A->P.Topology[cpu].CPU->Cycles.C0[0].UCC - A->P.Topology[cpu].CPU->Cycles.C0[1].UCC
-							:A->P.Topology[cpu].CPU->Cycles.C0[1].UCC - A->P.Topology[cpu].CPU->Cycles.C0[0].UCC;
+			if(A->P.Topology[cpu].CPU != NULL)
+			{
+				// Compute the absolute Delta of Unhalted (Core & Ref) C0 Cycles = Current[1] - Previous[0].
+				A->P.Topology[cpu].CPU->Delta.C0.UCC=	(A->P.Topology[cpu].CPU->Cycles.C0[0].UCC > A->P.Topology[cpu].CPU->Cycles.C0[1].UCC) ?
+								A->P.Topology[cpu].CPU->Cycles.C0[0].UCC - A->P.Topology[cpu].CPU->Cycles.C0[1].UCC
+								:A->P.Topology[cpu].CPU->Cycles.C0[1].UCC - A->P.Topology[cpu].CPU->Cycles.C0[0].UCC;
 
-			A->P.Topology[cpu].CPU->Delta.C0.URC=	A->P.Topology[cpu].CPU->Cycles.C0[1].URC - A->P.Topology[cpu].CPU->Cycles.C0[0].URC;
+				A->P.Topology[cpu].CPU->Delta.C0.URC=	A->P.Topology[cpu].CPU->Cycles.C0[1].URC - A->P.Topology[cpu].CPU->Cycles.C0[0].URC;
 
-			A->P.Topology[cpu].CPU->Delta.C3=	A->P.Topology[cpu].CPU->Cycles.C3[1] - A->P.Topology[cpu].CPU->Cycles.C3[0];
+				A->P.Topology[cpu].CPU->Delta.C3=	A->P.Topology[cpu].CPU->Cycles.C3[1] - A->P.Topology[cpu].CPU->Cycles.C3[0];
 
-			A->P.Topology[cpu].CPU->Delta.C6=	A->P.Topology[cpu].CPU->Cycles.C6[1] - A->P.Topology[cpu].CPU->Cycles.C6[0];
+				A->P.Topology[cpu].CPU->Delta.C6=	A->P.Topology[cpu].CPU->Cycles.C6[1] - A->P.Topology[cpu].CPU->Cycles.C6[0];
 
-			A->P.Topology[cpu].CPU->Delta.TSC=	A->P.Topology[cpu].CPU->Cycles.TSC[1] - A->P.Topology[cpu].CPU->Cycles.TSC[0];
+				A->P.Topology[cpu].CPU->Delta.TSC=	A->P.Topology[cpu].CPU->Cycles.TSC[1] - A->P.Topology[cpu].CPU->Cycles.TSC[0];
 
-			// Compute Turbo State per Cycles Delta. (Protect against a division by zero)
-			A->P.Topology[cpu].CPU->State.Turbo=(double) (A->P.Topology[cpu].CPU->Delta.C0.URC != 0) ?
-						  (double) (A->P.Topology[cpu].CPU->Delta.C0.UCC) / (double) A->P.Topology[cpu].CPU->Delta.C0.URC
-						 : 0.0f;
-			// Compute C-States.
-			A->P.Topology[cpu].CPU->State.C0=(double) (A->P.Topology[cpu].CPU->Delta.C0.URC) / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
-			A->P.Topology[cpu].CPU->State.C3=(double) (A->P.Topology[cpu].CPU->Delta.C3)  / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
-			A->P.Topology[cpu].CPU->State.C6=(double) (A->P.Topology[cpu].CPU->Delta.C6)  / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
+				// Compute Turbo State per Cycles Delta. (Protect against a division by zero)
+				A->P.Topology[cpu].CPU->State.Turbo=(double) (A->P.Topology[cpu].CPU->Delta.C0.URC != 0) ?
+							(double) (A->P.Topology[cpu].CPU->Delta.C0.UCC) / (double) A->P.Topology[cpu].CPU->Delta.C0.URC
+							: 0.0f;
+				// Compute C-States.
+				A->P.Topology[cpu].CPU->State.C0=(double) (A->P.Topology[cpu].CPU->Delta.C0.URC) / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
+				A->P.Topology[cpu].CPU->State.C3=(double) (A->P.Topology[cpu].CPU->Delta.C3)  / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
+				A->P.Topology[cpu].CPU->State.C6=(double) (A->P.Topology[cpu].CPU->Delta.C6)  / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
 
-			A->P.Topology[cpu].CPU->RelativeRatio=A->P.Topology[cpu].CPU->State.Turbo * A->P.Topology[cpu].CPU->State.C0 * (double) A->P.Platform.MaxNonTurboRatio;
+				A->P.Topology[cpu].CPU->RelativeRatio=A->P.Topology[cpu].CPU->State.Turbo * A->P.Topology[cpu].CPU->State.C0 * (double) A->P.Platform.MaxNonTurboRatio;
 
-			// Relative Frequency = Relative Ratio x Bus Clock Frequency
-			A->P.Topology[cpu].CPU->RelativeFreq=A->P.Topology[cpu].CPU->RelativeRatio * A->P.ClockSpeed;
+				// Relative Frequency = Relative Ratio x Bus Clock Frequency
+				A->P.Topology[cpu].CPU->RelativeFreq=A->P.Topology[cpu].CPU->RelativeRatio * A->P.ClockSpeed;
 
-			// Save TSC.
-			A->P.Topology[cpu].CPU->Cycles.TSC[0]=A->P.Topology[cpu].CPU->Cycles.TSC[1];
-			// Save the Unhalted Core & Reference Cycles for next iteration.
-			A->P.Topology[cpu].CPU->Cycles.C0[0].UCC=A->P.Topology[cpu].CPU->Cycles.C0[1].UCC;
-			A->P.Topology[cpu].CPU->Cycles.C0[0].URC =A->P.Topology[cpu].CPU->Cycles.C0[1].URC;
-			// Save also the C-State Reference Cycles.
-			A->P.Topology[cpu].CPU->Cycles.C3[0]=A->P.Topology[cpu].CPU->Cycles.C3[1];
-			A->P.Topology[cpu].CPU->Cycles.C6[0]=A->P.Topology[cpu].CPU->Cycles.C6[1];
+				// Save TSC.
+				A->P.Topology[cpu].CPU->Cycles.TSC[0]=A->P.Topology[cpu].CPU->Cycles.TSC[1];
+				// Save the Unhalted Core & Reference Cycles for next iteration.
+				A->P.Topology[cpu].CPU->Cycles.C0[0].UCC=A->P.Topology[cpu].CPU->Cycles.C0[1].UCC;
+				A->P.Topology[cpu].CPU->Cycles.C0[0].URC =A->P.Topology[cpu].CPU->Cycles.C0[1].URC;
+				// Save also the C-State Reference Cycles.
+				A->P.Topology[cpu].CPU->Cycles.C3[0]=A->P.Topology[cpu].CPU->Cycles.C3[1];
+				A->P.Topology[cpu].CPU->Cycles.C6[0]=A->P.Topology[cpu].CPU->Cycles.C6[1];
 
-			// Sum the C-States before the average.
-			A->P.Avg.Turbo+=A->P.Topology[cpu].CPU->State.Turbo;
-			A->P.Avg.C0+=A->P.Topology[cpu].CPU->State.C0;
-			A->P.Avg.C3+=A->P.Topology[cpu].CPU->State.C3;
-			A->P.Avg.C6+=A->P.Topology[cpu].CPU->State.C6;
+				// Sum the C-States before the average.
+				A->P.Avg.Turbo+=A->P.Topology[cpu].CPU->State.Turbo;
+				A->P.Avg.C0+=A->P.Topology[cpu].CPU->State.C0;
+				A->P.Avg.C3+=A->P.Topology[cpu].CPU->State.C3;
+				A->P.Avg.C6+=A->P.Topology[cpu].CPU->State.C6;
 
-			// Index the Top CPU speed.
-			if(maxFreq < A->P.Topology[cpu].CPU->RelativeFreq) {
-				maxFreq=A->P.Topology[cpu].CPU->RelativeFreq;
-				A->P.Top=cpu;
+				// Index the Top CPU speed.
+				if(maxFreq < A->P.Topology[cpu].CPU->RelativeFreq) {
+					maxFreq=A->P.Topology[cpu].CPU->RelativeFreq;
+					A->P.Top=cpu;
+				}
+
+				// Update the Digital Thermal Sensor.
+				if( (Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_THERM_STATUS, (THERM_STATUS *) &A->P.Topology[cpu].CPU->ThermStat)) == -1)
+					A->P.Topology[cpu].CPU->ThermStat.DTS=0;
+
+				// Index which Core is hot.
+				if(A->P.Topology[cpu].CPU->ThermStat.DTS < maxTemp) {
+					maxTemp=A->P.Topology[cpu].CPU->ThermStat.DTS;
+					A->P.Hot=cpu;
+				}
+				// Store the coldest temperature.
+				if(A->P.Topology[cpu].CPU->ThermStat.DTS > A->P.Cold)
+					A->P.Cold=A->P.Topology[cpu].CPU->ThermStat.DTS;
 			}
-
-			// Update the Digital Thermal Sensor.
-			if( (Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_THERM_STATUS, (THERM_STATUS *) &A->P.Topology[cpu].CPU->ThermStat)) == -1)
-				A->P.Topology[cpu].CPU->ThermStat.DTS=0;
-
-			// Index which Core is hot.
-			if(A->P.Topology[cpu].CPU->ThermStat.DTS < maxTemp) {
-				maxTemp=A->P.Topology[cpu].CPU->ThermStat.DTS;
-				A->P.Hot=cpu;
-			}
-			// Store the coldest temperature.
-			if(A->P.Topology[cpu].CPU->ThermStat.DTS > A->P.Cold)
-				A->P.Cold=A->P.Topology[cpu].CPU->ThermStat.DTS;
-		}
 		// Average the C-States.
 		A->P.Avg.Turbo/=A->P.CPU;
 		A->P.Avg.C0/=A->P.CPU;
@@ -381,7 +396,8 @@ int	Read_SMBIOS(int structure, int instance, off_t offset, void *buf, size_t nby
 	int	tmpFD=0, rc=-1;
 
 	sprintf(pathname, "/sys/firmware/dmi/entries/%d-%d/raw", structure, instance);
-	if( (tmpFD=open(pathname, O_RDONLY)) != -1 ) {
+	if( (tmpFD=open(pathname, O_RDONLY)) != -1 )
+	{
 		retval=pread(tmpFD, buf, nbyte, offset);
 		close(tmpFD);
 		rc=(retval != nbyte) ? -1 : 0;
@@ -635,18 +651,19 @@ unsigned int Create_Topology(uARG *A)
 
 	uAPIC *uApic=calloc(A->P.CPU, sizeof(uAPIC));
 
-	for(cpu=0; cpu < A->P.CPU; cpu++) {
+	for(cpu=0; cpu < A->P.CPU; cpu++)
+	{
 		uApic[cpu].cpu=cpu;
 		uApic[cpu].A=A;
 		pthread_create(&uApic[cpu].TID, NULL, uReadAPIC, &uApic[cpu]);
 	}
 	for(cpu=0; cpu < A->P.CPU; cpu++)
-		{
+	{
 		pthread_join(uApic[cpu].TID, NULL);
 
 		if(A->P.Topology[cpu].CPU != NULL)
 			CountEnabledCPU++;
-		}
+	}
 	free(uApic);
 
 	return(CountEnabledCPU);
@@ -1015,7 +1032,8 @@ MaxText XPrint(Display *display, Drawable drawable, GC gc, int x, int y, char *N
 {
 	char *pStartLine=NewLineStr, *pNewLine=NULL;
 	MaxText  Text={0,0};
-	while((pNewLine=strchr(pStartLine,'\n')) != NULL) {
+	while((pNewLine=strchr(pStartLine,'\n')) != NULL)
+	{
 		int cols=pNewLine - pStartLine;
 		XDrawString(	display, drawable, gc,
 				x,
@@ -1032,7 +1050,8 @@ MaxText XPrint(Display *display, Drawable drawable, GC gc, int x, int y, char *N
 void	ScaleMDI(uARG *A)
 {
 	int G=FIRST_WIDGET, RightMost=LAST_WIDGET, BottomMost=LAST_WIDGET;
-	while(G <= LAST_WIDGET) {
+	while(G <= LAST_WIDGET)
+	{
 		if((A->W[G].x + A->W[G].width)  > (A->W[RightMost].x + A->W[RightMost].width))
 			RightMost=G;
 		if((A->W[G].y + A->W[G].height) > (A->W[BottomMost].y + A->W[BottomMost].height))
@@ -1054,7 +1073,8 @@ void	ScaleMDI(uARG *A)
 void	ReSizeWidget(uARG *A, int G)
 {
 	XSizeHints *hints=NULL;
-	if((hints=XAllocSizeHints()) != NULL) {
+	if((hints=XAllocSizeHints()) != NULL)
+	{
 		hints->x=A->W[G].x;
 		hints->y=A->W[G].y;
 		hints->min_width= hints->max_width= A->W[G].width;
@@ -1235,12 +1255,12 @@ void	StartSplash(uARG *A)
 						0x0,
 						0)) != 0
 	&& (A->Splash.gc=XCreateGC(A->display, A->Splash.window, 0, NULL)) != 0)
-		{
+	{
 		A->Splash.bitmap=XCreateBitmapFromData(A->display, A->Splash.window, (const char *) splash_bits, splash_width, splash_height);
 
 		XSizeHints *hints=NULL;
 		if((hints=XAllocSizeHints()) != NULL)
-			{
+		{
 			hints->x=A->Splash.x;
 			hints->y=A->Splash.y;
 			hints->min_width= hints->max_width= A->Splash.w;
@@ -1248,26 +1268,29 @@ void	StartSplash(uARG *A)
 			hints->flags=USPosition|USSize|PMinSize|PMaxSize;
 			XSetWMNormalHints(A->display, A->Splash.window, hints);
 			XFree(hints);
-			}
+		}
 		else
 			XMoveWindow(A->display, A->Splash.window, A->Splash.x, A->Splash.y);
 
-		struct {
-			unsigned long	flags,
-					functions,
-					decorations;
-			long		inputMode;
-			unsigned long	status;
-			} data={flags:2, functions:0, decorations:0, inputMode:0, status:0};
-
 		Atom property=XInternAtom(A->display, "_MOTIF_WM_HINTS", true);
-		XChangeProperty(A->display, A->Splash.window, property, property, 32, PropModeReplace, (unsigned char *) &data, 5);
+		if(property != None)
+		{
+			struct {
+				unsigned long   flags,
+						functions,
+						decorations;
+				long		inputMode;
+				unsigned long	status;
+				}
+					data={flags:2, functions:0, decorations:0, inputMode:0, status:0};
 
+			XChangeProperty(A->display, A->Splash.window, property, property, 32, PropModeReplace, (unsigned char *) &data, 5);
+		}
 		XSelectInput(A->display, A->Splash.window, ExposureMask);
 		XMapWindow(A->display, A->Splash.window);
 
 		pthread_create(&A->TID_Draw, NULL, uSplash, A);
-		}
+	}
 }
 
 void	StopSplash(uARG *A)
@@ -1396,688 +1419,691 @@ int	OpenWidgets(uARG *A)
 
 	int G=0;
 	for(G=MAIN; noerr && (G < WIDGETS); G++)
-		{
-			// Dispose Widgets from each other : [Right & Bottom + width & height] Or -[1,-1] = X,Y origin + Margins.
-			int U=A->W[G].x;
-			int V=A->W[G].y;
-			if(_IS_MDI_) {
-				if(G != MAIN) {
-					switch(U) {
-						case -1:
-							A->W[G].x=A->L.Margin.H;
-							break;
-						case MAIN:
-							A->W[G].x=A->L.Margin.H + A->W[U].width;
-							break;
-						default:
-							A->W[G].x=A->L.Margin.H + A->W[U].x + A->W[U].width;
-							break;
-					}
-					switch(V) {
-						case -1:
-							A->W[G].y=A->L.Margin.V;
-							break;
-						case MAIN:
-							A->W[G].y=A->L.Margin.V + A->W[V].height;
-							break;
-						default:
-							A->W[G].y=A->L.Margin.V + A->W[V].y + A->W[V].height;
-							break;
-					}
+	{
+		// Dispose Widgets from each other : [Right & Bottom + width & height] Or -[1,-1] = X,Y origin + Margins.
+		int U=A->W[G].x;
+		int V=A->W[G].y;
+		if(_IS_MDI_) {
+			if(G != MAIN) {
+				switch(U) {
+					case -1:
+						A->W[G].x=A->L.Margin.H;
+						break;
+					case MAIN:
+						A->W[G].x=A->L.Margin.H + A->W[U].width;
+						break;
+					default:
+						A->W[G].x=A->L.Margin.H + A->W[U].x + A->W[U].width;
+						break;
 				}
-				else {
-					A->W[G].x=A->L.Start.H;
-					A->W[G].y=A->L.Start.V;
+				switch(V) {
+					case -1:
+						A->W[G].y=A->L.Margin.V;
+						break;
+					case MAIN:
+						A->W[G].y=A->L.Margin.V + A->W[V].height;
+						break;
+					default:
+						A->W[G].y=A->L.Margin.V + A->W[V].y + A->W[V].height;
+						break;
 				}
 			}
 			else {
-				if(U == -1)
-					A->W[G].x=A->L.Start.H;
-				else
-					A->W[G].x=A->L.Margin.H + A->W[U].x + A->W[U].width;
-				if(V == -1)
-					A->W[G].y=A->L.Start.V;
-				else
-					A->W[G].y=A->L.Margin.V + A->W[V].y + A->W[V].height;
+				A->W[G].x=A->L.Start.H;
+				A->W[G].y=A->L.Start.V;
 			}
+		}
+		else {
+			if(U == -1)
+				A->W[G].x=A->L.Start.H;
+			else
+				A->W[G].x=A->L.Margin.H + A->W[U].x + A->W[U].width;
+			if(V == -1)
+				A->W[G].y=A->L.Start.V;
+			else
+				A->W[G].y=A->L.Margin.V + A->W[V].y + A->W[V].height;
+		}
 
-			// Override default colors if values supplied in the command line.
-			if(A->L.globalBackground != GLOBAL_BACKGROUND)
-				A->W[G].background=A->L.globalBackground;
-			if(A->L.globalForeground != GLOBAL_FOREGROUND)
-				A->W[G].foreground=A->L.globalForeground;
+		// Override default colors if values supplied in the command line.
+		if(A->L.globalBackground != GLOBAL_BACKGROUND)
+			A->W[G].background=A->L.globalBackground;
+		if(A->L.globalForeground != GLOBAL_FOREGROUND)
+			A->W[G].foreground=A->L.globalForeground;
 
-			// Create the Widgets.
-			if((A->W[G].window=XCreateWindow(A->display,
-							_IS_MDI_ && (G != MAIN) ?
-							A->W[MAIN].window
-							: DefaultRootWindow(A->display),
-							A->W[G].x, A->W[G].y, A->W[G].width, A->W[G].height, A->W[G].border_width,
-							CopyFromParent, InputOutput, CopyFromParent, CWBorderPixel|CWOverrideRedirect|CWCursor, &swa)) )
+		// Create the Widgets.
+		if((A->W[G].window=XCreateWindow(A->display,
+						_IS_MDI_ && (G != MAIN) ?
+						A->W[MAIN].window
+						: DefaultRootWindow(A->display),
+						A->W[G].x, A->W[G].y, A->W[G].width, A->W[G].height, A->W[G].border_width,
+						CopyFromParent, InputOutput, CopyFromParent, CWBorderPixel|CWOverrideRedirect|CWCursor, &swa)) )
+		{
+			sprintf(str, TITLE_MAIN_FMT, _MAJOR, _MINOR, _NIGHTLY);
+			SetWidgetName(A, G, str);
+
+			if((A->W[G].gc=XCreateGC(A->display, A->W[G].window, 0, NULL)))
 				{
-				sprintf(str, TITLE_MAIN_FMT, _MAJOR, _MINOR, _NIGHTLY);
-				SetWidgetName(A, G, str);
+				XSetFont(A->display, A->W[G].gc, A->xfont->fid);
 
-				if((A->W[G].gc=XCreateGC(A->display, A->W[G].window, 0, NULL)))
-					{
-					XSetFont(A->display, A->W[G].gc, A->xfont->fid);
+				switch(G)
+				{
+					// Compute Widgets scaling.
+					case MAIN: {
+						SetHViewport(G, MAIN_TEXT_WIDTH  - 3);
+						SetVViewport(G, MAIN_TEXT_HEIGHT - 2);
+						SetHFrame(G, GetHViewport(G) << MAIN_FRAME_VIEW_HSHIFT);
+						SetVFrame(G, GetVViewport(G) << MAIN_FRAME_VIEW_VSHIFT);
 
-					switch(G) {
-						// Compute Widgets scaling.
-						case MAIN: {
-							SetHViewport(G, MAIN_TEXT_WIDTH  - 3);
-							SetVViewport(G, MAIN_TEXT_HEIGHT - 2);
-							SetHFrame(G, GetHViewport(G) << MAIN_FRAME_VIEW_HSHIFT);
-							SetVFrame(G, GetVViewport(G) << MAIN_FRAME_VIEW_VSHIFT);
+						XTextExtents(	A->xfont, HDSIZE, MAIN_TEXT_WIDTH,
+								&A->W[G].extents.dir, &A->W[G].extents.ascent,
+								&A->W[G].extents.descent, &A->W[G].extents.overall);
 
-							XTextExtents(	A->xfont, HDSIZE, MAIN_TEXT_WIDTH,
-									&A->W[G].extents.dir, &A->W[G].extents.ascent,
-									&A->W[G].extents.descent, &A->W[G].extents.overall);
+						A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
+									- A->xfont->min_bounds.lbearing;
+						A->W[G].extents.charHeight=A->W[G].extents.ascent
+									+ A->W[G].extents.descent;
 
-							A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
-										- A->xfont->min_bounds.lbearing;
-							A->W[G].extents.charHeight=A->W[G].extents.ascent
+						A->W[G].width	= A->W[G].extents.overall.width;
+						A->W[G].height	= One_Char_Height(G) * MAIN_TEXT_HEIGHT;
+
+						// Prepare the chart axes.
+						A->L.Axes[G].N=2;
+						A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
+						// Header.
+						A->L.Axes[G].Segment[0].x1=0;
+						A->L.Axes[G].Segment[0].y1=Header_Height(G) + 1;
+						A->L.Axes[G].Segment[0].x2=A->W[G].width;
+						A->L.Axes[G].Segment[0].y2=A->L.Axes[G].Segment[0].y1;
+						// Footer.
+						A->L.Axes[G].Segment[1].x1=A->L.Axes[G].Segment[0].x1;
+						A->L.Axes[G].Segment[1].y1=A->W[G].height - 1;
+						A->L.Axes[G].Segment[1].x2=A->L.Axes[G].Segment[0].x2;
+						A->L.Axes[G].Segment[1].y2=A->L.Axes[G].Segment[1].y1;
+						A->W[G].height+=Footer_Height(G);
+
+						// First run if MAIN is not defined as MDI then create buttons.
+						if(!_IS_MDI_) {
+							unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
+
+							CreateButton(	A, DECORATION, ID_QUIT, G,
+									A->W[G].width - (One_Char_Width(G) * 5) - 2,
+									2,
+									square - 2,
+									square - 2,
+									CallBackQuit,
+									NULL);
+
+							CreateButton(	A, DECORATION, ID_MIN, G,
+									A->W[G].width - Twice_Char_Width(G) - 2,
+									2,
+									square - 2,
+									square - 2,
+									CallBackMinimizeWidget,
+									NULL);
+
+							CreateButton(	A, SCROLLING, ID_NORTH, G,
+									A->W[G].width - square,
+									Header_Height(G) + 2,
+									square,
+									square,
+									CallBackButton,
+									NULL);
+
+							CreateButton(	A, SCROLLING, ID_SOUTH, G,
+									A->W[G].width - square,
+									A->W[G].height - (Footer_Height(G) + square + 2),
+									square,
+									square,
+									CallBackButton,
+									NULL);
+
+							CreateButton(	A, SCROLLING, ID_EAST, G,
+									A->W[G].width
+									- (MAX(Twice_Char_Height(G),Twice_Char_Width(G)) + 2),
+									A->W[G].height - (square + 2),
+									square,
+									square,
+									CallBackButton,
+									NULL);
+
+							CreateButton(	A, SCROLLING, ID_WEST, G,
+									A->W[G].width
+									- (MAX( 3*One_Char_Height(G)+Quarter_Char_Height(G),
+										3 * One_Char_Width(G)+Quarter_Char_Width(G)) + 2),
+									A->W[G].height - (square + 2),
+									square,
+									square,
+									CallBackButton,
+									NULL);
+						}
+					}
+						break;
+					case CORES: {
+						SetHViewport(G, CORES_TEXT_WIDTH);
+						SetVViewport(G, CORES_TEXT_HEIGHT);
+						SetHFrame(G, GetHViewport(G));
+						SetVFrame(G, GetVViewport(G));
+
+						XTextExtents(	A->xfont, HDSIZE, CORES_TEXT_WIDTH << 1,
+								&A->W[G].extents.dir, &A->W[G].extents.ascent,
+								&A->W[G].extents.descent, &A->W[G].extents.overall);
+
+						A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
+									- A->xfont->min_bounds.lbearing;
+						A->W[G].extents.charHeight=A->W[G].extents.ascent
 										+ A->W[G].extents.descent;
 
-							A->W[G].width	= A->W[G].extents.overall.width;
-							A->W[G].height	= One_Char_Height(G) * MAIN_TEXT_HEIGHT;
+						A->W[G].width	= A->W[G].extents.overall.width
+								+ (One_Char_Width(G) << 2)
+								+ Half_Char_Width(G);
+						A->W[G].height	= Quarter_Char_Height(G)
+								+ One_Char_Height(G) * (CORES_TEXT_HEIGHT + 2);
 
-							// Prepare the chart axes.
-							A->L.Axes[G].N=2;
-							A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
-							// Header.
-							A->L.Axes[G].Segment[0].x1=0;
-							A->L.Axes[G].Segment[0].y1=Header_Height(G) + 1;
-							A->L.Axes[G].Segment[0].x2=A->W[G].width;
-							A->L.Axes[G].Segment[0].y2=A->L.Axes[G].Segment[0].y1;
-							// Footer.
-							A->L.Axes[G].Segment[1].x1=A->L.Axes[G].Segment[0].x1;
-							A->L.Axes[G].Segment[1].y1=A->W[G].height - 1;
-							A->L.Axes[G].Segment[1].x2=A->L.Axes[G].Segment[0].x2;
-							A->L.Axes[G].Segment[1].y2=A->L.Axes[G].Segment[1].y1;
-							A->W[G].height+=Footer_Height(G);
-
-							// First run if MAIN is not defined as MDI then create buttons.
-							if(!_IS_MDI_) {
-								unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
-
-								CreateButton(	A, DECORATION, ID_QUIT, G,
-										A->W[G].width - (One_Char_Width(G) * 5) - 2,
-										2,
-										square - 2,
-										square - 2,
-										CallBackQuit,
-										NULL);
-
-								CreateButton(	A, DECORATION, ID_MIN, G,
-										A->W[G].width - Twice_Char_Width(G) - 2,
-										2,
-										square - 2,
-										square - 2,
-										CallBackMinimizeWidget,
-										NULL);
-
-								CreateButton(	A, SCROLLING, ID_NORTH, G,
-										A->W[G].width - square,
-										Header_Height(G) + 2,
-										square,
-										square,
-										CallBackButton,
-										NULL);
-
-								CreateButton(	A, SCROLLING, ID_SOUTH, G,
-										A->W[G].width - square,
-										A->W[G].height - (Footer_Height(G) + square + 2),
-										square,
-										square,
-										CallBackButton,
-										NULL);
-
-								CreateButton(	A, SCROLLING, ID_EAST, G,
-										A->W[G].width
-										- (MAX(Twice_Char_Height(G),Twice_Char_Width(G)) + 2),
-										A->W[G].height - (square + 2),
-										square,
-										square,
-										CallBackButton,
-										NULL);
-
-								CreateButton(	A, SCROLLING, ID_WEST, G,
-										A->W[G].width
-										- (MAX( 3*One_Char_Height(G)+Quarter_Char_Height(G),
-											3 * One_Char_Width(G)+Quarter_Char_Width(G)) + 2),
-										A->W[G].height - (square + 2),
-										square,
-										square,
-										CallBackButton,
-										NULL);
-							}
+						// Prepare the chart axes.
+						A->L.Axes[G].N=CORES_TEXT_WIDTH + 2;
+						// A->L.Axes[G].N=CORES_TEXT_WIDTH + 1; /* Without a footer (plus 1 to malloc size) */
+						A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
+						int	i=0,
+							j=A->W[G].extents.overall.width / CORES_TEXT_WIDTH;
+						for(i=0; i <= CORES_TEXT_WIDTH; i++) {
+							A->L.Axes[G].Segment[i].x1=(j * i) + (One_Char_Width(G) * 3);
+							A->L.Axes[G].Segment[i].y1=3 + One_Char_Height(G);
+							A->L.Axes[G].Segment[i].x2=A->L.Axes[G].Segment[i].x1;
+							A->L.Axes[G].Segment[i].y2=((CORES_TEXT_HEIGHT + 1) * One_Char_Height(G)) - 3;
 						}
-							break;
-						case CORES: {
-							SetHViewport(G, CORES_TEXT_WIDTH);
-							SetVViewport(G, CORES_TEXT_HEIGHT);
-							SetHFrame(G, GetHViewport(G));
-							SetVFrame(G, GetVViewport(G));
+						// With a footer.
+						A->L.Axes[G].Segment[i].x1=0;
+						A->L.Axes[G].Segment[i].y1=A->W[G].height - 1;
+						A->L.Axes[G].Segment[i].x2=A->W[G].width;
+						A->L.Axes[G].Segment[i].y2=A->L.Axes[G].Segment[i].y1;
+						A->W[G].height+=Footer_Height(G);
 
-							XTextExtents(	A->xfont, HDSIZE, CORES_TEXT_WIDTH << 1,
-									&A->W[G].extents.dir, &A->W[G].extents.ascent,
-									&A->W[G].extents.descent, &A->W[G].extents.overall);
+						unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
 
-							A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
+						CreateButton(	A, DECORATION, ID_MIN, G,
+								A->W[G].width - Twice_Char_Width(G) - 2,
+								2,
+								square - 2,
+								square - 2,
+								CallBackMinimizeWidget,
+								NULL);
+
+						struct {
+							char		ID;
+							RESOURCE	RSC;
+						} Loader[]={	{ID:ID_PAUSE, RSC:{Text:RSC_PAUSE}},
+								{ID:ID_FREQ , RSC:{Text:RSC_FREQ} },
+								{ID:ID_CYCLE, RSC:{Text:RSC_CYCLE}},
+								{ID:ID_RATIO, RSC:{Text:RSC_RATIO}},
+								{ID:ID_NULL , RSC:{Text:NULL}}
+							};
+						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
+						for(i=0; Loader[i].ID != ID_NULL; i++, spacing+=One_Char_Width(G) * (2 + strlen(Loader[i-1].RSC.Text)))
+							CreateButton(	A, TEXT, Loader[i].ID, G,
+										spacing,
+										A->W[G].height - Footer_Height(G) + 2,
+										One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
+										One_Char_Height(G),
+										CallBackButton,
+										&Loader[i].RSC);
+					}
+						break;
+					case CSTATES: {
+						SetHViewport(G, CSTATES_TEXT_WIDTH);
+						SetVViewport(G, CSTATES_TEXT_HEIGHT);
+						SetHFrame(G, GetHViewport(G));
+						SetVFrame(G, GetVViewport(G));
+
+						XTextExtents(	A->xfont, HDSIZE, CSTATES_TEXT_WIDTH,
+								&A->W[G].extents.dir, &A->W[G].extents.ascent,
+								&A->W[G].extents.descent, &A->W[G].extents.overall);
+
+						A->W[G].extents.charWidth	= A->xfont->max_bounds.rbearing
 										- A->xfont->min_bounds.lbearing;
-							A->W[G].extents.charHeight=A->W[G].extents.ascent
-										 + A->W[G].extents.descent;
+						A->W[G].extents.charHeight	= A->W[G].extents.ascent
+										+ A->W[G].extents.descent;
 
-							A->W[G].width	= A->W[G].extents.overall.width
-									+ (One_Char_Width(G) << 2)
-									+ Half_Char_Width(G);
-							A->W[G].height	= Quarter_Char_Height(G)
-									+ One_Char_Height(G) * (CORES_TEXT_HEIGHT + 2);
+						A->W[G].width	= Quarter_Char_Width(G)
+								+ Twice_Half_Char_Width(G)
+								+ (CSTATES_TEXT_WIDTH * One_Half_Char_Width(G));
+						A->W[G].height	= Twice_Half_Char_Height(G)
+								+ (One_Char_Height(G) * CSTATES_TEXT_HEIGHT);
 
-							// Prepare the chart axes.
-							A->L.Axes[G].N=CORES_TEXT_WIDTH + 2;
-							// A->L.Axes[G].N=CORES_TEXT_WIDTH + 1; /* Without a footer (plus 1 to malloc size) */
-							A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
-							int	i=0,
-								j=A->W[G].extents.overall.width / CORES_TEXT_WIDTH;
-							for(i=0; i <= CORES_TEXT_WIDTH; i++) {
-								A->L.Axes[G].Segment[i].x1=(j * i) + (One_Char_Width(G) * 3);
-								A->L.Axes[G].Segment[i].y1=3 + One_Char_Height(G);
-								A->L.Axes[G].Segment[i].x2=A->L.Axes[G].Segment[i].x1;
-								A->L.Axes[G].Segment[i].y2=((CORES_TEXT_HEIGHT + 1) * One_Char_Height(G)) - 3;
-							}
-							// With a footer.
+						// Prepare the chart axes.
+						A->L.Axes[G].N=CSTATES_TEXT_HEIGHT + 2;
+						// A->L.Axes[G].N=CSTATES_TEXT_HEIGHT + 1; /* Without a footer */
+						A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
+						int i=0;
+						for(i=0; i < CSTATES_TEXT_HEIGHT; i++) {
 							A->L.Axes[G].Segment[i].x1=0;
-							A->L.Axes[G].Segment[i].y1=A->W[G].height - 1;
+							A->L.Axes[G].Segment[i].y1=(i + 1) * One_Char_Height(G);
 							A->L.Axes[G].Segment[i].x2=A->W[G].width;
 							A->L.Axes[G].Segment[i].y2=A->L.Axes[G].Segment[i].y1;
-							A->W[G].height+=Footer_Height(G);
-
-							unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
-
-							CreateButton(	A, DECORATION, ID_MIN, G,
-									A->W[G].width - Twice_Char_Width(G) - 2,
-									2,
-									square - 2,
-									square - 2,
-									CallBackMinimizeWidget,
-									NULL);
-
-							struct {
-								char		ID;
-								RESOURCE	RSC;
-							} Loader[]={	{ID:ID_PAUSE, RSC:{Text:RSC_PAUSE}},
-									{ID:ID_FREQ , RSC:{Text:RSC_FREQ} },
-									{ID:ID_CYCLE, RSC:{Text:RSC_CYCLE}},
-									{ID:ID_RATIO, RSC:{Text:RSC_RATIO}},
-									{ID:ID_NULL , RSC:{Text:NULL}}
-								};
-							int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
-							for(i=0; Loader[i].ID != ID_NULL; i++, spacing+=One_Char_Width(G) * (2 + strlen(Loader[i-1].RSC.Text)))
-								CreateButton(	A, TEXT, Loader[i].ID, G,
-											spacing,
-											A->W[G].height - Footer_Height(G) + 2,
-											One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
-											One_Char_Height(G),
-											CallBackButton,
-											&Loader[i].RSC);
 						}
-							break;
-						case CSTATES: {
-							SetHViewport(G, CSTATES_TEXT_WIDTH);
-							SetVViewport(G, CSTATES_TEXT_HEIGHT);
-							SetHFrame(G, GetHViewport(G));
-							SetVFrame(G, GetVViewport(G));
+						// Percent.
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 2].x1=A->W[G].width
+											- One_Char_Width(G) - Quarter_Char_Width(G);
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 2].y1=One_Char_Height(G);
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 2].x2=A->L.Axes[G].Segment[A->L.Axes[G].N - 2].x1;
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 2].y2=One_Char_Height(G)
+											+ (One_Char_Height(G) * CSTATES_TEXT_HEIGHT);
+						// With a footer.
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 1].x1=0;
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y1=A->W[G].height - 1;
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 1].x2=A->W[G].width;
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y2=A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y1;
+						A->W[G].height+=Footer_Height(G);
 
-							XTextExtents(	A->xfont, HDSIZE, CSTATES_TEXT_WIDTH,
-									&A->W[G].extents.dir, &A->W[G].extents.ascent,
-									&A->W[G].extents.descent, &A->W[G].extents.overall);
+						unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
 
-							A->W[G].extents.charWidth	= A->xfont->max_bounds.rbearing
-											- A->xfont->min_bounds.lbearing;
-							A->W[G].extents.charHeight	= A->W[G].extents.ascent
-											+ A->W[G].extents.descent;
+						CreateButton(	A, DECORATION, ID_MIN, G,
+								A->W[G].width - Twice_Char_Width(G) - 2,
+								2,
+								square - 2,
+								square - 2,
+								CallBackMinimizeWidget,
+								NULL);
 
-							A->W[G].width	= Quarter_Char_Width(G)
-									+ Twice_Half_Char_Width(G)
-									+ (CSTATES_TEXT_WIDTH * One_Half_Char_Width(G));
-							A->W[G].height	= Twice_Half_Char_Height(G)
-									+ (One_Char_Height(G) * CSTATES_TEXT_HEIGHT);
-
-							// Prepare the chart axes.
-							A->L.Axes[G].N=CSTATES_TEXT_HEIGHT + 2;
-							// A->L.Axes[G].N=CSTATES_TEXT_HEIGHT + 1; /* Without a footer */
-							A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
-							int i=0;
-							for(i=0; i < CSTATES_TEXT_HEIGHT; i++) {
-								A->L.Axes[G].Segment[i].x1=0;
-								A->L.Axes[G].Segment[i].y1=(i + 1) * One_Char_Height(G);
-								A->L.Axes[G].Segment[i].x2=A->W[G].width;
-								A->L.Axes[G].Segment[i].y2=A->L.Axes[G].Segment[i].y1;
-							}
-							// Percent.
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 2].x1=A->W[G].width
-												- One_Char_Width(G) - Quarter_Char_Width(G);
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 2].y1=One_Char_Height(G);
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 2].x2=A->L.Axes[G].Segment[A->L.Axes[G].N - 2].x1;
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 2].y2=One_Char_Height(G)
-												+ (One_Char_Height(G) * CSTATES_TEXT_HEIGHT);
-							// With a footer.
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 1].x1=0;
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y1=A->W[G].height - 1;
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 1].x2=A->W[G].width;
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y2=A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y1;
-							A->W[G].height+=Footer_Height(G);
-
-							unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
-
-							CreateButton(	A, DECORATION, ID_MIN, G,
-									A->W[G].width - Twice_Char_Width(G) - 2,
-									2,
-									square - 2,
-									square - 2,
-									CallBackMinimizeWidget,
-									NULL);
-
-							struct {
-								char		ID;
-								RESOURCE	RSC;
-							} Loader[]={	{ID:ID_PAUSE, RSC:{Text:RSC_PAUSE}},
-									{ID:ID_STATE, RSC:{Text:RSC_STATE}},
-									{ID:ID_NULL , RSC:{Text:NULL}}
-								};
-							int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
-							for(i=0; Loader[i].ID != ID_NULL; i++, spacing+=One_Char_Width(G) * (2 + strlen(Loader[i-1].RSC.Text)))
-								CreateButton(	A, TEXT, Loader[i].ID, G,
-										spacing,
-										A->W[G].height - Footer_Height(G) + 2,
-										One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
-										One_Char_Height(G),
-										CallBackButton,
-										&Loader[i].RSC);
-						}
-							break;
-						case TEMPS: {
-							SetHViewport(G, TEMPS_TEXT_WIDTH);
-							SetVViewport(G, TEMPS_TEXT_HEIGHT);
-							SetHFrame(G, GetHViewport(G));
-							SetVFrame(G, GetVViewport(G));
-
-							XTextExtents(	A->xfont, HDSIZE, TEMPS_TEXT_WIDTH,
-									&A->W[G].extents.dir, &A->W[G].extents.ascent,
-									&A->W[G].extents.descent, &A->W[G].extents.overall);
-
-							A->W[G].extents.charWidth	= A->xfont->max_bounds.rbearing
-											- A->xfont->min_bounds.lbearing;
-							A->W[G].extents.charHeight	= A->W[G].extents.ascent
-											+ A->W[G].extents.descent;
-
-							A->W[G].width	= A->W[G].extents.overall.width
-									+ (One_Char_Width(G) * 6);
-							A->W[G].height	=  Quarter_Char_Height(G)
-									+ One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1);
-
-							// Prepare the chart axes.
-							A->L.Axes[G].N=TEMPS_TEXT_WIDTH + 2;
-							// A->L.Axes[G].N=TEMPS_TEXT_WIDTH + 1; /* Without a footer (plus 1 to malloc size) */
-							A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
-							int i=0;
-							for(i=0; i < TEMPS_TEXT_WIDTH; i++) {
-								A->L.Axes[G].Segment[i].x1=Twice_Char_Width(G) + (i * One_Char_Width(G));
-								A->L.Axes[G].Segment[i].y1=(TEMPS_TEXT_HEIGHT + 1) * One_Char_Height(G);
-								A->L.Axes[G].Segment[i].x2=A->L.Axes[G].Segment[i].x1 + One_Char_Width(G);
-								A->L.Axes[G].Segment[i].y2=A->L.Axes[G].Segment[i].y1;
-							}
-							// Padding.
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 3].x2=A->L.Axes[G].Segment[A->L.Axes[G].N - 3].x1
-													+ Twice_Half_Char_Width(G);
-							// Temps.
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 2].x1=Twice_Char_Width(G);
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 2].y1=One_Char_Height(G);
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 2].x2=A->L.Axes[G].Segment[A->L.Axes[G].N - 2].x1;
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 2].y2=One_Char_Height(G)
-												+ (One_Char_Height(G) * TEMPS_TEXT_HEIGHT);
-							// With a footer.
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 1].x1=0;
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y1=A->W[G].height - 1;
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 1].x2=A->W[G].width;
-							A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y2=A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y1;
-							A->W[G].height+=Footer_Height(G);
-
-							unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
-
-							CreateButton(	A, DECORATION, ID_MIN, G,
-									A->W[G].width - Twice_Char_Width(G) - 2,
-									2,
-									square - 2,
-									square - 2,
-									CallBackMinimizeWidget,
-									NULL);
-
-							struct {
-								char		ID;
-								RESOURCE	RSC;
-							} Loader[]={	{ID:ID_PAUSE, RSC:{Text:RSC_PAUSE}},
-									{ID:ID_NULL , RSC:{Text:NULL}}
-								};
-							int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
-							for(i=0; Loader[i].ID != ID_NULL; i++, spacing+=One_Char_Width(G) * (2 + strlen(Loader[i-1].RSC.Text)))
-								CreateButton(	A, TEXT, Loader[i].ID, G,
-											spacing,
-											A->W[G].height - Footer_Height(G) + 2,
-											One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
-											One_Char_Height(G),
-											CallBackButton,
-											&Loader[i].RSC);
-						}
-							break;
-						case SYSINFO: {
-							SetHViewport(G, SYSINFO_TEXT_WIDTH  - 3);
-							SetVViewport(G, SYSINFO_TEXT_HEIGHT - 2);
-							SetHFrame(G, GetHViewport(G) << SYSINFO_FRAME_VIEW_HSHIFT);
-							SetVFrame(G, GetVViewport(G) << SYSINFO_FRAME_VIEW_VSHIFT);
-
-							XTextExtents(	A->xfont, HDSIZE, SYSINFO_TEXT_WIDTH,
-									&A->W[G].extents.dir, &A->W[G].extents.ascent,
-									&A->W[G].extents.descent, &A->W[G].extents.overall);
-
-							A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
-										- A->xfont->min_bounds.lbearing;
-							A->W[G].extents.charHeight=A->W[G].extents.ascent
-										+ A->W[G].extents.descent;
-
-							A->W[G].width	= A->W[G].extents.overall.width;
-							A->W[G].height	= One_Char_Height(G) * SYSINFO_TEXT_HEIGHT;
-
-							// Prepare the chart axes.
-							A->L.Axes[G].N=2;
-							A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
-							// Header.
-							A->L.Axes[G].Segment[0].x1=0;
-							A->L.Axes[G].Segment[0].y1=Header_Height(G) + 1;
-							A->L.Axes[G].Segment[0].x2=A->W[G].width;
-							A->L.Axes[G].Segment[0].y2=A->L.Axes[G].Segment[0].y1;
-							// Footer.
-							A->L.Axes[G].Segment[1].x1=A->L.Axes[G].Segment[0].x1;
-							A->L.Axes[G].Segment[1].y1=A->W[G].height - 1;
-							A->L.Axes[G].Segment[1].x2=A->L.Axes[G].Segment[0].x2;
-							A->L.Axes[G].Segment[1].y2=A->L.Axes[G].Segment[1].y1;
-							A->W[G].height+=Footer_Height(G);
-
-							unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
-
-							CreateButton(	A, DECORATION, ID_MIN, G,
-									A->W[G].width - Twice_Char_Width(G) - 2,
-									2,
-									square - 2,
-									square - 2,
-									CallBackMinimizeWidget,
-									NULL);
-
-							CreateButton(	A, SCROLLING, ID_NORTH, G,
-									A->W[G].width - square,
-									Header_Height(G) + 2,
-									square,
-									square,
+						struct {
+							char		ID;
+							RESOURCE	RSC;
+						} Loader[]={	{ID:ID_PAUSE, RSC:{Text:RSC_PAUSE}},
+								{ID:ID_STATE, RSC:{Text:RSC_STATE}},
+								{ID:ID_NULL , RSC:{Text:NULL}}
+							};
+						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
+						for(i=0; Loader[i].ID != ID_NULL; i++, spacing+=One_Char_Width(G) * (2 + strlen(Loader[i-1].RSC.Text)))
+							CreateButton(	A, TEXT, Loader[i].ID, G,
+									spacing,
+									A->W[G].height - Footer_Height(G) + 2,
+									One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
+									One_Char_Height(G),
 									CallBackButton,
-									NULL);
-
-							CreateButton(	A, SCROLLING, ID_SOUTH, G,
-									A->W[G].width - square,
-									A->W[G].height - (Footer_Height(G) + square + 2),
-									square,
-									square,
-									CallBackButton,
-									NULL);
-
-							CreateButton(	A, SCROLLING, ID_EAST, G,
-									A->W[G].width
-									- (MAX(Twice_Char_Height(G),Twice_Char_Width(G)) + 2),
-									A->W[G].height - (square + 2),
-									square,
-									square,
-									CallBackButton,
-									NULL);
-
-							CreateButton(	A, SCROLLING, ID_WEST, G,
-									2,
-									A->W[G].height - (square + 2),
-									square,
-									square,
-									CallBackButton,
-									NULL);
-
-							struct {
-								char		ID;
-								RESOURCE	RSC;
-							} Loader[]={	{ID:ID_PAUSE,     RSC:{Text:RSC_PAUSE}},
-									{ID:ID_WALLBOARD, RSC:{Text:RSC_WALLBOARD}},
-									{ID:ID_INCLOOP,   RSC:{Text:RSC_INCLOOP}},
-									{ID:ID_TSC,       RSC:{Text:RSC_TSC}},
-									{ID:ID_BIOS,      RSC:{Text:RSC_BIOS}},
-									{ID:ID_SPEC,      RSC:{Text:RSC_SPEC}},
-									{ID:ID_ROM,       RSC:{Text:RSC_ROM}},
-									{ID:ID_DECLOOP,   RSC:{Text:RSC_DECLOOP}},
-									{ID:ID_NULL ,     RSC:{Text:NULL}}
-								};
-							int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
-							int i=0;
-							for(i=0; Loader[i].ID != ID_NULL; i++, spacing+=One_Char_Width(G) * (2 + strlen(Loader[i-1].RSC.Text)))
-								CreateButton(	A, TEXT, Loader[i].ID, G,
-											spacing,
-											A->W[G].height - Footer_Height(G) + 2,
-											One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
-											One_Char_Height(G),
-											CallBackButton,
-											&Loader[i].RSC);
-
-							// Prepare a Wallboard string with the Processor information.
-							int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
-							sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Platform.MaxNonTurboRatio * A->P.ClockSpeed);
-							A->L.WB.Length=strlen(str) + (padding << 1);
-							A->L.WB.String=calloc(A->L.WB.Length, 1);
-							memset(A->L.WB.String, 0x20, A->L.WB.Length);
-							A->L.WB.Scroll=padding;
-							A->L.WB.Length=strlen(str) + A->L.WB.Scroll;
-						}
-							break;
-						case DUMP: {
-							SetHViewport(G, DUMP_TEXT_WIDTH  - 3);
-							SetVViewport(G, DUMP_TEXT_HEIGHT - 2);
-							SetHFrame(G, GetHViewport(G) << DUMP_FRAME_VIEW_HSHIFT);
-							SetVFrame(G, GetVViewport(G) << DUMP_FRAME_VIEW_VSHIFT);
-
-							XTextExtents(	A->xfont, HDSIZE, DUMP_TEXT_WIDTH,
-									&A->W[G].extents.dir, &A->W[G].extents.ascent,
-									&A->W[G].extents.descent, &A->W[G].extents.overall);
-
-							A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
-										- A->xfont->min_bounds.lbearing;
-							A->W[G].extents.charHeight=A->W[G].extents.ascent
-										+ A->W[G].extents.descent;
-
-							A->W[G].width	= A->W[G].extents.overall.width;
-							A->W[G].height	= One_Char_Height(G) * DUMP_TEXT_HEIGHT;
-
-							// Prepare the chart axes.
-							A->L.Axes[G].N=2;
-							A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
-							// Header.
-							A->L.Axes[G].Segment[0].x1=0;
-							A->L.Axes[G].Segment[0].y1=Header_Height(G) + 1;
-							A->L.Axes[G].Segment[0].x2=A->W[G].width;
-							A->L.Axes[G].Segment[0].y2=A->L.Axes[G].Segment[0].y1;
-							// Footer.
-							A->L.Axes[G].Segment[1].x1=A->L.Axes[G].Segment[0].x1;
-							A->L.Axes[G].Segment[1].y1=A->W[G].height - 1;
-							A->L.Axes[G].Segment[1].x2=A->L.Axes[G].Segment[0].x2;
-							A->L.Axes[G].Segment[1].y2=A->L.Axes[G].Segment[1].y1;
-							A->W[G].height+=Footer_Height(G);
-
-							unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
-
-							CreateButton(	A, DECORATION, ID_MIN, G,
-									A->W[G].width - Twice_Char_Width(G) - 2,
-									2,
-									square - 2,
-									square - 2,
-									CallBackMinimizeWidget,
-									NULL);
-
-							CreateButton(	A, SCROLLING, ID_NORTH, G,
-									A->W[G].width - square,
-									Header_Height(G) + 2,
-									square,
-									square,
-									CallBackButton,
-									NULL);
-
-							CreateButton(	A, SCROLLING, ID_SOUTH, G,
-									A->W[G].width - square,
-									A->W[G].height - (Footer_Height(G) + square + 2),
-									square,
-									square,
-									CallBackButton,
-									NULL);
-
-							CreateButton(	A, SCROLLING, ID_EAST, G,
-									A->W[G].width
-									- (MAX(Twice_Char_Height(G),Twice_Char_Width(G)) + 2),
-									A->W[G].height - (square + 2),
-									square,
-									square,
-									CallBackButton,
-									NULL);
-
-							CreateButton(	A, SCROLLING, ID_WEST, G,
-									2,
-									A->W[G].height - (square + 2),
-									square,
-									square,
-									CallBackButton,
-									NULL);
-
-							struct {
-								char		ID;
-								RESOURCE	RSC;
-							} Loader[]={	{ID:ID_PAUSE, RSC:{Text:RSC_PAUSE}},
-									{ID:ID_NULL , RSC:{Text:NULL}}
-								};
-							int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
-							int i=0;
-							for(i=0; Loader[i].ID != ID_NULL; i++, spacing+=One_Char_Width(G) * (2 + strlen(Loader[i-1].RSC.Text)))
-								CreateButton(	A, TEXT, Loader[i].ID, G,
-										spacing,
-										A->W[G].height - Footer_Height(G) + 2,
-										One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
-										One_Char_Height(G),
-										CallBackButton,
-										&Loader[i].RSC);
-						}
-							break;
+									&Loader[i].RSC);
 					}
-					ReSizeWidget(A, G);
+						break;
+					case TEMPS: {
+						SetHViewport(G, TEMPS_TEXT_WIDTH);
+						SetVViewport(G, TEMPS_TEXT_HEIGHT);
+						SetHFrame(G, GetHViewport(G));
+						SetVFrame(G, GetVViewport(G));
+
+						XTextExtents(	A->xfont, HDSIZE, TEMPS_TEXT_WIDTH,
+								&A->W[G].extents.dir, &A->W[G].extents.ascent,
+								&A->W[G].extents.descent, &A->W[G].extents.overall);
+
+						A->W[G].extents.charWidth	= A->xfont->max_bounds.rbearing
+										- A->xfont->min_bounds.lbearing;
+						A->W[G].extents.charHeight	= A->W[G].extents.ascent
+										+ A->W[G].extents.descent;
+
+						A->W[G].width	= A->W[G].extents.overall.width
+								+ (One_Char_Width(G) * 6);
+						A->W[G].height	=  Quarter_Char_Height(G)
+								+ One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1);
+
+						// Prepare the chart axes.
+						A->L.Axes[G].N=TEMPS_TEXT_WIDTH + 2;
+						// A->L.Axes[G].N=TEMPS_TEXT_WIDTH + 1; /* Without a footer (plus 1 to malloc size) */
+						A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
+						int i=0;
+						for(i=0; i < TEMPS_TEXT_WIDTH; i++) {
+							A->L.Axes[G].Segment[i].x1=Twice_Char_Width(G) + (i * One_Char_Width(G));
+							A->L.Axes[G].Segment[i].y1=(TEMPS_TEXT_HEIGHT + 1) * One_Char_Height(G);
+							A->L.Axes[G].Segment[i].x2=A->L.Axes[G].Segment[i].x1 + One_Char_Width(G);
+							A->L.Axes[G].Segment[i].y2=A->L.Axes[G].Segment[i].y1;
+						}
+						// Padding.
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 3].x2=A->L.Axes[G].Segment[A->L.Axes[G].N - 3].x1
+												+ Twice_Half_Char_Width(G);
+						// Temps.
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 2].x1=Twice_Char_Width(G);
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 2].y1=One_Char_Height(G);
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 2].x2=A->L.Axes[G].Segment[A->L.Axes[G].N - 2].x1;
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 2].y2=One_Char_Height(G)
+											+ (One_Char_Height(G) * TEMPS_TEXT_HEIGHT);
+						// With a footer.
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 1].x1=0;
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y1=A->W[G].height - 1;
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 1].x2=A->W[G].width;
+						A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y2=A->L.Axes[G].Segment[A->L.Axes[G].N - 1].y1;
+						A->W[G].height+=Footer_Height(G);
+
+						unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
+
+						CreateButton(	A, DECORATION, ID_MIN, G,
+								A->W[G].width - Twice_Char_Width(G) - 2,
+								2,
+								square - 2,
+								square - 2,
+								CallBackMinimizeWidget,
+								NULL);
+
+						struct {
+							char		ID;
+							RESOURCE	RSC;
+						} Loader[]={	{ID:ID_PAUSE, RSC:{Text:RSC_PAUSE}},
+								{ID:ID_NULL , RSC:{Text:NULL}}
+							};
+						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
+						for(i=0; Loader[i].ID != ID_NULL; i++, spacing+=One_Char_Width(G) * (2 + strlen(Loader[i-1].RSC.Text)))
+							CreateButton(	A, TEXT, Loader[i].ID, G,
+										spacing,
+										A->W[G].height - Footer_Height(G) + 2,
+										One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
+										One_Char_Height(G),
+										CallBackButton,
+										&Loader[i].RSC);
+					}
+						break;
+					case SYSINFO: {
+						SetHViewport(G, SYSINFO_TEXT_WIDTH  - 3);
+						SetVViewport(G, SYSINFO_TEXT_HEIGHT - 2);
+						SetHFrame(G, GetHViewport(G) << SYSINFO_FRAME_VIEW_HSHIFT);
+						SetVFrame(G, GetVViewport(G) << SYSINFO_FRAME_VIEW_VSHIFT);
+
+						XTextExtents(	A->xfont, HDSIZE, SYSINFO_TEXT_WIDTH,
+								&A->W[G].extents.dir, &A->W[G].extents.ascent,
+								&A->W[G].extents.descent, &A->W[G].extents.overall);
+
+						A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
+									- A->xfont->min_bounds.lbearing;
+						A->W[G].extents.charHeight=A->W[G].extents.ascent
+									+ A->W[G].extents.descent;
+
+						A->W[G].width	= A->W[G].extents.overall.width;
+						A->W[G].height	= One_Char_Height(G) * SYSINFO_TEXT_HEIGHT;
+
+						// Prepare the chart axes.
+						A->L.Axes[G].N=2;
+						A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
+						// Header.
+						A->L.Axes[G].Segment[0].x1=0;
+						A->L.Axes[G].Segment[0].y1=Header_Height(G) + 1;
+						A->L.Axes[G].Segment[0].x2=A->W[G].width;
+						A->L.Axes[G].Segment[0].y2=A->L.Axes[G].Segment[0].y1;
+						// Footer.
+						A->L.Axes[G].Segment[1].x1=A->L.Axes[G].Segment[0].x1;
+						A->L.Axes[G].Segment[1].y1=A->W[G].height - 1;
+						A->L.Axes[G].Segment[1].x2=A->L.Axes[G].Segment[0].x2;
+						A->L.Axes[G].Segment[1].y2=A->L.Axes[G].Segment[1].y1;
+						A->W[G].height+=Footer_Height(G);
+
+						unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
+
+						CreateButton(	A, DECORATION, ID_MIN, G,
+								A->W[G].width - Twice_Char_Width(G) - 2,
+								2,
+								square - 2,
+								square - 2,
+								CallBackMinimizeWidget,
+								NULL);
+
+						CreateButton(	A, SCROLLING, ID_NORTH, G,
+								A->W[G].width - square,
+								Header_Height(G) + 2,
+								square,
+								square,
+								CallBackButton,
+								NULL);
+
+						CreateButton(	A, SCROLLING, ID_SOUTH, G,
+								A->W[G].width - square,
+								A->W[G].height - (Footer_Height(G) + square + 2),
+								square,
+								square,
+								CallBackButton,
+								NULL);
+
+						CreateButton(	A, SCROLLING, ID_EAST, G,
+								A->W[G].width
+								- (MAX(Twice_Char_Height(G),Twice_Char_Width(G)) + 2),
+								A->W[G].height - (square + 2),
+								square,
+								square,
+								CallBackButton,
+								NULL);
+
+						CreateButton(	A, SCROLLING, ID_WEST, G,
+								2,
+								A->W[G].height - (square + 2),
+								square,
+								square,
+								CallBackButton,
+								NULL);
+
+						struct {
+							char		ID;
+							RESOURCE	RSC;
+						} Loader[]={	{ID:ID_PAUSE,     RSC:{Text:RSC_PAUSE}},
+								{ID:ID_WALLBOARD, RSC:{Text:RSC_WALLBOARD}},
+								{ID:ID_INCLOOP,   RSC:{Text:RSC_INCLOOP}},
+								{ID:ID_TSC,       RSC:{Text:RSC_TSC}},
+								{ID:ID_BIOS,      RSC:{Text:RSC_BIOS}},
+								{ID:ID_SPEC,      RSC:{Text:RSC_SPEC}},
+								{ID:ID_ROM,       RSC:{Text:RSC_ROM}},
+								{ID:ID_DECLOOP,   RSC:{Text:RSC_DECLOOP}},
+								{ID:ID_NULL ,     RSC:{Text:NULL}}
+							};
+						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
+						int i=0;
+						for(i=0; Loader[i].ID != ID_NULL; i++, spacing+=One_Char_Width(G) * (2 + strlen(Loader[i-1].RSC.Text)))
+							CreateButton(	A, TEXT, Loader[i].ID, G,
+										spacing,
+										A->W[G].height - Footer_Height(G) + 2,
+										One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
+										One_Char_Height(G),
+										CallBackButton,
+										&Loader[i].RSC);
+
+						// Prepare a Wallboard string with the Processor information.
+						int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
+						sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Platform.MaxNonTurboRatio * A->P.ClockSpeed);
+						A->L.WB.Length=strlen(str) + (padding << 1);
+						A->L.WB.String=calloc(A->L.WB.Length, 1);
+						memset(A->L.WB.String, 0x20, A->L.WB.Length);
+						A->L.WB.Scroll=padding;
+						A->L.WB.Length=strlen(str) + A->L.WB.Scroll;
+					}
+						break;
+					case DUMP: {
+						SetHViewport(G, DUMP_TEXT_WIDTH  - 3);
+						SetVViewport(G, DUMP_TEXT_HEIGHT - 2);
+						SetHFrame(G, GetHViewport(G) << DUMP_FRAME_VIEW_HSHIFT);
+						SetVFrame(G, GetVViewport(G) << DUMP_FRAME_VIEW_VSHIFT);
+
+						XTextExtents(	A->xfont, HDSIZE, DUMP_TEXT_WIDTH,
+								&A->W[G].extents.dir, &A->W[G].extents.ascent,
+								&A->W[G].extents.descent, &A->W[G].extents.overall);
+
+						A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
+									- A->xfont->min_bounds.lbearing;
+						A->W[G].extents.charHeight=A->W[G].extents.ascent
+									+ A->W[G].extents.descent;
+
+						A->W[G].width	= A->W[G].extents.overall.width;
+						A->W[G].height	= One_Char_Height(G) * DUMP_TEXT_HEIGHT;
+
+						// Prepare the chart axes.
+						A->L.Axes[G].N=2;
+						A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
+						// Header.
+						A->L.Axes[G].Segment[0].x1=0;
+						A->L.Axes[G].Segment[0].y1=Header_Height(G) + 1;
+						A->L.Axes[G].Segment[0].x2=A->W[G].width;
+						A->L.Axes[G].Segment[0].y2=A->L.Axes[G].Segment[0].y1;
+						// Footer.
+						A->L.Axes[G].Segment[1].x1=A->L.Axes[G].Segment[0].x1;
+						A->L.Axes[G].Segment[1].y1=A->W[G].height - 1;
+						A->L.Axes[G].Segment[1].x2=A->L.Axes[G].Segment[0].x2;
+						A->L.Axes[G].Segment[1].y2=A->L.Axes[G].Segment[1].y1;
+						A->W[G].height+=Footer_Height(G);
+
+						unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
+
+						CreateButton(	A, DECORATION, ID_MIN, G,
+								A->W[G].width - Twice_Char_Width(G) - 2,
+								2,
+								square - 2,
+								square - 2,
+								CallBackMinimizeWidget,
+								NULL);
+
+						CreateButton(	A, SCROLLING, ID_NORTH, G,
+								A->W[G].width - square,
+								Header_Height(G) + 2,
+								square,
+								square,
+								CallBackButton,
+								NULL);
+
+						CreateButton(	A, SCROLLING, ID_SOUTH, G,
+								A->W[G].width - square,
+								A->W[G].height - (Footer_Height(G) + square + 2),
+								square,
+								square,
+								CallBackButton,
+								NULL);
+
+						CreateButton(	A, SCROLLING, ID_EAST, G,
+								A->W[G].width
+								- (MAX(Twice_Char_Height(G),Twice_Char_Width(G)) + 2),
+								A->W[G].height - (square + 2),
+								square,
+								square,
+								CallBackButton,
+								NULL);
+
+						CreateButton(	A, SCROLLING, ID_WEST, G,
+								2,
+								A->W[G].height - (square + 2),
+								square,
+								square,
+								CallBackButton,
+								NULL);
+
+						struct {
+							char		ID;
+							RESOURCE	RSC;
+						} Loader[]={	{ID:ID_PAUSE, RSC:{Text:RSC_PAUSE}},
+								{ID:ID_NULL , RSC:{Text:NULL}}
+							};
+						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
+						int i=0;
+						for(i=0; Loader[i].ID != ID_NULL; i++, spacing+=One_Char_Width(G) * (2 + strlen(Loader[i-1].RSC.Text)))
+							CreateButton(	A, TEXT, Loader[i].ID, G,
+									spacing,
+									A->W[G].height - Footer_Height(G) + 2,
+									One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
+									One_Char_Height(G),
+									CallBackButton,
+									&Loader[i].RSC);
+					}
+						break;
 				}
-				else	noerr=false;
+				ReSizeWidget(A, G);
 			}
 			else	noerr=false;
 		}
-		if(noerr && _IS_MDI_) {
-			ScaleMDI(A);
-			ReSizeWidget(A, MAIN);
+		else	noerr=false;
+	}
+	if(noerr && _IS_MDI_)
+	{
+		ScaleMDI(A);
+		ReSizeWidget(A, MAIN);
 
-			unsigned int square=MAX(A->W[MAIN].extents.charHeight, A->W[MAIN].extents.charWidth);
+		unsigned int square=MAX(A->W[MAIN].extents.charHeight, A->W[MAIN].extents.charWidth);
 
-			CreateButton(	A, DECORATION, ID_QUIT, MAIN,
-					A->W[MAIN].width - (A->W[MAIN].extents.charWidth * 5) - 2,
-					2,
-					square - 2,
-					square - 2,
-					CallBackQuit,
-					NULL);
+		CreateButton(	A, DECORATION, ID_QUIT, MAIN,
+				A->W[MAIN].width - (A->W[MAIN].extents.charWidth * 5) - 2,
+				2,
+				square - 2,
+				square - 2,
+				CallBackQuit,
+				NULL);
 
-			CreateButton(	A, DECORATION, ID_MIN, MAIN,
-					A->W[MAIN].width - (A->W[MAIN].extents.charWidth << 1) - 2,
-					2,
-					square - 2,
-					square - 2,
-					CallBackMinimizeWidget,
-					NULL);
+		CreateButton(	A, DECORATION, ID_MIN, MAIN,
+				A->W[MAIN].width - (A->W[MAIN].extents.charWidth << 1) - 2,
+				2,
+				square - 2,
+				square - 2,
+				CallBackMinimizeWidget,
+				NULL);
 
-			CreateButton(	A, SCROLLING, ID_NORTH, MAIN,
-					A->W[MAIN].width - square,
-					Header_Height(MAIN) + 2,
-					square,
-					square,
-					CallBackButton,
-					NULL);
+		CreateButton(	A, SCROLLING, ID_NORTH, MAIN,
+				A->W[MAIN].width - square,
+				Header_Height(MAIN) + 2,
+				square,
+				square,
+				CallBackButton,
+				NULL);
 
-			CreateButton(	A, SCROLLING, ID_SOUTH, MAIN,
-					A->W[MAIN].width - square,
-					A->L.Axes[MAIN].Segment[1].y2 - (square + 2),
-					square,
-					square,
-					CallBackButton,
-					NULL);
+		CreateButton(	A, SCROLLING, ID_SOUTH, MAIN,
+				A->W[MAIN].width - square,
+				A->L.Axes[MAIN].Segment[1].y2 - (square + 2),
+				square,
+				square,
+				CallBackButton,
+				NULL);
 
-			CreateButton(	A, SCROLLING, ID_EAST, MAIN,
-					A->W[MAIN].width
-					- (MAX((A->W[MAIN].extents.charHeight << 1), (A->W[MAIN].extents.charWidth << 1)) + 2),
-					A->L.Axes[MAIN].Segment[1].y2 + 2,
-					square,
-					square,
-					CallBackButton,
-					NULL);
+		CreateButton(	A, SCROLLING, ID_EAST, MAIN,
+				A->W[MAIN].width
+				- (MAX((A->W[MAIN].extents.charHeight << 1), (A->W[MAIN].extents.charWidth << 1)) + 2),
+				A->L.Axes[MAIN].Segment[1].y2 + 2,
+				square,
+				square,
+				CallBackButton,
+				NULL);
 
-			CreateButton(	A, SCROLLING, ID_WEST, MAIN,
-					A->W[MAIN].width
-					- (MAX(	3 * A->W[MAIN].extents.charHeight+(A->W[MAIN].extents.charHeight >> 2),
-						3 * A->W[MAIN].extents.charWidth+(A->W[MAIN].extents.charWidth >> 2))
-					+ 2),
-					A->L.Axes[MAIN].Segment[1].y2 + 2,
-					square,
-					square,
-					CallBackButton,
-					NULL);
-		}
-		for(G=MAIN; noerr && (G < WIDGETS); G++)
-			if((A->W[G].pixmap.B=XCreatePixmap(	A->display, A->W[G].window,
-								A->W[G].width, A->W[G].height,
-								DefaultDepthOfScreen(A->screen) ))
-			&& (A->W[G].pixmap.F=XCreatePixmap(	A->display, A->W[G].window,
-								A->W[G].width, A->W[G].height,
-								DefaultDepthOfScreen(A->screen) )))
+		CreateButton(	A, SCROLLING, ID_WEST, MAIN,
+				A->W[MAIN].width
+				- (MAX(	3 * A->W[MAIN].extents.charHeight+(A->W[MAIN].extents.charHeight >> 2),
+					3 * A->W[MAIN].extents.charWidth+(A->W[MAIN].extents.charWidth >> 2))
+				+ 2),
+				A->L.Axes[MAIN].Segment[1].y2 + 2,
+				square,
+				square,
+				CallBackButton,
+				NULL);
+	}
+	for(G=MAIN; noerr && (G < WIDGETS); G++)
+		if((A->W[G].pixmap.B=XCreatePixmap(	A->display, A->W[G].window,
+							A->W[G].width, A->W[G].height,
+							DefaultDepthOfScreen(A->screen) ))
+		&& (A->W[G].pixmap.F=XCreatePixmap(	A->display, A->W[G].window,
+							A->W[G].width, A->W[G].height,
+							DefaultDepthOfScreen(A->screen) )))
+		{
+			if(A->L.Page[G].Pageable)
 			{
-				if(A->L.Page[G].Pageable) {
-					A->L.Page[G].width	= (GetHViewport(G) * One_Char_Width(G))
-								+ One_Char_Width(G);
-					A->L.Page[G].height	= (GetVViewport(G) * One_Char_Height(G))
-								+ Half_Char_Height(G) + Quarter_Char_Height(G)
-								- 3;	// above the footer line.
+				A->L.Page[G].width	= (GetHViewport(G) * One_Char_Width(G))
+							+ One_Char_Width(G);
+				A->L.Page[G].height	= (GetVViewport(G) * One_Char_Height(G))
+							+ Half_Char_Height(G) + Quarter_Char_Height(G)
+							- 3;	// above the footer line.
 
-					A->L.Page[G].Pixmap=XCreatePixmap(	A->display, A->W[G].window,
-										GetHFrame(G) * One_Char_Width(G),
-										GetVFrame(G) * One_Char_Height(G),
-										DefaultDepthOfScreen(A->screen) );
-					// Preset the scrolling area.
-					XSetForeground(A->display, A->W[G].gc, A->W[G].background);
-					XFillRectangle(A->display, A->L.Page[G].Pixmap, A->W[G].gc,
-							0,
-							0,
-							GetHFrame(G) * One_Char_Width(G),
-							GetVFrame(G) * One_Char_Height(G));
-				}
-				long EventProfile=BASE_EVENTS;
-				if(_IS_MDI_) {
-					if(G == MAIN)
-						EventProfile=EventProfile | CLICK_EVENTS | MOVE_EVENTS;
-				}
-				else	EventProfile=EventProfile | CLICK_EVENTS | MOVE_EVENTS;
-
-				XSelectInput(A->display, A->W[G].window, EventProfile);
+				A->L.Page[G].Pixmap=XCreatePixmap(	A->display, A->W[G].window,
+									GetHFrame(G) * One_Char_Width(G),
+									GetVFrame(G) * One_Char_Height(G),
+									DefaultDepthOfScreen(A->screen) );
+				// Preset the scrolling area.
+				XSetForeground(A->display, A->W[G].gc, A->W[G].background);
+				XFillRectangle(A->display, A->L.Page[G].Pixmap, A->W[G].gc,
+						0,
+						0,
+						GetHFrame(G) * One_Char_Width(G),
+						GetVFrame(G) * One_Char_Height(G));
 			}
-			else	noerr=false;
+			long EventProfile=BASE_EVENTS;
+			if(_IS_MDI_) {
+				if(G == MAIN)
+					EventProfile=EventProfile | CLICK_EVENTS | MOVE_EVENTS;
+			}
+			else	EventProfile=EventProfile | CLICK_EVENTS | MOVE_EVENTS;
+
+			XSelectInput(A->display, A->W[G].window, EventProfile);
+		}
+		else	noerr=false;
 
 	// Store some Ratios into a string for future chart drawing.
 	sprintf(A->P.Boost, "%02d%02d%02d",	A->P.Platform.MinimumRatio,
@@ -2104,7 +2130,8 @@ void	BuildLayout(uARG *A, int G)
 	for(wButton=A->W[G].wButton[HEAD]; wButton != NULL; wButton=wButton->Chain)
 		wButton->DrawFunc(A, wButton);
 
-	switch(G) {
+	switch(G)
+	{
 		case MAIN:
 		{
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
@@ -2559,7 +2586,8 @@ void	FlushLayout(uARG *A, int G)
 // Draw the layout foreground.
 void	DrawLayout(uARG *A, int G)
 {
-	switch(G) {
+	switch(G)
+	{
 		case MAIN:
 		{
 			int edline=_IS_MDI_ ? A->L.Axes[G].Segment[1].y2 + Footer_Height(G) : A->W[G].height;
@@ -2589,73 +2617,74 @@ void	DrawLayout(uARG *A, int G)
 			char str[16];
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++)
-			  if(A->P.Topology[cpu].CPU != NULL) {
-				// Select a color based ratio.
-				unsigned long BarBg, BarFg;
-				if(A->P.Topology[cpu].CPU->RelativeRatio <= A->P.Platform.MinimumRatio)
-					{ BarBg=INIT_VALUE_COLOR; BarFg=DYNAMIC_COLOR; }
-				if(A->P.Topology[cpu].CPU->RelativeRatio >  A->P.Platform.MinimumRatio)
-					{ BarBg=LOW_VALUE_COLOR; BarFg=CORES_BACKGROUND; }
-				if(A->P.Topology[cpu].CPU->RelativeRatio >= A->P.Platform.MaxNonTurboRatio)
-					{ BarBg=MED_VALUE_COLOR; BarFg=CORES_BACKGROUND; }
-				if(A->P.Topology[cpu].CPU->RelativeRatio >= A->P.Turbo.MaxRatio_4C)
-					{ BarBg=HIGH_VALUE_COLOR; BarFg=CORES_BACKGROUND; }
+				if(A->P.Topology[cpu].CPU != NULL)
+				{
+					// Select a color based ratio.
+					unsigned long BarBg, BarFg;
+					if(A->P.Topology[cpu].CPU->RelativeRatio <= A->P.Platform.MinimumRatio)
+						{ BarBg=INIT_VALUE_COLOR; BarFg=DYNAMIC_COLOR; }
+					if(A->P.Topology[cpu].CPU->RelativeRatio >  A->P.Platform.MinimumRatio)
+						{ BarBg=LOW_VALUE_COLOR; BarFg=CORES_BACKGROUND; }
+					if(A->P.Topology[cpu].CPU->RelativeRatio >= A->P.Platform.MaxNonTurboRatio)
+						{ BarBg=MED_VALUE_COLOR; BarFg=CORES_BACKGROUND; }
+					if(A->P.Topology[cpu].CPU->RelativeRatio >= A->P.Turbo.MaxRatio_4C)
+						{ BarBg=HIGH_VALUE_COLOR; BarFg=CORES_BACKGROUND; }
 
-				// Draw the Core frequency.
-				XSetForeground(A->display, A->W[G].gc, BarBg);
-				XFillRectangle(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-						One_Char_Width(G) * 3,
-						3 + ( One_Char_Height(G) * (cpu + 1) ),
-						(A->W[G].extents.overall.width * A->P.Topology[cpu].CPU->RelativeRatio) / CORES_TEXT_WIDTH,
-						One_Char_Height(G) - 3);
+					// Draw the Core frequency.
+					XSetForeground(A->display, A->W[G].gc, BarBg);
+					XFillRectangle(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+							One_Char_Width(G) * 3,
+							3 + ( One_Char_Height(G) * (cpu + 1) ),
+							(A->W[G].extents.overall.width * A->P.Topology[cpu].CPU->RelativeRatio) / CORES_TEXT_WIDTH,
+							One_Char_Height(G) - 3);
 
-				// For each Core, display its frequency, C-STATE & ratio.
-				if(A->L.Play.freqHertz && (A->P.Topology[cpu].CPU->RelativeRatio >= 5.0f) ) {
-					XSetForeground(A->display, A->W[G].gc, BarFg);
-					sprintf(str, CORE_FREQ, A->P.Topology[cpu].CPU->RelativeFreq);
-					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-							One_Char_Width(G) * 5,
-							One_Char_Height(G) * (cpu + 1 + 1),
-							str, strlen(str) );
-				}
+					// For each Core, display its frequency, C-STATE & ratio.
+					if(A->L.Play.freqHertz && (A->P.Topology[cpu].CPU->RelativeRatio >= 5.0f) ) {
+						XSetForeground(A->display, A->W[G].gc, BarFg);
+						sprintf(str, CORE_FREQ, A->P.Topology[cpu].CPU->RelativeFreq);
+						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+								One_Char_Width(G) * 5,
+								One_Char_Height(G) * (cpu + 1 + 1),
+								str, strlen(str) );
+					}
 
-				XSetForeground(A->display, A->W[G].gc, DYNAMIC_COLOR);
-				if(A->L.Play.cycleValues) {
-					sprintf(str, CORE_DELTA,
-							A->P.Topology[cpu].CPU->Delta.C0.UCC / (IDLE_BASE_USEC * A->P.IdleTime),
-							A->P.Topology[cpu].CPU->Delta.C0.URC / (IDLE_BASE_USEC * A->P.IdleTime),
-							A->P.Topology[cpu].CPU->Delta.C3 / (IDLE_BASE_USEC * A->P.IdleTime),
-							A->P.Topology[cpu].CPU->Delta.C6 / (IDLE_BASE_USEC * A->P.IdleTime),
-							A->P.Topology[cpu].CPU->Delta.TSC / (IDLE_BASE_USEC * A->P.IdleTime));
-					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-							One_Char_Width(G) * 13,
-							One_Char_Height(G) * (cpu + 1 + 1),
-							str, strlen(str) );
-				}
-				else if(!A->L.Play.ratioValues) {
-					sprintf(str, CORE_CYCLES,
-							A->P.Topology[cpu].CPU->Cycles.C0[1].UCC,
-							A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
-					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-							One_Char_Width(G) * 13,
-							One_Char_Height(G) * (cpu + 1 + 1),
-							str, strlen(str) );
-				}
+					XSetForeground(A->display, A->W[G].gc, DYNAMIC_COLOR);
+					if(A->L.Play.cycleValues) {
+						sprintf(str,	CORE_DELTA,
+								A->P.Topology[cpu].CPU->Delta.C0.UCC / (IDLE_BASE_USEC * A->P.IdleTime),
+								A->P.Topology[cpu].CPU->Delta.C0.URC / (IDLE_BASE_USEC * A->P.IdleTime),
+								A->P.Topology[cpu].CPU->Delta.C3 / (IDLE_BASE_USEC * A->P.IdleTime),
+								A->P.Topology[cpu].CPU->Delta.C6 / (IDLE_BASE_USEC * A->P.IdleTime),
+								A->P.Topology[cpu].CPU->Delta.TSC / (IDLE_BASE_USEC * A->P.IdleTime));
+						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+								One_Char_Width(G) * 13,
+								One_Char_Height(G) * (cpu + 1 + 1),
+								str, strlen(str) );
+					}
+					else if(!A->L.Play.ratioValues) {
+						sprintf(str,	CORE_CYCLES,
+								A->P.Topology[cpu].CPU->Cycles.C0[1].UCC,
+								A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
+						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+								One_Char_Width(G) * 13,
+								One_Char_Height(G) * (cpu + 1 + 1),
+								str, strlen(str) );
+					}
 
-				if(A->L.Play.ratioValues) {
-					sprintf(str, CORE_RATIO, A->P.Topology[cpu].CPU->RelativeRatio);
-					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-							Twice_Char_Width(G) * A->P.Turbo.MaxRatio_1C,
-							One_Char_Height(G) * (cpu + 1 + 1),
-							str, strlen(str) );
-				}
-			} else {
+					if(A->L.Play.ratioValues) {
+						sprintf(str, CORE_RATIO, A->P.Topology[cpu].CPU->RelativeRatio);
+						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+								Twice_Char_Width(G) * A->P.Turbo.MaxRatio_1C,
+								One_Char_Height(G) * (cpu + 1 + 1),
+								str, strlen(str) );
+					}
+				} else {
 					XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							Twice_Char_Width(G) * A->P.Turbo.MaxRatio_1C,
 							One_Char_Height(G) * (cpu + 1 + 1),
 							"OFF", 3 );
-			}
+				}
 		}
 			break;
 		case CSTATES:
@@ -2664,29 +2693,30 @@ void	DrawLayout(uARG *A, int G)
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++)
-			  if(A->P.Topology[cpu].CPU != NULL) {
-				// Prepare the C0 chart.
-				A->L.Usage.C0[cpu].x=Half_Char_Width(G) + ((cpu * CSTATES_TEXT_SPACING) * One_Half_Char_Width(G));
-				A->L.Usage.C0[cpu].y=One_Char_Height(G)
-							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->P.Topology[cpu].CPU->State.C0);
-				A->L.Usage.C0[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 3;
-				A->L.Usage.C0[cpu].height=One_Char_Height(G)
-							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->P.Topology[cpu].CPU->State.C0;
-				// Prepare the C3 chart.
-				A->L.Usage.C3[cpu].x=Half_Char_Width(G) + A->L.Usage.C0[cpu].x + A->L.Usage.C0[cpu].width;
-				A->L.Usage.C3[cpu].y=One_Char_Height(G)
-							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->P.Topology[cpu].CPU->State.C3);
-				A->L.Usage.C3[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 3;
-				A->L.Usage.C3[cpu].height=One_Char_Height(G)
-							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->P.Topology[cpu].CPU->State.C3;
-				// Prepare the C6 chart.
-				A->L.Usage.C6[cpu].x=Half_Char_Width(G) + A->L.Usage.C3[cpu].x + A->L.Usage.C3[cpu].width;
-				A->L.Usage.C6[cpu].y=One_Char_Height(G)
-							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->P.Topology[cpu].CPU->State.C6);
-				A->L.Usage.C6[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 3;
-				A->L.Usage.C6[cpu].height=One_Char_Height(G)
-							+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->P.Topology[cpu].CPU->State.C6;
-			}			// Display the C-State averages.
+				if(A->P.Topology[cpu].CPU != NULL)
+				{
+					// Prepare the C0 chart.
+					A->L.Usage.C0[cpu].x=Half_Char_Width(G) + ((cpu * CSTATES_TEXT_SPACING) * One_Half_Char_Width(G));
+					A->L.Usage.C0[cpu].y=One_Char_Height(G)
+								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->P.Topology[cpu].CPU->State.C0);
+					A->L.Usage.C0[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 3;
+					A->L.Usage.C0[cpu].height=One_Char_Height(G)
+								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->P.Topology[cpu].CPU->State.C0;
+					// Prepare the C3 chart.
+					A->L.Usage.C3[cpu].x=Half_Char_Width(G) + A->L.Usage.C0[cpu].x + A->L.Usage.C0[cpu].width;
+					A->L.Usage.C3[cpu].y=One_Char_Height(G)
+								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->P.Topology[cpu].CPU->State.C3);
+					A->L.Usage.C3[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 3;
+					A->L.Usage.C3[cpu].height=One_Char_Height(G)
+								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->P.Topology[cpu].CPU->State.C3;
+					// Prepare the C6 chart.
+					A->L.Usage.C6[cpu].x=Half_Char_Width(G) + A->L.Usage.C3[cpu].x + A->L.Usage.C3[cpu].width;
+					A->L.Usage.C6[cpu].y=One_Char_Height(G)
+								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->P.Topology[cpu].CPU->State.C6);
+					A->L.Usage.C6[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 3;
+					A->L.Usage.C6[cpu].height=One_Char_Height(G)
+								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->P.Topology[cpu].CPU->State.C6;
+				}			// Display the C-State averages.
 			sprintf(str, CSTATES_PERCENT,	100.f * A->P.Avg.Turbo,
 							100.f * A->P.Avg.C0,
 							100.f * A->P.Avg.C3,
@@ -2706,25 +2736,26 @@ void	DrawLayout(uARG *A, int G)
 
 			if(A->L.Play.cStatePercent)
 				for(cpu=0; cpu < A->P.CPU; cpu++)
-				  if(A->P.Topology[cpu].CPU != NULL) {
-					XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
-					sprintf(str, CORE_NUM, cpu);
-					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-							0,
-							One_Char_Height(G) * (cpu + 1 + 1),
-							str, strlen(str) );
+					if(A->P.Topology[cpu].CPU != NULL)
+					{
+						XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+						sprintf(str, CORE_NUM, cpu);
+						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+								0,
+								One_Char_Height(G) * (cpu + 1 + 1),
+								str, strlen(str) );
 
-					XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
-					sprintf(str, CSTATES_PERCENT,	100.f * A->P.Topology[cpu].CPU->State.Turbo,
-									100.f * A->P.Topology[cpu].CPU->State.C0,
-									100.f * A->P.Topology[cpu].CPU->State.C3,
-									100.f * A->P.Topology[cpu].CPU->State.C6);
+						XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
+						sprintf(str, CSTATES_PERCENT,	100.f * A->P.Topology[cpu].CPU->State.Turbo,
+										100.f * A->P.Topology[cpu].CPU->State.C0,
+										100.f * A->P.Topology[cpu].CPU->State.C3,
+										100.f * A->P.Topology[cpu].CPU->State.C6);
 
-					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-							Twice_Half_Char_Width(G),
-							One_Char_Height(G) * (cpu + 1 + 1),
-							str, strlen(str) );
-				}
+						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+								Twice_Half_Char_Width(G),
+								One_Char_Height(G) * (cpu + 1 + 1),
+								str, strlen(str) );
+					}
 		}
 			break;
 		case TEMPS:
@@ -2756,20 +2787,21 @@ void	DrawLayout(uARG *A, int G)
 			// Display the Core temperature.
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++)
-			  if(A->P.Topology[cpu].CPU != NULL) {
-				XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
-				sprintf(str, TEMPERATURE, A->P.Topology[cpu].CPU->TjMax.Target - A->P.Topology[cpu].CPU->ThermStat.DTS);
-				XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-						(One_Char_Width(G) * 5) + Quarter_Char_Width(G) + (cpu << 1) * Twice_Char_Width(G),
-						One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1),
-						str, strlen(str));
-			} else {
-				XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
-				XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-						(One_Char_Width(G) * 5) + Quarter_Char_Width(G) + (cpu << 1) * Twice_Char_Width(G),
-						One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1),
-						"OFF", 3);
-			}
+				if(A->P.Topology[cpu].CPU != NULL)
+				{
+					XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+					sprintf(str, TEMPERATURE, A->P.Topology[cpu].CPU->TjMax.Target - A->P.Topology[cpu].CPU->ThermStat.DTS);
+					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+							(One_Char_Width(G) * 5) + Quarter_Char_Width(G) + (cpu << 1) * Twice_Char_Width(G),
+							One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1),
+							str, strlen(str));
+				} else {
+					XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+							(One_Char_Width(G) * 5) + Quarter_Char_Width(G) + (cpu << 1) * Twice_Char_Width(G),
+							One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1),
+							"OFF", 3);
+				}
 			// Show Temperature Thresholds
 /*
 			XSetForeground(A->display, A->W[G].gc, GRAPH2_COLOR);
@@ -2840,7 +2872,8 @@ void	DrawLayout(uARG *A, int G)
 			break;
 		case SYSINFO:
 			// Display the Wallboard.
-			if(A->L.Play.wallboard) {
+			if(A->L.Play.wallboard)
+			{
 				// Scroll the Wallboard.
 				if(A->L.WB.Scroll < A->L.WB.Length)
 					A->L.WB.Scroll++;
@@ -3271,7 +3304,8 @@ void	CallBackRestoreWidget(uARG *A, WBUTTON *wButton)
 static void *uLoop(uARG *A)
 {
 	XEvent	E={0};
-	while(A->LOOP) {
+	while(A->LOOP)
+	{
 		XNextEvent(A->display, &E);
 
 		int G=0;
@@ -3504,19 +3538,19 @@ static void *uLoop(uARG *A)
 				A->LOOP=false;
 				break;
 			case UnmapNotify: {
-					if(G != MAIN)
-						A->PAUSE[G]=true;
+				if(G != MAIN)
+					A->PAUSE[G]=true;
 
-					IconifyWidget(A, G, &E);
-					fDraw(MAIN, true, false);
+				IconifyWidget(A, G, &E);
+				fDraw(MAIN, true, false);
 			}
 				break;
 			case MapNotify: {
-					if(G != MAIN)
-						A->PAUSE[G]=false;
+				if(G != MAIN)
+					A->PAUSE[G]=false;
 
-					IconifyWidget(A, G, &E);
-					fDraw(MAIN, true, false);
+				IconifyWidget(A, G, &E);
+				fDraw(MAIN, true, false);
 			}
 				break;
 			case VisibilityNotify:

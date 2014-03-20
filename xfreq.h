@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.22 SR0 by CyrIng
+ * XFreq.h #0.22 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,7 +7,7 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "22"
-#define _NIGHTLY "0"
+#define _NIGHTLY "1"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #define MAX(M, m)	((M) > (m) ? (M) : (m))

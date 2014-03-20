@@ -85,6 +85,9 @@
  *
  * [HISTORY]
  *
+ * R 0.22 : 03/20 2014 SR-1
+ *        - Fixed the Splash startup.
+ *
  * R 0.22 : 03/19 2014
  *        - The initial disposal of the Widgets is corrected.
  *        - Change the scale of the temperature graphic.
