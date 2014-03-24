@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.22 SR1 by CyrIng
+ * XFreq.h #0.22 SR3 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,8 +7,9 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "22"
-#define _NIGHTLY "1"
+#define _NIGHTLY "3"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
+
 
 #define MAX(M, m)	((M) > (m) ? (M) : (m))
 #define MIN(m, M)	((m) < (M) ? (m) : (M))
@@ -21,7 +22,7 @@ typedef struct
 	{
 		struct SIGNATURE
 		{
-		unsigned
+			unsigned
 			Stepping	:  4-0,
 			Model		:  8-4,
 			Family		: 12-8,
@@ -33,7 +34,7 @@ typedef struct
 		} EAX;
 		struct
 		{
-		unsigned
+			unsigned
 			Brand_ID	:  8-0,
 			CLFSH_Size	: 16-8,
 			MaxThread	: 24-16,
@@ -41,7 +42,7 @@ typedef struct
 		} EBX;
 		struct
 		{
-		unsigned
+			unsigned
 			SSE3	:  1-0,
 			PCLMULDQ:  2-1,
 			DTES64	:  3-2,
@@ -77,7 +78,7 @@ typedef struct
 		} ECX;
 		struct
 		{
-		unsigned
+			unsigned
 			FPU	:  1-0,
 			VME	:  2-1,
 			DE	:  3-2,
@@ -115,7 +116,8 @@ typedef struct
 	unsigned	ThreadCount;
 	struct
 	{
-		struct {
+		struct
+		{
 			unsigned
 			DTS	:  1-0,
 			Turbo	:  2-1,
@@ -126,12 +128,14 @@ typedef struct
 			PTM	:  7-6,
 			Unused2	: 32-7;
 		} EAX;
-		struct	{
+		struct
+		{
 			unsigned
 			Threshld:  4-0,
 			Unused1	: 32-4;
 		} EBX;
-		struct	{
+		struct
+		{
 			unsigned
 			HCF_Cap	:  1-0,
 			ACNT_Cap:  2-1,
@@ -139,21 +143,24 @@ typedef struct
 			PEB_Cap	:  4-3,
 			Unused2	: 32-4;
 		} ECX;
-		struct	{
+		struct
+		{
 			unsigned
 			Unused1	: 32-0;
 		} EDX;
 	} Thermal_Power_Leaf;
 	struct
 	{
-		struct	{
+		struct
+		{
 			unsigned
 			Version	:  8-0,
 			MonCtrs	: 16-8,
 			MonWidth: 24-16,
 			VectorSz: 32-24;
 		} EAX;
-		struct	{
+		struct
+		{
 			unsigned
 			CoreCycl:  1-0,
 			InRetire:  2-1,
@@ -164,11 +171,13 @@ typedef struct
 			BrMispre:  7-6,
 			Unused1	: 32-7;
 		} EBX;
-		struct	{
+		struct
+		{
 			unsigned
 			Unused1	: 32-0;
 		} ECX;
-		struct	{
+		struct
+		{
 			unsigned
 			FixCtrs	:  5-0,
 			FixWidth: 13-5,
@@ -177,11 +186,13 @@ typedef struct
 	} Perf_Monitoring_Leaf;
 	struct
 	{
-		struct {
+		struct
+		{
 			unsigned
 			MaxSubLeaf	: 32-0;
 		} EAX;
-		struct {
+		struct
+		{
 			unsigned
 			FSGSBASE	:  1-0,
 			TSC_ADJUST	:  2-1,
@@ -332,13 +343,15 @@ struct IMCINFO
 #define	Read_MSR(FD, offset, msr)  pread(FD, msr, sizeof(*msr), offset)
 #define	Write_MSR(FD, offset, msr) pwrite(FD, msr, sizeof(*msr), offset)
 
-typedef	struct {
+typedef	struct
+{
 	unsigned long long
 		Ratio		: 16-0,
 		ReservedBits	: 64-16;
 } PERF_STATUS;
 
-typedef struct {
+typedef struct
+{
 	unsigned long long
 		ReservedBits1	:  8-0,
 		MaxNonTurboRatio: 16-8,
@@ -350,7 +363,8 @@ typedef struct {
 		ReservedBits4	: 64-48;
 } PLATFORM;
 
-typedef struct {
+typedef struct
+{
 	unsigned long long
 		MaxRatio_1C	:  8-0,
 		MaxRatio_2C	: 16-8,
@@ -362,7 +376,8 @@ typedef struct {
 		MaxRatio_8C	: 64-56;
 } TURBO;
 
-typedef	struct {
+typedef	struct
+{
 	unsigned long long
 		FastStrings	:  1-0,
 		ReservedBits1	:  3-1,
@@ -386,7 +401,8 @@ typedef	struct {
 		ReservedBits9	: 64-39;
 } MISC_PROC_FEATURES;
 
-typedef struct {
+typedef struct
+{
 	unsigned long long
 		EN_PMC0		:  1-0,
 		EN_PMC1		:  2-1,
@@ -397,7 +413,8 @@ typedef struct {
 		ReservedBits2	: 64-35;
 } GLOBAL_PERF_COUNTER;
 
-typedef struct {
+typedef struct
+{
 	unsigned long long
 		EN0_OS		:  1-0,
 		EN0_Usr		:  2-1,
@@ -414,7 +431,8 @@ typedef struct {
 		ReservedBits	: 64-12;
 } FIXED_PERF_COUNTER;
 
-typedef struct {
+typedef struct
+{
 	unsigned long long
 		Overflow_PMC0	:  1-0,
 		Overflow_PMC1	:  2-1,
@@ -430,7 +448,8 @@ typedef struct {
 		Ovf_CondChg	: 64-63;
 } GLOBAL_PERF_STATUS;
 
-typedef	struct {
+typedef	struct
+{
 	unsigned long long
 		Clear_Ovf_PMC0	:  1-0,
 		Clear_Ovf_PMC1	:  2-1,
@@ -448,7 +467,8 @@ typedef	struct {
 #define MED_TEMP_VALUE		45
 #define	HIGH_TEMP_VALUE		65
 
-typedef struct {
+typedef struct
+{
 	unsigned long long
 		HighTempEnable	:  1-0,
 		LowTempEnable	:  2-1,
@@ -464,7 +484,8 @@ typedef struct {
 		ReservedBits2	: 64-25;
 } THERM_INTERRUPT;
 
-typedef struct {
+typedef struct
+{
 	unsigned long long
 		Status		:  1-0,
 		StatusLog	:  2-1,
@@ -486,7 +507,8 @@ typedef struct {
 		ReservedBits3	: 64-32;
 } THERM_STATUS;
 
-typedef struct {
+typedef struct
+{
 	unsigned long long
 		ReservedBits1	: 16-0,
 		Target		: 24-16,
@@ -512,7 +534,8 @@ typedef struct {
 #define	Haswell_45			{ExtFamily:0x0, Family:0x6, ExtModel:0x4, Model:0x5}
 #define	Haswell_46			{ExtFamily:0x0, Family:0x6, ExtModel:0x4, Model:0x6}
 
-const struct {
+const struct
+{
 	struct	SIGNATURE	Signature;
 	const	unsigned int	MaxOfCores;
 	const	double		ClockSpeed;
@@ -539,7 +562,8 @@ typedef	struct {
 			GLOBAL_PERF_COUNTER	GlobalPerfCounter;
 			FIXED_PERF_COUNTER	FixedPerfCounter;
 			struct {
-				struct {
+				struct
+				{
 				unsigned long long
 					UCC,
 					URC;
@@ -550,7 +574,8 @@ typedef	struct {
 						TSC[2];
 			} Cycles;
 			struct {
-				struct {
+				struct
+				{
 				unsigned long long
 					UCC,
 					URC;
@@ -574,9 +599,9 @@ typedef	struct {
 } CPU_STRUCT;
 
 #define	IDLE_BASE_USEC	50000
-#define	IDLE_RATIO_DEF	20
-#define	IDLE_RATIO_MAX	80
-#define	IDLE_RATIO_MIN	2
+#define	IDLE_COEF_DEF	20
+#define	IDLE_COEF_MAX	80
+#define	IDLE_COEF_MIN	2
 
 #define	LEVEL_INVALID	0
 #define	LEVEL_THREAD	1
@@ -591,7 +616,8 @@ typedef	struct
 	CPU_STRUCT	*CPU;
 } TOPOLOGY;
 
-typedef struct {
+typedef struct
+{
 		signed int			ArchID;
 		FEATURES			Features;
 		TOPOLOGY			*Topology;
@@ -655,6 +681,7 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 
 #define	ID_NULL		'\0'
 #define	ID_MIN		'm'
+#define	ID_SAVE		'.'
 #define	ID_QUIT		'Q'
 #define	ID_NORTH	'N'
 #define	ID_SOUTH	'S'
@@ -667,6 +694,7 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 #define	ID_CTRLHOME	'{'
 #define	ID_CTRLEND	'}'
 #define	ID_PAUSE	'I'
+#define	ID_RESET	'Z'
 #define	ID_FREQ		'H'
 #define	ID_CYCLE	'Y'
 #define	ID_RATIO	'R'
@@ -681,6 +709,7 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 #define	ID_WALLBOARD	'B'
 
 #define	RSC_PAUSE	"Pause"
+#define	RSC_RESET	"Reset"
 #define	RSC_FREQ	"Freq."
 #define	RSC_CYCLE	"Cycle"
 #define	RSC_STATE	"States"
@@ -697,13 +726,14 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 
 typedef	enum	{DECORATION, SCROLLING, TEXT, ICON} WBTYPE;
 
-typedef	union	{
+typedef	union
+{
 	char		*Text;
 	char		Label;
-	Pixmap		*Bitmap;
 } RESOURCE;
 
-struct WButton {
+struct WButton
+{
 	WBTYPE		Type;
 	char		ID;
 	int		Target;
@@ -721,7 +751,8 @@ typedef	struct	WButton	WBUTTON;
 
 enum	{HEAD, TAIL, CHAINS};
 
-typedef struct {
+typedef struct
+{
 	Window		window;
 	struct {
 		Pixmap	B,
@@ -733,7 +764,8 @@ typedef struct {
 			width,
 			height,
 			border_width;
-	struct	{
+	struct
+	{
 	    XCharStruct	overall;
 		int	dir,
 			ascent,
@@ -746,7 +778,8 @@ typedef struct {
 	WBUTTON		*wButton[CHAINS];
 } XWINDOW;
 
-typedef struct {
+typedef struct
+{
 	Window		window;
 	GC		gc;
 	Pixmap		bitmap;
@@ -760,7 +793,8 @@ typedef struct {
 #define	MOVE_EVENTS	ButtonReleaseMask | Button3MotionMask
 #define	CLICK_EVENTS	ButtonPressMask
 
-typedef struct {
+typedef struct
+{
 	bool		Locked;
 	int		S,
 			dx,
@@ -979,12 +1013,14 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	DUMP_FRAME_VIEW_HSHIFT		1
 #define	DUMP_FRAME_VIEW_VSHIFT		1
 
-typedef struct {
+typedef struct
+{
 	int	cols,
 		rows;
 } MaxText;
 
-typedef struct {
+typedef struct
+{
 	struct	{
 		int		H,
 				V;
@@ -1009,7 +1045,8 @@ typedef struct {
 				cStatePercent,
 				alwaysOnTop,
 				wallboard,
-				flashCursor;
+				flashCursor,
+				hideSplash;
 	} Play;
 	struct {;
 		int		Scroll,
@@ -1049,11 +1086,43 @@ typedef struct {
 	FlushLayout(A, N);			\
 }
 
-typedef struct {
+#define	XDB_SETTINGS_FILE	".xfreq"
+#define	XDB_CLASS_MAIN		"Main"
+#define	XDB_CLASS_CORES		"Cores"
+#define	XDB_CLASS_CSTATES	"CStates"
+#define	XDB_CLASS_TEMPS		"Temps"
+#define	XDB_CLASS_SYSINFO	"SysInfo"
+#define	XDB_CLASS_DUMP		"Dump"
+#define	XDB_KEY_FONT		"Font"
+#define	XDB_KEY_LEFT		"Left"
+#define	XDB_KEY_TOP		"Top"
+#define	XDB_KEY_BACKGROUND	"Background"
+#define	XDB_KEY_FOREGROUND	"Foreground"
+#define	XDB_KEY_CLOCK_SOURCE	"ClockSource"
+#define	XDB_KEY_ROM_ADDRESS	"ClockRomAddr"
+#define	XDB_KEY_PLAY_FREQ	"PlayFrequency"
+#define	XDB_KEY_PLAY_CYCLES	"PlayCycles"
+#define	XDB_KEY_PLAY_RATIOS	"PlayRatios"
+#define	XDB_KEY_PLAY_CSTATES	"PlayCStates"
+#define	XDB_KEY_PLAY_WALLBOARD	"PlayBrand"
+
+#define	OPTIONS_COUNT	17
+typedef struct
+{
+	char		*argument;
+	char		*format;
+	void		*pointer;
+	char		*manual;
+	char		*xrmName;
+} OPTIONS;
+
+typedef struct
+{
 	PROCESSOR	P;
 	struct IMCINFO	*M;
 	Display		*display;
 	Screen		*screen;
+	pthread_t	TID_Draw;
 	char		*fontName;
 	XFontStruct	*xfont;
 	char		xACL;
@@ -1067,23 +1136,18 @@ typedef struct {
 			PAUSE[WIDGETS],
 			MSR,
 			BIOS;
-	pthread_t	TID_Draw;
+	OPTIONS		Options[OPTIONS_COUNT];
 } uARG;
 
-typedef struct {
+typedef struct
+{
 	int		cpu;
 	pthread_t	TID;
 	uARG		*A;
 } uAPIC;
 
-typedef struct {
-	char *argument;
-	char *format;
-	void *pointer;
-	char *manual;
-} OPTION;
-
-typedef	struct {
+typedef	struct
+{
 	char	*Instruction;
 	void	(*Procedure)();
 } COMMAND;

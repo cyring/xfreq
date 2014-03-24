@@ -51,13 +51,13 @@
  * + screenshot key.
  * + resize footer separator w/ MDI.
  * + give a better disposal of the Widgets using % of screen size and absolute positions.
- * + save and load settings.
+ * + save and load settings : done.
  * + show the minimum value in the Temp Widget : on the graphic, left side=min & right side=max : done.
  *
  *
  *  Source code
  * -------------
- * + clean makefile : remove my previous Raspberry instructions.
+ * + clean makefile : remove my previous Raspberry instructions : done.
  * + clang compliant : rewrite code to remove any "warning: use of GNU old-style ..."
  * + provide some configure and install scripts, especially an ArchLinux PKGBUILD.
  * + split the code between GUI and hardware parts.
@@ -84,6 +84,16 @@
  *
  *
  * [HISTORY]
+ *
+ * R 0.22 : 03/24 2014 SR-3
+ *        - Save settings into the '.xfreq' file in home directory.
+ *
+ * R 0.22 : 03/23 2014 SR-2
+ *        - Load settings from .xfreq file in home directory.
+ *        - Provided a new button to Reset the coldest temperature.
+ *        - Added the '-i' command line argument to hide the Splash screen.
+ *        - Fixed margins when in non MDI.
+ *        - Fixed the scale of the Cold Temperature.
  *
  * R 0.22 : 03/20 2014 SR-1
  *        - Fixed the Splash startup.

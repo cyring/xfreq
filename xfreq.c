@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.22 SR1 by CyrIng
+ * XFreq.c #0.22 SR3 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -13,10 +13,12 @@
 #include <X11/Xos.h>
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
+#include <X11/Xresource.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/io.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <unistd.h>
 #include <string.h>
 #include <pthread.h>
@@ -282,6 +284,8 @@ static void *uCycle(void *uArg)
 			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C3[0]);
 			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C6[0]);
 		}
+	if(A->P.IdleTime < IDLE_COEF_MIN)	A->P.IdleTime=IDLE_COEF_MIN;
+	if(A->P.IdleTime > IDLE_COEF_MAX)	A->P.IdleTime=IDLE_COEF_MAX;
 
 	while(A->LOOP)
 	{
@@ -406,13 +410,13 @@ int	Read_SMBIOS(int structure, int instance, off_t offset, void *buf, size_t nby
 }
 
 // Estimate the Bus Clock Frequency from the TSC.
-double	Compute_ExtClock(int ratio)
+double	Compute_ExtClock(int Coef)
 {
 	unsigned long long TSC[2];
 	TSC[0]=RDTSC();
-	usleep(IDLE_BASE_USEC * ratio);
+	usleep(IDLE_BASE_USEC * Coef);
 	TSC[1]=RDTSC();
-	return((double) (TSC[1] - TSC[0]) / (IDLE_BASE_USEC * ratio));
+	return((double) (TSC[1] - TSC[0]) / (IDLE_BASE_USEC * Coef));
 }
 
 // Read the Bus Clock Frequency from the BIOS.
@@ -738,7 +742,7 @@ void	SelectBaseClock(uARG *A)
 		default:
 		case SRC_TSC:	// Base Clock = TSC divided by the maximum ratio (without Turbo).
 			if(A->MSR) {
-				A->P.ClockSpeed=Compute_ExtClock(IDLE_RATIO_DEF) / A->P.Platform.MaxNonTurboRatio;
+				A->P.ClockSpeed=Compute_ExtClock(IDLE_COEF_DEF) / A->P.Platform.MaxNonTurboRatio;
 				A->P.ClockSrc=SRC_TSC;
 				break;
 			}
@@ -780,6 +784,34 @@ void	SelectBaseClock(uARG *A)
 void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 {
 	switch(wButton->ID) {
+		case ID_SAVE: {
+			XPoint xpoints[]={
+					{	x:+wButton->x	, y:+wButton->y		},
+					{	x:+wButton->w	, y:0			},
+					{	x:0		, y:+wButton->h		},
+					{	x:-wButton->w+3	, y:0			},
+					{	x:-3		, y:-3			},
+					{	x:0		, y:-wButton->h+3	}
+			};
+			XDrawLines(	A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
+					xpoints, sizeof(xpoints) / sizeof(XPoint), CoordModePrevious);
+			XPoint xpoly[]={
+					{	x:wButton->x+4			, y:wButton->y+wButton->h-(wButton->h >> 1)	},
+					{	x:wButton->x+wButton->w-2	, y:wButton->y+wButton->h-(wButton->h >> 1)	},
+					{	x:wButton->x+wButton->w-2	, y:wButton->y+wButton->h-1	},
+					{	x:wButton->x+4			, y:wButton->y+wButton->h-1	}
+			};
+			XFillPolygon(	A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
+					xpoly, sizeof(xpoly) / sizeof(XPoint), Nonconvex, CoordModeOrigin);
+
+			XSegment xsegments[]={
+				{	x1:wButton->x+3,		y1:wButton->y+3,	x2:wButton->x+3,		y2:wButton->y+4},
+				{	x1:wButton->x+wButton->w-3,	y1:wButton->y+3,	x2:wButton->x+wButton->w-3,	y2:wButton->y+4}
+			};
+			XDrawSegments(	A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
+					xsegments, sizeof(xsegments)/sizeof(XSegment));
+		}
+			break;
 		case ID_QUIT: {
 			XFillRectangle(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
 					wButton->x + (wButton->w >> 1) - 1, wButton->y, 3, (wButton->h >> 1));
@@ -873,6 +905,7 @@ void	DrawIconButton(uARG *A, WBUTTON *wButton)
 }
 
 // CallBack functions definition.
+void	CallBackSave(uARG *A, WBUTTON *wButton) ;
 void	CallBackQuit(uARG *A, WBUTTON *wButton) ;
 void	CallBackButton(uARG *A, WBUTTON *wButton) ;
 void	CallBackMinimizeWidget(uARG *A, WBUTTON *wButton) ;
@@ -896,15 +929,11 @@ void	CreateButton(uARG *A, WBTYPE Type, char ID, int Target, int x, int y, unsig
 
 	switch(NewButton->Type)
 	{
-		case DECORATION: {
-			NewButton->Resource.Bitmap=NULL;
+		case DECORATION:
 			NewButton->DrawFunc=DrawDecorationButton;
-		}
 			break;
-		case SCROLLING: {
-			NewButton->Resource.Bitmap=NULL;
+		case SCROLLING:
 			NewButton->DrawFunc=DrawScrollingButton;
-		}
 			break;
 		case TEXT: {
 			if(Resource->Text != NULL) {
@@ -1070,7 +1099,7 @@ void	ScaleMDI(uARG *A)
 }
 
 // ReSize a Widget window & inform WM.
-void	ReSizeWidget(uARG *A, int G)
+void	ReSizeMoveWidget(uARG *A, int G)
 {
 	XSizeHints *hints=NULL;
 	if((hints=XAllocSizeHints()) != NULL)
@@ -1085,9 +1114,10 @@ void	ReSizeWidget(uARG *A, int G)
 	}
 	XWindowAttributes xwa={0};
 	XGetWindowAttributes(A->display, A->W[G].window, &xwa);
-	// Did the Window Manager really resize the Window ?
-	if((xwa.width != A->W[G].width) || (xwa.height != A->W[G].height))
-		XResizeWindow(A->display, A->W[G].window, A->W[G].width, A->W[G].height);
+
+	// Did the Window Manager really move and size the Window ?
+	if((xwa.width != A->W[G].width) || (xwa.height != A->W[G].height) || (xwa.x != A->W[G].x) || (xwa.y != A->W[G].y))
+		XMoveResizeWindow(A->display, A->W[G].window, A->W[G].x, A->W[G].y, A->W[G].width, A->W[G].height);
 }
 
 // Move a Widget Window (when the MDI mode is enabled).
@@ -1352,8 +1382,13 @@ int	OpenDisplay(uARG *A)
 			noerr=false;
 		else {
 			// Adjust margins using the font size.
-			A->L.Margin.H=(A->xfont->max_bounds.rbearing - A->xfont->min_bounds.lbearing) << 1;
-			A->L.Margin.V=(A->xfont->ascent + A->xfont->descent) + ((A->xfont->ascent + A->xfont->descent) >> 2);
+			if(_IS_MDI_) {
+				A->L.Margin.H=(A->xfont->max_bounds.rbearing - A->xfont->min_bounds.lbearing) << 1;
+				A->L.Margin.V=(A->xfont->ascent + A->xfont->descent) + ((A->xfont->ascent + A->xfont->descent) >> 2);
+			} else {
+				A->L.Margin.H=(A->xfont->max_bounds.rbearing - A->xfont->min_bounds.lbearing) << 1;
+				A->L.Margin.V=(A->xfont->ascent + A->xfont->descent) + (A->xfont->ascent + A->xfont->descent);
+			}
 		}
 		if(noerr) {
 			A->MouseCursor[MC_DEFAULT]=XCreateFontCursor(A->display, XC_left_ptr);
@@ -1420,56 +1455,11 @@ int	OpenWidgets(uARG *A)
 	int G=0;
 	for(G=MAIN; noerr && (G < WIDGETS); G++)
 	{
-		// Dispose Widgets from each other : [Right & Bottom + width & height] Or -[1,-1] = X,Y origin + Margins.
-		int U=A->W[G].x;
-		int V=A->W[G].y;
-		if(_IS_MDI_) {
-			if(G != MAIN) {
-				switch(U) {
-					case -1:
-						A->W[G].x=A->L.Margin.H;
-						break;
-					case MAIN:
-						A->W[G].x=A->L.Margin.H + A->W[U].width;
-						break;
-					default:
-						A->W[G].x=A->L.Margin.H + A->W[U].x + A->W[U].width;
-						break;
-				}
-				switch(V) {
-					case -1:
-						A->W[G].y=A->L.Margin.V;
-						break;
-					case MAIN:
-						A->W[G].y=A->L.Margin.V + A->W[V].height;
-						break;
-					default:
-						A->W[G].y=A->L.Margin.V + A->W[V].y + A->W[V].height;
-						break;
-				}
-			}
-			else {
-				A->W[G].x=A->L.Start.H;
-				A->W[G].y=A->L.Start.V;
-			}
-		}
-		else {
-			if(U == -1)
-				A->W[G].x=A->L.Start.H;
-			else
-				A->W[G].x=A->L.Margin.H + A->W[U].x + A->W[U].width;
-			if(V == -1)
-				A->W[G].y=A->L.Start.V;
-			else
-				A->W[G].y=A->L.Margin.V + A->W[V].y + A->W[V].height;
-		}
-
 		// Override default colors if values supplied in the command line.
 		if(A->L.globalBackground != GLOBAL_BACKGROUND)
 			A->W[G].background=A->L.globalBackground;
 		if(A->L.globalForeground != GLOBAL_FOREGROUND)
 			A->W[G].foreground=A->L.globalForeground;
-
 		// Create the Widgets.
 		if((A->W[G].window=XCreateWindow(A->display,
 						_IS_MDI_ && (G != MAIN) ?
@@ -1524,6 +1514,14 @@ int	OpenWidgets(uARG *A)
 						// First run if MAIN is not defined as MDI then create buttons.
 						if(!_IS_MDI_) {
 							unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
+
+							CreateButton(	A, DECORATION, ID_SAVE, G,
+									A->W[G].width - (One_Char_Width(G) * 8) - 2,
+									2,
+									square - 2,
+									square - 2,
+									CallBackSave,
+									NULL);
 
 							CreateButton(	A, DECORATION, ID_QUIT, G,
 									A->W[G].width - (One_Char_Width(G) * 5) - 2,
@@ -1783,6 +1781,7 @@ int	OpenWidgets(uARG *A)
 							char		ID;
 							RESOURCE	RSC;
 						} Loader[]={	{ID:ID_PAUSE, RSC:{Text:RSC_PAUSE}},
+								{ID:ID_RESET, RSC:{Text:RSC_RESET}},
 								{ID:ID_NULL , RSC:{Text:NULL}}
 							};
 						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
@@ -2001,7 +2000,7 @@ int	OpenWidgets(uARG *A)
 					}
 						break;
 				}
-				ReSizeWidget(A, G);
+				ReSizeMoveWidget(A, G);
 			}
 			else	noerr=false;
 		}
@@ -2010,9 +2009,17 @@ int	OpenWidgets(uARG *A)
 	if(noerr && _IS_MDI_)
 	{
 		ScaleMDI(A);
-		ReSizeWidget(A, MAIN);
+		ReSizeMoveWidget(A, MAIN);
 
 		unsigned int square=MAX(A->W[MAIN].extents.charHeight, A->W[MAIN].extents.charWidth);
+
+		CreateButton(	A, DECORATION, ID_SAVE, MAIN,
+				A->W[MAIN].width - (A->W[MAIN].extents.charWidth * 8) - 2,
+				2,
+				square - 2,
+				square - 2,
+				CallBackSave,
+				NULL);
 
 		CreateButton(	A, DECORATION, ID_QUIT, MAIN,
 				A->W[MAIN].width - (A->W[MAIN].extents.charWidth * 5) - 2,
@@ -2774,10 +2781,6 @@ void	DrawLayout(uARG *A, int G)
 			U->x1=(TEMPS_TEXT_WIDTH + 2) * One_Char_Width(G);
 			U->y1=V->y2;
 			U->x2=U->x1 + One_Char_Width(G);
-/*
-			U->y2=(( (TEMPS_TEXT_HEIGHT * A->P.Topology[A->P.Hot].CPU->ThermStat.DTS)
-				/ A->P.Topology[A->P.Hot].CPU->TjMax.Target) + 2) * One_Char_Height(G);
-*/
 			U->y2=(A->W[G].height * A->P.Topology[A->P.Hot].CPU->ThermStat.DTS)
 				/ A->P.Topology[A->P.Hot].CPU->TjMax.Target;
 
@@ -2850,8 +2853,7 @@ void	DrawLayout(uARG *A, int G)
 					str, 3);
 
 			int	ColdValue=A->P.Topology[A->P.Hot].CPU->TjMax.Target - A->P.Cold,
-				yCold=(( (TEMPS_TEXT_HEIGHT * A->P.Cold)
-					/ A->P.Topology[A->P.Hot].CPU->TjMax.Target) + 2) * One_Char_Height(G);
+				yCold=(A->W[G].height * A->P.Cold) / A->P.Topology[A->P.Hot].CPU->TjMax.Target;
 
 			if(ColdValue <= LOW_TEMP_VALUE)
 				XSetForeground(A->display, A->W[G].gc, INIT_VALUE_COLOR);
@@ -3141,7 +3143,7 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_INCLOOP:
-			if(A->P.IdleTime < IDLE_RATIO_MAX) {
+			if(A->P.IdleTime < IDLE_COEF_MAX) {
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
 				A->P.IdleTime++;
@@ -3152,7 +3154,7 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_DECLOOP:
-			if(A->P.IdleTime > IDLE_RATIO_MIN) {
+			if(A->P.IdleTime > IDLE_COEF_MIN) {
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
 				A->P.IdleTime--;
@@ -3161,6 +3163,9 @@ void	Play(uARG *A, int G, char ID)
 				fDraw(G, true, false);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
+			break;
+		case ID_RESET:
+			A->P.Cold=0;
 			break;
 		case ID_FREQ:
 			A->L.Play.freqHertz=!A->L.Play.freqHertz;
@@ -3224,6 +3229,102 @@ void	Play(uARG *A, int G, char ID)
 	}
 }
 
+char	*FQN_Settings(const char *fName)
+{
+	char *Home=getenv("HOME");
+	if(Home != NULL)
+	{
+		char	*lHome=strdup(Home),
+			*rHome=strdup(Home),
+			*dName=dirname(lHome),
+			*bName=basename(rHome),
+			*FQN=calloc(1024, 1);
+
+		if(!strcmp(dName, "/"))
+			sprintf(FQN, "%s%s/%s", dName, bName, fName);
+		else
+			sprintf(FQN, "%s/%s/%s", dName, bName, fName);
+
+		free(lHome);
+		free(rHome);
+
+		return(FQN);
+	}
+	return(NULL);
+}
+
+bool	StoreSettings(uARG *A)
+{
+	char *FQN=FQN_Settings(XDB_SETTINGS_FILE);
+	if(FQN != NULL)
+	{
+		XrmDatabase xdb=XrmGetFileDatabase(FQN);
+
+		char strVal[256]={0};
+		char strKey[32]={0};
+		int i=0;
+		for(i=0; i < OPTIONS_COUNT; i++)
+			if(A->Options[i].xrmName != NULL)
+			{
+				switch(A->Options[i].format[1]) {
+					case 'd': {
+						sprintf(strKey, "%s: %s", A->Options[i].xrmName, A->Options[i].format);
+						signed int *pINT=A->Options[i].pointer;
+						sprintf(strVal, strKey, *pINT);
+						}
+						break;
+					case 'u': {
+						sprintf(strKey, "%s: %s", A->Options[i].xrmName, A->Options[i].format);
+						unsigned int *pUINT=A->Options[i].pointer;
+						sprintf(strVal, strKey, *pUINT);
+						}
+						break;
+					case 'X':
+					case 'x': {
+						sprintf(strKey, "%s: 0x%s", A->Options[i].xrmName, A->Options[i].format);
+						unsigned int *pHEX=A->Options[i].pointer;
+						sprintf(strVal, strKey, *pHEX);
+						}
+						break;
+					case 'c': {
+						sprintf(strKey, "%s: %s", A->Options[i].xrmName, A->Options[i].format);
+						unsigned char *pCHAR=A->Options[i].pointer;
+						sprintf(strVal, strKey, pCHAR);
+						}
+						break;
+					case 's': {
+					default:
+						sprintf(strKey, "%s: %s", A->Options[i].xrmName, A->Options[i].format);
+						char *pSTR=A->Options[i].pointer;
+						sprintf(strVal, strKey, pSTR);
+						}
+						break;
+				}
+				XrmPutLineResource(&xdb, strVal);
+			}
+		const char *xrmClass[WIDGETS]={	XDB_CLASS_MAIN,
+						XDB_CLASS_CORES,
+						XDB_CLASS_CSTATES,
+						XDB_CLASS_TEMPS,
+						XDB_CLASS_SYSINFO,
+						XDB_CLASS_DUMP};
+		int G=0;
+		for(G=MAIN; G < WIDGETS; G++) {
+			sprintf(strVal, "%s.%s.%s: %d", _IS_MDI_ ? "MDI":"", xrmClass[G], XDB_KEY_LEFT, A->W[G].x);
+			XrmPutLineResource(&xdb, strVal);
+			sprintf(strVal, "%s.%s.%s: %d", _IS_MDI_ ? "MDI":"", xrmClass[G], XDB_KEY_TOP, A->W[G].y);
+			XrmPutLineResource(&xdb, strVal);
+		}
+		XrmPutFileDatabase(xdb, FQN);
+		XrmDestroyDatabase(xdb);
+		free(FQN);
+
+		return(true);
+	}
+	else
+		return(false);
+}
+
 // Instructions set.
 void	Proc_Release(uARG *A)
 {
@@ -3278,16 +3379,22 @@ void	ExecCommand(uARG *A)
 
 void	CallBackButton(uARG *A, WBUTTON *wButton)
 {
-	// Flash the selected button.
-	XSetForeground(A->display, A->W[wButton->Target].gc, FOCUS_COLOR);
-	XDrawRectangle(A->display, A->W[wButton->Target].window, A->W[wButton->Target].gc, wButton->x, wButton->y, wButton->w, wButton->h);
-	// Update associated values.
 	Play(A, wButton->Target, wButton->ID);
+}
+
+void	CallBackSave(uARG *A, WBUTTON *wButton)
+{
+	if(StoreSettings(A))
+		Output(A, "Settings successfully saved.\n");
+	else
+		Output(A, "Failed to save settings.\n");
+	fDraw(MAIN, true, false);
 }
 
 void	CallBackQuit(uARG *A, WBUTTON *wButton)
 {
 	Proc_Quit(A);
+	fDraw(MAIN, true, false);
 }
 
 void	CallBackMinimizeWidget(uARG *A, WBUTTON *wButton)
@@ -3569,51 +3676,124 @@ static void *uLoop(uARG *A)
 	return(NULL);
 }
 
-// Parse the command line arguments.
-int	Args(uARG *A, int argc, char *argv[])
+// Load settings
+int	LoadSettings(uARG *A, int argc, char *argv[])
 {
-	OPTION	options[] = {
-				{"-D", "%d", &A->MDI,                  "Enable MDI Window (0/1)"                            },
-				{"-F", "%s", A->fontName,              "Font name"                                          },
-				{"-a", "%c", &A->xACL,                 "Enable or disable X ACL (Y/N)"                      },
-				{"-x", "%d", &A->L.Start.H,            "Left position (Pixel value)"                        },
-				{"-y", "%d", &A->L.Start.V,            "Top position (Pixel value)"                         },
-				{"-b", "%x", &A->L.globalBackground,   "Background color (Hex. value)"                      },
-				{"-f", "%x", &A->L.globalForeground,   "Foreground color (Hex. value)"                      },
-/*				{"-c", "%ud",&A->P.PerCore,            "Monitor per Thread/Core (0/1)"                      },*/
-				{"-S", "%ud",&A->P.ClockSrc,           "Clock source TSC(0) BIOS(1) SPEC(2) ROM(3) USER(4)" },
-				{"-M", "%x", &A->P.BClockROMaddr,      "ROM memory address of the Base Clock (Hex. value)"  },
-				{"-s", "%ud",&A->P.IdleTime,           "Idle time ratio where N x 50000 (usec)"             },
-				{"-h", "%ud",&A->L.Play.freqHertz,     "CPU frequency (0/1)"                                },
-				{"-l", "%ud",&A->L.Play.cycleValues,   "Cycle Values (0/1)"                                 },
-				{"-r", "%ud",&A->L.Play.ratioValues,   "Ratio Values (0/1)"                                 },
-				{"-p", "%ud",&A->L.Play.cStatePercent, "C-STATE percentage (0/1)"                           },
-				{"-t", "%ud",&A->L.Play.alwaysOnTop,   "Always On Top (0/1)"                                },
-				{"-w", "%ud",&A->L.Play.wallboard,     "Scroll wallboard (0/1)"                             },
-		};
-	const int s=sizeof(options)/sizeof(OPTION);
-	int i=0, j=0, noerr=true;
+	bool noerr=true;
+	XrmDatabase xdb=NULL;
+	int i=0, j=0, G=0;
 
+	char *FQN=FQN_Settings(XDB_SETTINGS_FILE);
+	if(FQN != NULL)
+	{
+		xdb=XrmGetFileDatabase(FQN);
+		free(FQN);
+		if(xdb != NULL)
+		{
+			char     *xtype;
+			XrmValue xvalue;
+
+			for(i=0; i < OPTIONS_COUNT; i++)
+				if((A->Options[i].xrmName != NULL) && XrmGetResource(xdb, A->Options[i].xrmName, NULL, &xtype, &xvalue))
+					sscanf(xvalue.addr, A->Options[i].format, A->Options[i].pointer);
+		}
+	}
+	//  Parse the command line arguments which may override settings.
 	if( (argc - ((argc >> 1) << 1)) ) {
 		for(j=1; j < argc; j+=2) {
-			for(i=0; i < s; i++)
-				if(!strcmp(argv[j], options[i].argument)) {
-					sscanf(argv[j+1], options[i].format, options[i].pointer);
+			for(i=0; i < OPTIONS_COUNT; i++)
+				if(!strcmp(argv[j], A->Options[i].argument)) {
+					sscanf(argv[j+1], A->Options[i].format, A->Options[i].pointer);
 					break;
 				}
-			if(i == s) {
+			if(i == OPTIONS_COUNT) {
 				noerr=false;
 				break;
+			}
+		}
+		// If the settings file was not found then dispose Widgets from one to each other,
+		// such as: [Right & Bottom + width & height] Or -[1,-1] = X,Y origin + Margins.
+		if(noerr) {
+			if(!xdb || A->L.Start.H || A->L.Start.V)
+			{
+				for(G=MAIN; noerr && (G < WIDGETS); G++)
+				{
+					int U=A->W[G].x;
+					int V=A->W[G].y;
+					if(_IS_MDI_) {
+						if(G != MAIN) {
+							switch(U) {
+								case -1:
+									A->W[G].x=A->L.Margin.H;
+									break;
+								case MAIN:
+									A->W[G].x=A->L.Margin.H + A->W[U].width;
+									break;
+								default:
+									A->W[G].x=A->L.Margin.H + A->W[U].x + A->W[U].width;
+									break;
+							}
+							switch(V) {
+								case -1:
+									A->W[G].y=A->L.Margin.V;
+									break;
+								case MAIN:
+									A->W[G].y=A->L.Margin.V + A->W[V].height;
+									break;
+								default:
+									A->W[G].y=A->L.Margin.V + A->W[V].y + A->W[V].height;
+									break;
+							}
+						}
+						else {
+							A->W[G].x=A->L.Start.H;
+							A->W[G].y=A->L.Start.V;
+						}
+					}
+					else {
+						if(U == -1)
+							A->W[G].x=A->L.Start.H;
+						else
+							A->W[G].x=A->L.Margin.H + A->W[U].x + A->W[U].width;
+						if(V == -1)
+							A->W[G].y=A->L.Start.V;
+						else
+							A->W[G].y=A->L.Margin.V + A->W[V].y + A->W[V].height;
+					}
+				}
+			} else {
+				const char *xrmClass[WIDGETS]={	XDB_CLASS_MAIN,
+								XDB_CLASS_CORES,
+								XDB_CLASS_CSTATES,
+								XDB_CLASS_TEMPS,
+								XDB_CLASS_SYSINFO,
+								XDB_CLASS_DUMP};
+				char *xtype, xrmKey[32]={0};
+				XrmValue xvalue;
+
+				for(G=MAIN; G < WIDGETS; G++)
+				{
+				sprintf(xrmKey, "%s.%s.%s", _IS_MDI_ ? "MDI":"", xrmClass[G], XDB_KEY_LEFT);
+				if(XrmGetResource(xdb, xrmKey, NULL, &xtype, &xvalue))
+					sscanf(xvalue.addr, "%d", &A->W[G].x);
+
+				sprintf(xrmKey, "%s.%s.%s", _IS_MDI_ ? "MDI":"", xrmClass[G], XDB_KEY_TOP);
+				if(XrmGetResource(xdb, xrmKey, NULL, &xtype, &xvalue))
+					sscanf(xvalue.addr, "%d", &A->W[G].y);
+				}
 			}
 		}
 	}
 	else
 		noerr=false;
 
+	if(xdb != NULL)
+		XrmDestroyDatabase(xdb);
+
 	if(noerr == false) {
 		printf("Usage: %s [OPTION...]\n\n", argv[0]);
-		for(i=0; i < s; i++)
-			printf("\t%s\t%s\n", options[i].argument, options[i].manual);
+		for(i=0; i < OPTIONS_COUNT; i++)
+			printf("\t%s\t%s\n", A->Options[i].argument, A->Options[i].manual);
 		printf("\nExit status:\n0\tif OK,\n1\tif problems,\n2\tif serious trouble.\n");
 		printf("\nReport bugs to webmaster@cyring.fr\n");
 	}
@@ -3626,6 +3806,7 @@ int main(int argc, char *argv[])
 	uARG	A= {
 			display:NULL,
 			screen:NULL,
+			TID_Draw: 0,
 			fontName:malloc(sizeof(char)*256),
 			xfont:NULL,
 			MouseCursor:{0},
@@ -3655,7 +3836,7 @@ int main(int argc, char *argv[])
 				Cold:0,
 				PerCore:false,
 				ClockSrc:SRC_TSC,
-				IdleTime:IDLE_RATIO_DEF,
+				IdleTime:IDLE_COEF_DEF,
 			},
 			Splash: {window:0, gc:0, x:0, y:0, w:splash_width + (splash_width >> 2), h:splash_height << 1},
 			W: {
@@ -3667,7 +3848,7 @@ int main(int argc, char *argv[])
 				x:-1,
 				y:-1,
 				width:300,
-				height:150,
+				height:200,
 				border_width:1,
 				extents: {
 					overall:{0},
@@ -3689,7 +3870,7 @@ int main(int argc, char *argv[])
 				x:-1,
 				y:MAIN,
 				width:300,
-				height:150,
+				height:160,
 				border_width:1,
 				extents: {
 					overall:{0},
@@ -3710,8 +3891,8 @@ int main(int argc, char *argv[])
 				gc:0,
 				x:CORES,
 				y:MAIN,
-				width:300,
-				height:175,
+				width:240,
+				height:180,
 				border_width:1,
 				extents: {
 					overall:{0},
@@ -3732,8 +3913,8 @@ int main(int argc, char *argv[])
 				gc:0,
 				x:-1,
 				y:CSTATES,
-				width:225,
-				height:150,
+				width:230,
+				height:280,
 				border_width:1,
 				extents: {
 					overall:{0},
@@ -3754,8 +3935,8 @@ int main(int argc, char *argv[])
 				gc:0,
 				x:TEMPS,
 				y:CSTATES,
-				width:500,
-				height:300,
+				width:480,
+				height:280,
 				border_width:1,
 				extents: {
 					overall:{0},
@@ -3776,8 +3957,8 @@ int main(int argc, char *argv[])
 				gc:0,
 				x:-1,
 				y:TEMPS,
-				width:675,
-				height:200,
+				width:710,
+				height:190,
 				border_width:1,
 				extents: {
 					overall:{0},
@@ -3803,8 +3984,8 @@ int main(int argc, char *argv[])
 				globalForeground:GLOBAL_FOREGROUND,
 				// Margins must be initialized with a zero size.
 				Margin: {
-					H:0,
-					V:0,
+					H:16,
+					V:16,
 				},
 				Start: {
 					H:0,
@@ -3898,6 +4079,7 @@ int main(int argc, char *argv[])
 					alwaysOnTop: false,
 					wallboard:false,
 					flashCursor:true,
+					hideSplash:false,
 				},
 				WB: {
 					Scroll:0,
@@ -3928,22 +4110,43 @@ int main(int argc, char *argv[])
 			},
 			LOOP: true,
 			PAUSE: {false},
-			TID_Draw: 0,
+			Options:
+			{
+				{"-D", "%d", &A.MDI,                  "Enable MDI Window (0/1)",                           NULL                                       },
+				{"-F", "%s", A.fontName,              "Font name",                                         XDB_CLASS_MAIN"."XDB_KEY_FONT              },
+				{"-a", "%c", &A.xACL,                 "Enable or disable X ACL (Y/N)",                     NULL                                       },
+				{"-x", "%d", &A.L.Start.H,            "Left position (pixel value)",                       NULL                                       },
+				{"-y", "%d", &A.L.Start.V,            "Top position (pixel value)",                        NULL                                       },
+				{"-b", "%x", &A.L.globalBackground,   "Background color (Hex. value)",                     XDB_CLASS_MAIN"."XDB_KEY_BACKGROUND        },
+				{"-f", "%x", &A.L.globalForeground,   "Foreground color (Hex. value)",                     XDB_CLASS_MAIN"."XDB_KEY_FOREGROUND        },
+				{"-S", "%u", &A.P.ClockSrc,           "Clock source TSC(0) BIOS(1) SPEC(2) ROM(3) USER(4)",XDB_CLASS_SYSINFO"."XDB_KEY_CLOCK_SOURCE   },
+				{"-M", "%x", &A.P.BClockROMaddr,      "ROM memory address of the Base Clock (Hex. value)", XDB_CLASS_SYSINFO"."XDB_KEY_ROM_ADDRESS    },
+				{"-s", "%u", &A.P.IdleTime,           "Idle time ratio where N x 50000 (usec)",            NULL                                       },
+				{"-h", "%u", &A.L.Play.freqHertz,     "CPU frequency (0/1)",                               XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
+				{"-l", "%u", &A.L.Play.cycleValues,   "Cycle Values (0/1)",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
+				{"-r", "%u", &A.L.Play.ratioValues,   "Ratio Values (0/1)",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
+				{"-p", "%u", &A.L.Play.cStatePercent, "C-STATE percentage (0/1)",                          XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
+				{"-t", "%u", &A.L.Play.alwaysOnTop,   "Always On Top (0/1)",                               NULL                                       },
+				{"-w", "%u", &A.L.Play.wallboard,     "Scroll wallboard (0/1)",                            XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
+				{"-i", "%u", &A.L.Play.hideSplash,    "Hide the splash screen (0/1)",                      NULL                                       },
+			},
 		};
+	uid_t	UID=geteuid();
+	bool	ROOT=(UID == 0);	// Check root access.
+	char	BootLog[1024]={0};
 	int	rc=0;
 
-	if(Args(&A, argc, argv))
+	XrmInitialize();
+	if(LoadSettings(&A, argc, argv))
 	{
 		// Initialize & run the Widget.
 		if(XInitThreads() && OpenDisplay(&A))
 		{
-			StartSplash(&A);
+			if(!A.L.Play.hideSplash)
+				StartSplash(&A);
 
-			bool ROOT=false;
-
-			// Check root access.
-			if(!(ROOT=(geteuid() == 0)))
-				Output(&A, "Warning: root permission is denied.\n");
+			if(!ROOT)
+				strcat(BootLog, "Warning: root permission is denied.\n");
 
 			// Read the CPU Features.
 			Read_Features(&A.P.Features);
@@ -3958,34 +4161,34 @@ int main(int argc, char *argv[])
 
 			if(!(A.P.CPU=A.P.Features.ThreadCount))
 			{
-				Output(&A, "Warning: can not read the maximum number of Cores from CPUID.\n");
+				strcat(BootLog, "Warning: can not read the maximum number of Cores from CPUID.\n");
 
 				if(A.P.Features.Std.EDX.HTT)
 				{
 					if(!(A.BIOS=(A.P.CPU=Get_ThreadCount()) != 0))
-						Output(&A, "Warning: can not read the maximum number of Threads from BIOS DMI\nCheck if 'dmi' kernel module is loaded.\n");
+						strcat(BootLog, "Warning: can not read the maximum number of Threads from BIOS DMI\nCheck if 'dmi' kernel module is loaded.\n");
 				}
 				else
 				{
 					if(!(A.BIOS=(A.P.CPU=Get_CoreCount()) != 0))
-						Output(&A, "Warning: can not read the maximum number of Cores BIOS DMI\nCheck if 'dmi' kernel module is loaded\n");
+						strcat(BootLog, "Warning: can not read the maximum number of Cores BIOS DMI\nCheck if 'dmi' kernel module is loaded\n");
 				}
 			}
 			if(!A.P.CPU)
 			{		// Fallback to architecture specifications.
-				Output(&A, "Remark: apply a maximum number of Cores from the ");
+				strcat(BootLog, "Remark: apply a maximum number of Cores from the ");
 
 				if(A.P.ArchID != -1)
 				{
 					A.P.CPU=ARCH[A.P.ArchID].MaxOfCores;
-					Output(&A, ARCH[A.P.ArchID].Architecture);
+					strcat(BootLog, ARCH[A.P.ArchID].Architecture);
 				}
 				else
 				{
 					A.P.CPU=ARCH[0].MaxOfCores;
-					Output(&A, ARCH[0].Architecture);
+					strcat(BootLog, ARCH[0].Architecture);
 				}
-				Output(&A, "specifications.\n");
+				strcat(BootLog, "specifications.\n");
 			}
 
 			// Allocate the Cores working structure.
@@ -4000,31 +4203,31 @@ int main(int argc, char *argv[])
 
 			// Open once the MSR gate.
 			if(!(A.MSR=(Open_MSR(&A) != 0)))
-				Output(&A, "Warning: can not read the MSR registers\nCheck if the 'msr' kernel module is loaded.\n");
+				strcat(BootLog, "Warning: can not read the MSR registers\nCheck if the 'msr' kernel module is loaded.\n");
 
 			// Read the Integrated Memory Controler information.
 			A.M=IMC_Read_Info();
 			if(!A.M->ChannelCount)
-				Output(&A, "Warning: can not read the IMC controler.\n");
+				strcat(BootLog, "Warning: can not read the IMC controler.\n");
 
 			SelectBaseClock(&A);
 
-			StopSplash(&A);
+			if(!A.L.Play.hideSplash)
+				StopSplash(&A);
 
 			if(OpenWidgets(&A))
 			{
-				Output(&A, "Welcome to X-Freq\n");
-
 				int G=0;
 				for(G=MAIN; G < WIDGETS; G++) {
 					BuildLayout(&A, G);
 					MapLayout(&A, G);
 					XMapWindow(A.display, A.W[G].window);
 				}
-				Output(&A, "Enter help to list commands.\n");
-
 				pthread_t TID_Cycle=0;
 				if(!pthread_create(&TID_Cycle, NULL, uCycle, &A)) {
+					Output(&A, BootLog);
+					Output(&A, "Welcome to X-Freq\nEnter help to list commands.\n");
+
 					uLoop(&A);
 					pthread_join(TID_Cycle, NULL);
 				}
