@@ -1,13 +1,13 @@
 /*
- * XFreq.h #0.22 SR3 by CyrIng
+ * XFreq.h #0.23 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
 #define _MAJOR   "0"
-#define _MINOR   "22"
-#define _NIGHTLY "3"
+#define _MINOR   "23"
+#define _NIGHTLY "1"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 
@@ -312,7 +312,15 @@ struct IMCINFO
 	}	*Channel;
 };
 
+
+//	Read, Write a Model Specific Register.
+#define	Read_MSR(FD, offset, msr)  pread(FD, msr, sizeof(*msr), offset)
+#define	Write_MSR(FD, offset, msr) pwrite(FD, msr, sizeof(*msr), offset)
+
 #define	IA32_TIME_STAMP_COUNTER		0x10
+#define	MSR_FSB_FREQ			0xcd
+#define	IA32_MPERF			0xe7
+#define	IA32_APERF			0xe8
 #define	IA32_PERF_STATUS		0x198
 #define	IA32_CLOCK_MODULATION		0x19a
 #define	IA32_THERM_INTERRUPT		0x19b
@@ -338,16 +346,24 @@ struct IMCINFO
 #define	SMBIOS_PROCINFO_CORES		0x23
 #define	SMBIOS_PROCINFO_THREADS		0x25
 
-
-//	Read, Write a Model Specific Register.
-#define	Read_MSR(FD, offset, msr)  pread(FD, msr, sizeof(*msr), offset)
-#define	Write_MSR(FD, offset, msr) pwrite(FD, msr, sizeof(*msr), offset)
+typedef	struct
+{
+	unsigned long long
+		Bus_Speed	:  3-0,
+		ReservedBits	: 64-3;
+} FSB_FREQ;
 
 typedef	struct
 {
 	unsigned long long
 		Ratio		: 16-0,
-		ReservedBits	: 64-16;
+		ReservedBits1	: 31-16,
+		XE		: 32-31,
+		ReservedBits2	: 40-32,
+		MaxBusRatio	: 45-40,
+		ReservedBits3	: 46-45,
+		NonInt_BusRatio	: 47-46,
+		ReservedBits4	: 64-47;
 } PERF_STATUS;
 
 typedef struct
@@ -515,10 +531,24 @@ typedef struct
 		ReservedBits2	: 64-24;
 } TJMAX;
 
-#define	ARCHITECTURES 12
+#define	ARCHITECTURES 24
+//	[GenuineIntel]
+#define	GenuineIntel			{ExtFamily:0x0, Family:0x0, ExtModel:0x0, Model:0x0}
+//	[Core]
+#define	Core_Duo			{ExtFamily:0x0, Family:0x6, ExtModel:0x0, Model:0xE}
+#define	Core_2Duo			{ExtFamily:0x0, Family:0x6, ExtModel:0x0, Model:0xF}
+#define	Core_Kentsfield			{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0x5}
+#define	Core_Yorkfield			{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0x7}
+//	[Atom]
+#define	Atom_Bonnell			{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xC}
+#define	Atom_Silvermont			{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0x6}
+#define	Atom_27				{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0x7}
+#define	Atom_35				{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0x5}
+#define	Atom_Saltwell			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0x6}
 //	[Nehalem]
 #define	Nehalem_Bloomfield		{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xA}
 #define	Nehalem_Lynnfield		{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xE}
+#define	Nehalem_0F			{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xF}
 #define	Nehalem_NehalemEP		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xE}
 //	[Westmere]
 #define	Westmere_Arrandale		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0x5}
@@ -529,31 +559,21 @@ typedef struct
 #define	SandyBridge_Bromolow		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xA}
 //	[Ivy Bridge]
 #define	IvyBridge			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xA}
+#define	IvyBridgeEP			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xE}
 //	[Haswell]
 #define	Haswell_3C			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xC}
 #define	Haswell_45			{ExtFamily:0x0, Family:0x6, ExtModel:0x4, Model:0x5}
 #define	Haswell_46			{ExtFamily:0x0, Family:0x6, ExtModel:0x4, Model:0x6}
 
-const struct
+typedef	const struct
 {
 	struct	SIGNATURE	Signature;
-	const	unsigned int	MaxOfCores;
-	const	double		ClockSpeed;
+		unsigned int	MaxOfCores;
+		double		(*ClockSpeed)();
 	const	char		*Architecture;
-} ARCH[ARCHITECTURES]={
-				{ Nehalem_Bloomfield,    4, 133.66, "Nehalem" },
-				{ Nehalem_Lynnfield,     4, 133.66, "Nehalem" },
-				{ Nehalem_NehalemEP,     4, 133.66, "Nehalem" },
-				{ Westmere_Arrandale,    4, 133.66, "Westmere" },
-				{ Westmere_Gulftown,     6, 133.66, "Westmere" },
-				{ Westmere_WestmereEP,   6, 133.66, "Westmere" },
-				{ SandyBridge_1G,        6, 100.00, "SandyBridge" },
-				{ SandyBridge_Bromolow,  4, 100.00, "SandyBridge" },
-				{ IvyBridge,             6 ,100.00, "IvyBridge" },
-				{ Haswell_3C,            4, 100.00, "Haswell" },
-				{ Haswell_45,            4, 100.00, "Haswell" },
-				{ Haswell_46,            4, 100.00, "Haswell" },
-			};
+		void		*(*uCycle)(void *);
+		bool		(*Init_MSR)(void *);
+} ARCH;
 
 enum	{SRC_TSC, SRC_BIOS, SRC_SPEC, SRC_ROM, SRC_USER, SRC_COUNT};
 
@@ -619,8 +639,10 @@ typedef	struct
 typedef struct
 {
 		signed int			ArchID;
+		ARCH				Arch[ARCHITECTURES];
 		FEATURES			Features;
 		TOPOLOGY			*Topology;
+		PERF_STATUS			PerfStatus;
 		MISC_PROC_FEATURES		MiscFeatures;
 		PLATFORM			Platform;
 		TURBO				Turbo;
@@ -645,37 +667,79 @@ typedef struct
 } PROCESSOR;
 
 
-#define	GLOBAL_BACKGROUND	0x11114c
-#define	GLOBAL_FOREGROUND	0x8fcefa
-#define	MAIN_BACKGROUND		0x11114c
-#define	MAIN_FOREGROUND		0x8fcefa
-#define	CORES_BACKGROUND	0x191970
-#define	CORES_FOREGROUND	0x8fcefa
-#define	CSTATES_BACKGROUND	0x191970
-#define	CSTATES_FOREGROUND	0x8fcefa
-#define	TEMPS_BACKGROUND	0x191970
-#define	TEMPS_FOREGROUND	0x8fcefa
-#define	SYSINFO_BACKGROUND	0x191970
-#define	SYSINFO_FOREGROUND	0x8fcefa
-#define	DUMP_BACKGROUND		0x191970
-#define	DUMP_FOREGROUND		0x8fcefa
+enum {
+	BACKGROUND_MAIN,
+	FOREGROUND_MAIN,
+	BACKGROUND_CORES,
+	FOREGROUND_CORES,
+	BACKGROUND_CSTATES,
+	FOREGROUND_CSTATES,
+	BACKGROUND_TEMPS,
+	FOREGROUND_TEMPS,
+	BACKGROUND_SYSINFO,
+	FOREGROUND_SYSINFO,
+	BACKGROUND_DUMP,
+	FOREGROUND_DUMP,
+	COLOR_AXES,
+	COLOR_LABEL,
+	COLOR_PRINT,
+	COLOR_PROMPT,
+	COLOR_CURSOR,
+	COLOR_DYNAMIC,
+	COLOR_GRAPH1,
+	COLOR_GRAPH2,
+	COLOR_GRAPH3,
+	COLOR_INIT_VALUE,
+	COLOR_LOW_VALUE,
+	COLOR_MED_VALUE,
+	COLOR_HIGH_VALUE,
+	COLOR_PULSE,
+	COLOR_FOCUS,
+	COLOR_MDI_SEP,
+	COLOR_COUNT
+};
 
-#define	AXES_COLOR		0x404040
-#define	LABEL_COLOR		0xc0c0c0
-#define	PRINT_COLOR		0xf0f0f0
-#define	PROMPT_COLOR		0xffff00
-#define	CURSOR_COLOR		0xfd0000
-#define	DYNAMIC_COLOR		0xdddddd
-#define	GRAPH1_COLOR		0x6666f0
-#define	GRAPH2_COLOR		0x6666b0
-#define	GRAPH3_COLOR		0x666690
-#define	INIT_VALUE_COLOR	0x6666b0
-#define	LOW_VALUE_COLOR		0x00aa66
-#define	MED_VALUE_COLOR		0xe49400
-#define	HIGH_VALUE_COLOR	0xfd0000
-#define	PULSE_COLOR		0xf0f000
-#define	FOCUS_COLOR		0xffffff
-#define	MDI_SEP_COLOR		0x737373
+#define	_BACKGROUND_GLOBAL	0x11114c
+#define	_FOREGROUND_GLOBAL	0x8fcefa
+#define	_BACKGROUND_SPLASH	0x000000
+#define	_FOREGROUND_SPLASH	0x8fcefa
+
+#define	_BACKGROUND_MAIN	0x11114c
+#define	_FOREGROUND_MAIN	0x8fcefa
+#define	_BACKGROUND_CORES	0x191970
+#define	_FOREGROUND_CORES	0x8fcefa
+#define	_BACKGROUND_CSTATES	0x191970
+#define	_FOREGROUND_CSTATES	0x8fcefa
+#define	_BACKGROUND_TEMPS	0x191970
+#define	_FOREGROUND_TEMPS	0x8fcefa
+#define	_BACKGROUND_SYSINFO	0x191970
+#define	_FOREGROUND_SYSINFO	0x8fcefa
+#define	_BACKGROUND_DUMP	0x191970
+#define	_FOREGROUND_DUMP	0x8fcefa
+
+#define	_COLOR_AXES		0x404040
+#define	_COLOR_LABEL		0xc0c0c0
+#define	_COLOR_PRINT		0xf0f0f0
+#define	_COLOR_PROMPT		0xffff00
+#define	_COLOR_CURSOR		0xfd0000
+#define	_COLOR_DYNAMIC		0xdddddd
+#define	_COLOR_GRAPH1		0x6666f0
+#define	_COLOR_GRAPH2		0x6666b0
+#define	_COLOR_GRAPH3		0x666690
+#define	_COLOR_INIT_VALUE	0x6666b0
+#define	_COLOR_LOW_VALUE	0x00aa66
+#define	_COLOR_MED_VALUE	0xe49400
+#define	_COLOR_HIGH_VALUE	0xfd0000
+#define	_COLOR_PULSE		0xf0f000
+#define	_COLOR_FOCUS		0xffffff
+#define	_COLOR_MDI_SEP		0x737373
+
+typedef	struct
+{
+	unsigned int	RGB;
+	char		*xrmClass,
+			*xrmKey;
+} COLORS;
 
 enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 
@@ -831,11 +895,11 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 
 #define	MAIN_SECTION		"X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" CyrIng"
 
-#define	CORES_TEXT_WIDTH	(A->P.Turbo.MaxRatio_1C)
+#define	CORES_TEXT_WIDTH	MAX(A->P.Turbo.MaxRatio_1C, 22)
 #define	CORES_TEXT_HEIGHT	(A->P.CPU)
 
 #define	CSTATES_TEXT_SPACING	3
-#define	CSTATES_TEXT_WIDTH	( MAX(A->P.CPU, 7) * CSTATES_TEXT_SPACING )
+#define	CSTATES_TEXT_WIDTH	( MAX(A->P.CPU, 8) * CSTATES_TEXT_SPACING )
 #define	CSTATES_TEXT_HEIGHT	10
 
 #define	TEMPS_TEXT_WIDTH	(A->P.Features.ThreadCount << 2)
@@ -1074,6 +1138,7 @@ typedef struct
 	char			*Output;
 	unsigned long		globalBackground,
 				globalForeground;
+	COLORS			Colors[COLOR_COUNT];
 } LAYOUT;
 
 #define	_IS_MDI_	(A->MDI != false)
@@ -1106,7 +1171,7 @@ typedef struct
 #define	XDB_KEY_PLAY_CSTATES	"PlayCStates"
 #define	XDB_KEY_PLAY_WALLBOARD	"PlayBrand"
 
-#define	OPTIONS_COUNT	17
+#define	OPTIONS_COUNT	18
 typedef struct
 {
 	char		*argument;

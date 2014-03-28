@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.22 SR3 by CyrIng
+ * XFreq.c #0.23 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -116,12 +116,127 @@ void	Output(uARG *A, const char *message)
 	strcat(A->L.Output, message);
 }
 
-//	Open one MSR handle per Processor Core.
-int	Open_MSR(uARG *A)
+//	Initialize MSR based on Architecture. Open one MSR handle per Core.
+bool	Init_MSR_GenuineIntel(void *uArg)
 {
+	uARG *A=(uARG *) uArg;
+
 	ssize_t	retval=0;
 	int	tmpFD=open("/dev/cpu/0/msr", O_RDONLY);
-	int	rc=0;
+	bool	rc=true;
+	// Read the minimum, maximum & the turbo ratios from Core number 0
+	if(tmpFD != -1)
+	{
+		rc=((retval=Read_MSR(tmpFD, IA32_MISC_ENABLE,  (MISC_PROC_FEATURES *) &A->P.MiscFeatures)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM *) &A->P.Platform)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->P.PerfStatus)) != -1);
+		close(tmpFD);
+
+		if(rc == true)
+		{
+			unsigned long long Swap=A->P.Platform.MaxNonTurboRatio;
+			A->P.Platform.MaxNonTurboRatio=A->P.Platform.MinimumRatio;
+			A->P.Platform.MinimumRatio=Swap;
+			A->P.Turbo.MaxRatio_1C=A->P.Turbo.MaxRatio_2C=A->P.Turbo.MaxRatio_3C=A->P.Turbo.MaxRatio_4C=A->P.Turbo.MaxRatio_5C=A->P.Turbo.MaxRatio_6C=A->P.Turbo.MaxRatio_7C=A->P.Turbo.MaxRatio_8C=A->P.PerfStatus.MaxBusRatio;
+		}
+		else
+		{
+			A->P.Turbo.MaxRatio_1C=A->P.Turbo.MaxRatio_2C=A->P.Turbo.MaxRatio_3C=A->P.Turbo.MaxRatio_4C=A->P.Turbo.MaxRatio_5C=A->P.Turbo.MaxRatio_6C=A->P.Turbo.MaxRatio_7C=A->P.Turbo.MaxRatio_8C=A->P.Platform.MinimumRatio;
+		}
+	}
+	else rc=false;
+
+	char	pathname[]="/dev/cpu/999/msr", warning[64];
+	int	cpu=0;
+	for(cpu=0; cpu < A->P.CPU; cpu++)
+		if(A->P.Topology[cpu].CPU != NULL)
+		{
+			sprintf(pathname, "/dev/cpu/%d/msr", cpu);
+			if( (rc=((A->P.Topology[cpu].CPU->FD=open(pathname, O_RDWR)) != -1)) )
+			{
+				// Enable the Performance Counters 1 and 2 :
+				// - Set the global counter bits
+				rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Topology[cpu].CPU->GlobalPerfCounter)) != -1);
+				if(A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR1 != 0)
+				{
+					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #1 is already activated.\n", cpu);
+					Output(A, warning);
+				}
+				if(A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR2 != 0)
+				{
+					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #2 is already activated.\n", cpu);
+					Output(A, warning);
+				}
+				A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR1=1;
+				A->P.Topology[cpu].CPU->GlobalPerfCounter.EN_FIXED_CTR2=1;
+				rc=((retval=Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->P.Topology[cpu].CPU->GlobalPerfCounter)) != -1);
+
+				// - Set the fixed counter bits
+				rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Topology[cpu].CPU->FixedPerfCounter)) != -1);
+				A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_OS=1;
+				A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_OS=1;
+				A->P.Topology[cpu].CPU->FixedPerfCounter.EN1_Usr=1;
+				A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_Usr=1;
+				if(A->P.PerCore)
+				{
+					A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN1=1;
+					A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN2=1;
+				}
+				else {
+					A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN1=0;
+					A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN2=0;
+				}
+				rc=((retval=Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->P.Topology[cpu].CPU->FixedPerfCounter)) != -1);
+
+				// Check & fixe Counter Overflow.
+				GLOBAL_PERF_STATUS Overflow={0};
+				GLOBAL_PERF_OVF_CTRL OvfControl={0};
+				rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_STATUS, (GLOBAL_PERF_STATUS *) &Overflow)) != -1);
+				if(Overflow.Overflow_CTR1)
+				{
+					sprintf(warning, "Remark CPU#%02d: UCC Counter #1 is overflowed.\n", cpu);
+					Output(A, warning);
+					OvfControl.Clear_Ovf_CTR1=1;
+				}
+				if(Overflow.Overflow_CTR2)
+				{
+					sprintf(warning, "Remark CPU#%02d: URC Counter #1 is overflowed.\n", cpu);
+					Output(A, warning);
+					OvfControl.Clear_Ovf_CTR2=1;
+				}
+				if(Overflow.Overflow_CTR1|Overflow.Overflow_CTR2)
+				{
+					sprintf(warning, "Remark CPU#%02d: Resetting Counters.\n", cpu);
+					Output(A, warning);
+					rc=((retval=Write_MSR(A->P.Topology[cpu].CPU->FD, IA32_PERF_GLOBAL_OVF_CTRL, (GLOBAL_PERF_OVF_CTRL *) &OvfControl)) != -1);
+				}
+
+				// Retreive the Thermal Junction Max. Fallback to 100°C if not available.
+				rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_TEMPERATURE_TARGET, (TJMAX *) &A->P.Topology[cpu].CPU->TjMax)) != -1);
+				if(A->P.Topology[cpu].CPU->TjMax.Target == 0)
+				{
+					Output(A, "Warning: Thermal Junction Max unavailable.\n");
+					A->P.Topology[cpu].CPU->TjMax.Target=100;
+				}
+				rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->P.Topology[cpu].CPU->ThermIntr)) != -1);
+			}
+			else	// Fallback to an arbitrary & commom value.
+			{
+				sprintf(warning, "Remark CPU#%02d: Thermal Junction Max defaults to 100C.\n", cpu);
+				Output(A, warning);
+				A->P.Topology[cpu].CPU->TjMax.Target=100;
+			}
+		}
+	return(rc);
+}
+
+bool	Init_MSR_Nehalem(void *uArg)
+{
+	uARG *A=(uARG *) uArg;
+
+	ssize_t	retval=0;
+	int	tmpFD=open("/dev/cpu/0/msr", O_RDONLY);
+	bool	rc=true;
 	// Read the minimum, maximum & the turbo ratios from Core number 0
 	if(tmpFD != -1)
 	{
@@ -130,19 +245,8 @@ int	Open_MSR(uARG *A)
 		rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->P.Turbo)) != -1);
 		close(tmpFD);
 	}
-	else	// Fallback to arbitrary values for the sake the axes drawing.
-	{
-		A->P.Platform.MinimumRatio=10;
-		A->P.Platform.MaxNonTurboRatio=20;
-		A->P.Turbo.MaxRatio_1C=60;
-		A->P.Turbo.MaxRatio_2C=55;
-		A->P.Turbo.MaxRatio_3C=50;
-		A->P.Turbo.MaxRatio_4C=45;
-		A->P.Turbo.MaxRatio_5C=40;
-		A->P.Turbo.MaxRatio_6C=35;
-		A->P.Turbo.MaxRatio_7C=30;
-		A->P.Turbo.MaxRatio_8C=25;
-	}
+	else rc=false;
+
 	char	pathname[]="/dev/cpu/999/msr", warning[64];
 	int	cpu=0;
 	for(cpu=0; cpu < A->P.CPU; cpu++)
@@ -266,8 +370,250 @@ static __inline__ unsigned long long RDTSC(void)
 	return ((unsigned long long) Lo) | (((unsigned long long) Hi) << 32);
 }
 
-// The function thread which updates the Core values.
-static void *uCycle(void *uArg)
+// Architecture specifications helper functions.
+
+// [Genuine Intel]
+double	ClockSpeed_GenuineIntel()
+{
+	return(100.00f);
+};
+
+// [Core]
+double	ClockSpeed_Core_Duo()
+{
+	int FD=0;
+	if( (FD=open("/dev/cpu/0/msr", O_RDONLY)) != -1) {
+		FSB_FREQ FSB={0};
+		Read_MSR(FD, MSR_FSB_FREQ, (unsigned long long *) &FSB);
+		close(FD);
+
+		switch(FSB.Bus_Speed)
+		{
+			case 0b101:
+				return(100.00f);
+				break;
+			case 0b001:
+				return(133.33f);
+				break;
+			case 0b011:
+				return(166.67f);
+				break;
+			default:
+				return(100.00f);
+				break;
+		}
+	}
+	else
+		return(100.00f);
+};
+double	ClockSpeed_Core_2Duo()
+{
+	int FD=0;
+	if( (FD=open("/dev/cpu/0/msr", O_RDONLY)) != -1) {
+		FSB_FREQ FSB={0};
+		Read_MSR(FD, MSR_FSB_FREQ, (unsigned long long *) &FSB);
+		close(FD);
+
+		switch(FSB.Bus_Speed)
+		{
+			case 0b101:
+				return(100.00f);
+				break;
+			case 0b001:
+				return(133.33f);
+				break;
+			case 0b011:
+				return(166.67f);
+				break;
+			case 0b010:
+				return(200.00f);
+				break;
+			case 0b000:
+				return(266.67f);
+				break;
+			case 0b100:
+				return(333.33f);
+				break;
+			case 0b110:
+				return(400.00f);
+				break;
+			default:
+				return(100.00f);
+				break;
+		}
+	}
+	else
+		return(100.00f);
+};
+
+// [Atom]
+double	ClockSpeed_Atom()
+{
+	int FD=0;
+	if( (FD=open("/dev/cpu/0/msr", O_RDONLY)) != -1) {
+		FSB_FREQ FSB={0};
+		Read_MSR(FD, MSR_FSB_FREQ, (unsigned long long *) &FSB);
+		close(FD);
+
+		switch(FSB.Bus_Speed)
+		{
+			case 0b111:
+				return(83.00f);
+				break;
+			case 0b101:
+				return(100.00f);
+				break;
+			case 0b001:
+				return(133.33f);
+				break;
+			case 0b011:
+				return(166.67f);
+				break;
+			default:
+				return(83.00f);
+				break;
+		}
+	}
+	else
+		return(83.00f);
+};
+
+static void *uCycle_GenuineIntel(void *uArg)
+{
+	uARG *A=(uARG *) uArg;
+
+	unsigned int cpu=0;
+	for(cpu=0; cpu < A->P.CPU; cpu++)
+		if(A->P.Topology[cpu].CPU != NULL)
+		{
+			// Initial read of the Unhalted Core & Reference Cycles.
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_APERF, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].UCC);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_MPERF, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].URC);
+			// Initial read of the TSC in relation to the Logical Core.
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[0]);
+			/* Initial read of other C-States.
+			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C3[0]);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C6[0]);*/
+		}
+	if(A->P.IdleTime < IDLE_COEF_MIN)	A->P.IdleTime=IDLE_COEF_MIN;
+	if(A->P.IdleTime > IDLE_COEF_MAX)	A->P.IdleTime=IDLE_COEF_MAX;
+
+	while(A->LOOP)
+	{
+		// Settle down N x 50000 microseconds as specified by the command argument.
+		usleep(IDLE_BASE_USEC * A->P.IdleTime);
+
+/* CRITICAL_IN  */
+		for(cpu=0; cpu < A->P.CPU; cpu++)
+			if(A->P.Topology[cpu].CPU != NULL)
+			{
+				// Update the Unhalted Core & the Reference Cycles.
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_APERF, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].UCC);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_MPERF, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
+				// Update TSC.
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[1]);
+				/* Update C-States.
+				Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C3[1]);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C6[1]);*/
+			}
+/* CRITICAL_OUT */
+
+		// Reset C-States average.
+		A->P.Avg.Turbo=A->P.Avg.C0=A->P.Avg.C3=A->P.Avg.C6=0;
+
+		unsigned int maxFreq=0, maxTemp=A->P.Topology[0].CPU->TjMax.Target;
+		for(cpu=0; cpu < A->P.CPU; cpu++)
+			if(A->P.Topology[cpu].CPU != NULL)
+			{
+				// Compute the absolute Delta of Unhalted (Core & Ref) C0 Cycles = Current[1] - Previous[0].
+				A->P.Topology[cpu].CPU->Delta.C0.UCC=	(A->P.Topology[cpu].CPU->Cycles.C0[0].UCC > A->P.Topology[cpu].CPU->Cycles.C0[1].UCC) ?
+								A->P.Topology[cpu].CPU->Cycles.C0[0].UCC - A->P.Topology[cpu].CPU->Cycles.C0[1].UCC
+								:A->P.Topology[cpu].CPU->Cycles.C0[1].UCC - A->P.Topology[cpu].CPU->Cycles.C0[0].UCC;
+
+				A->P.Topology[cpu].CPU->Delta.C0.URC=	A->P.Topology[cpu].CPU->Cycles.C0[1].URC - A->P.Topology[cpu].CPU->Cycles.C0[0].URC;
+
+				A->P.Topology[cpu].CPU->Delta.C3=	A->P.Topology[cpu].CPU->Cycles.C3[1] - A->P.Topology[cpu].CPU->Cycles.C3[0];
+
+				A->P.Topology[cpu].CPU->Delta.C6=	A->P.Topology[cpu].CPU->Cycles.C6[1] - A->P.Topology[cpu].CPU->Cycles.C6[0];
+
+				A->P.Topology[cpu].CPU->Delta.TSC=	A->P.Topology[cpu].CPU->Cycles.TSC[1] - A->P.Topology[cpu].CPU->Cycles.TSC[0];
+
+				// Compute Turbo State per Cycles Delta. (Protect against a division by zero)
+				A->P.Topology[cpu].CPU->State.Turbo=(double) (A->P.Topology[cpu].CPU->Delta.C0.URC != 0) ?
+							(double) (A->P.Topology[cpu].CPU->Delta.C0.UCC) / (double) A->P.Topology[cpu].CPU->Delta.C0.URC
+							: 0.0f;
+				// Compute C-States.
+				A->P.Topology[cpu].CPU->State.C0=(double) (A->P.Topology[cpu].CPU->Delta.C0.URC) / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
+				A->P.Topology[cpu].CPU->State.C3=(double) (A->P.Topology[cpu].CPU->Delta.C3)  / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
+				A->P.Topology[cpu].CPU->State.C6=(double) (A->P.Topology[cpu].CPU->Delta.C6)  / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
+
+				A->P.Topology[cpu].CPU->RelativeRatio=A->P.Topology[cpu].CPU->State.Turbo * A->P.Topology[cpu].CPU->State.C0 * (double) A->P.PerfStatus.MaxBusRatio;
+
+				// Relative Frequency = Relative Ratio x Bus Clock Frequency
+				A->P.Topology[cpu].CPU->RelativeFreq=A->P.Topology[cpu].CPU->RelativeRatio * A->P.ClockSpeed;
+
+				// Save TSC.
+				A->P.Topology[cpu].CPU->Cycles.TSC[0]=A->P.Topology[cpu].CPU->Cycles.TSC[1];
+				// Save the Unhalted Core & Reference Cycles for next iteration.
+				A->P.Topology[cpu].CPU->Cycles.C0[0].UCC=A->P.Topology[cpu].CPU->Cycles.C0[1].UCC;
+				A->P.Topology[cpu].CPU->Cycles.C0[0].URC =A->P.Topology[cpu].CPU->Cycles.C0[1].URC;
+				/* Save also the C-State Reference Cycles.
+				A->P.Topology[cpu].CPU->Cycles.C3[0]=A->P.Topology[cpu].CPU->Cycles.C3[1];
+				A->P.Topology[cpu].CPU->Cycles.C6[0]=A->P.Topology[cpu].CPU->Cycles.C6[1];*/
+
+				// Sum the C-States before the average.
+				A->P.Avg.Turbo+=A->P.Topology[cpu].CPU->State.Turbo;
+				A->P.Avg.C0+=A->P.Topology[cpu].CPU->State.C0;
+			/*	A->P.Avg.C3+=A->P.Topology[cpu].CPU->State.C3;
+				A->P.Avg.C6+=A->P.Topology[cpu].CPU->State.C6;*/
+
+				// Index the Top CPU speed.
+				if(maxFreq < A->P.Topology[cpu].CPU->RelativeFreq) {
+					maxFreq=A->P.Topology[cpu].CPU->RelativeFreq;
+					A->P.Top=cpu;
+				}
+
+				// Update the Digital Thermal Sensor.
+				if( (Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_THERM_STATUS, (THERM_STATUS *) &A->P.Topology[cpu].CPU->ThermStat)) == -1)
+					A->P.Topology[cpu].CPU->ThermStat.DTS=0;
+
+				// Index which Core is hot.
+				if(A->P.Topology[cpu].CPU->ThermStat.DTS < maxTemp) {
+					maxTemp=A->P.Topology[cpu].CPU->ThermStat.DTS;
+					A->P.Hot=cpu;
+				}
+				// Store the coldest temperature.
+				if(A->P.Topology[cpu].CPU->ThermStat.DTS > A->P.Cold)
+					A->P.Cold=A->P.Topology[cpu].CPU->ThermStat.DTS;
+			}
+		// Average the C-States.
+		A->P.Avg.Turbo/=A->P.CPU;
+		A->P.Avg.C0/=A->P.CPU;
+	/*	A->P.Avg.C3/=A->P.CPU;
+		A->P.Avg.C6/=A->P.CPU;*/
+
+		// Fire the drawing thread.
+		if(pthread_mutex_trylock(&uDraw_mutex) == 0)
+			pthread_create(&A->TID_Draw, NULL, uDraw, A);
+	}
+	// Is drawing still processing ?
+	if(pthread_mutex_trylock(&uDraw_mutex) == EBUSY)
+		pthread_join(A->TID_Draw, NULL);
+
+	return(NULL);
+}
+
+
+
+// [Nehalem]
+double	ClockSpeed_Nehalem_Bloomfield()
+{
+	return(133.33f);
+};
+#define	ClockSpeed_Nehalem_Lynnfield	ClockSpeed_Nehalem_Bloomfield
+#define	ClockSpeed_Nehalem_NehalemEP	ClockSpeed_Nehalem_Bloomfield
+
+static void *uCycle_Nehalem(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
 
@@ -391,6 +737,42 @@ static void *uCycle(void *uArg)
 
 	return(NULL);
 }
+
+
+// [Westmere]
+double	ClockSpeed_Westmere_Arrandale()
+{
+	return(133.33f);
+};
+#define	ClockSpeed_Westmere_Gulftown	ClockSpeed_Westmere_Arrandale
+#define	ClockSpeed_Westmere_WestmereEP	ClockSpeed_Westmere_Gulftown
+
+
+// [SandyBridge]
+double	ClockSpeed_SandyBridge_1G()
+{
+	return(100.00f);
+};
+#define	ClockSpeed_SandyBridge_Bromolow	ClockSpeed_SandyBridge_1G
+
+
+// [IvyBridge]
+double	ClockSpeed_IvyBridge()
+{
+	return(100.00f);
+};
+#define	ClockSpeed_IvyBridgeEP	ClockSpeed_IvyBridge
+
+
+// [Haswell]
+double	ClockSpeed_Haswell_3C()
+{
+	return(100.00f);
+};
+#define	ClockSpeed_Haswell_45	ClockSpeed_Haswell_3C
+#define	ClockSpeed_Haswell_46	ClockSpeed_Haswell_3C
+
+
 
 // Read any data from the SMBIOS.
 int	Read_SMBIOS(int structure, int instance, off_t offset, void *buf, size_t nbyte)
@@ -607,7 +989,7 @@ static void *uReadAPIC(void *uApic)
 				  "=d"	(ExtTopology.EDX)
 				: "c"	(InputLevel)
 				);
-			if(!ExtTopology.EAX.Register && !ExtTopology.EBX.Register)
+			if(!ExtTopology.EBX.Register || (InputLevel > LEVEL_CORE))
 				NoMoreLevels=1;
 			else
 				{
@@ -728,9 +1110,9 @@ struct IMCINFO *IMC_Read_Info()
 // Release the IMC structure pointers.
 void IMC_Free_Info(struct IMCINFO *imc)
 {
-	if(imc!=NULL)
+	if(imc != NULL)
 	{
-		if(imc->Channel!=NULL)
+		if(imc->Channel != NULL)
 			free(imc->Channel);
 		free(imc);
 	}
@@ -746,34 +1128,24 @@ void	SelectBaseClock(uARG *A)
 				A->P.ClockSrc=SRC_TSC;
 				break;
 			}
-			else
-				Output(A, "Remark: MSR unavailable. Setting Clock source from BIOS.\n");
 		case SRC_BIOS:	// Read the Bus Clock Frequency in the SMBIOS (DMI).
 			if((A->BIOS=(A->P.ClockSpeed=Get_ExternalClock()) != 0)) {
 				A->P.ClockSrc=SRC_BIOS;
 				break;
 			}
-			else
-				Output(A, "Remark: BIOS unavailable. Setting Clock source from the Architecture specifications.\n");
-		case SRC_SPEC:	// Set the Base Clock from the architecture array if CPU ID is found.
+		case SRC_SPEC:	// Set the Base Clock from the architecture array if CPU ID was found.
 			if(A->P.ArchID != -1) {
-				A->P.ClockSpeed=ARCH[A->P.ArchID].ClockSpeed;
+				A->P.ClockSpeed=A->P.Arch[A->P.ArchID].ClockSpeed();
 				A->P.ClockSrc=SRC_SPEC;
 				break;
-			}
-			else {
-				char defaultClock[128]={0};
-				sprintf(defaultClock, "Remark: Architecture not found. Setting Clock source from %s @ %.2f MHz.\n",
-					ARCH[0].Architecture, ARCH[0].ClockSpeed);
-				Output(A, defaultClock);
 			}
 		case SRC_ROM:	// Read the Bus Clock Frequency at a specified memory address.
 			if((A->P.ClockSpeed=Read_ROM_BCLK(A->P.BClockROMaddr)) !=0 ) {
 				A->P.ClockSrc=SRC_ROM;
 				break;
 			}
-		case SRC_USER:{	// Set the Base Clock from the first row in the architecture array.
-			A->P.ClockSpeed=ARCH[0].ClockSpeed;
+		case SRC_USER: {	// Set the Base Clock from the first row in the architecture array.
+			A->P.ClockSpeed=A->P.Arch[0].ClockSpeed();
 			A->P.ClockSrc=SRC_USER;
 		}
 		break;
@@ -1252,7 +1624,7 @@ static void *uSplash(void *uArg)
 			case Expose:
 				if(!E.xexpose.count)
 					{
-					XSetForeground(A->display, A->Splash.gc, A->L.globalForeground);
+					XSetForeground(A->display, A->Splash.gc, _FOREGROUND_SPLASH);
 					XCopyPlane(	A->display,
 							A->Splash.bitmap,
 							A->Splash.window,
@@ -1282,8 +1654,8 @@ void	StartSplash(uARG *A)
 						A->Splash.w,
 						A->Splash.h,
 						0,
-						0x0,
-						0)) != 0
+						_BACKGROUND_SPLASH,
+						_BACKGROUND_SPLASH)) != 0
 	&& (A->Splash.gc=XCreateGC(A->display, A->Splash.window, 0, NULL)) != 0)
 	{
 		A->Splash.bitmap=XCreateBitmapFromData(A->display, A->Splash.window, (const char *) splash_bits, splash_width, splash_height);
@@ -1455,11 +1827,6 @@ int	OpenWidgets(uARG *A)
 	int G=0;
 	for(G=MAIN; noerr && (G < WIDGETS); G++)
 	{
-		// Override default colors if values supplied in the command line.
-		if(A->L.globalBackground != GLOBAL_BACKGROUND)
-			A->W[G].background=A->L.globalBackground;
-		if(A->L.globalForeground != GLOBAL_FOREGROUND)
-			A->W[G].foreground=A->L.globalForeground;
 		// Create the Widgets.
 		if((A->W[G].window=XCreateWindow(A->display,
 						_IS_MDI_ && (G != MAIN) ?
@@ -2128,7 +2495,7 @@ void	BuildLayout(uARG *A, int G)
 	XFillRectangle(A->display, A->W[G].pixmap.B, A->W[G].gc, 0, 0, A->W[G].width, A->W[G].height);
 
 	// Draw the axes.
-	XSetForeground(A->display, A->W[G].gc, AXES_COLOR);
+	XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_AXES].RGB);
 	XDrawSegments(A->display, A->W[G].pixmap.B, A->W[G].gc, A->L.Axes[G].Segment, A->L.Axes[G].N);
 
 	// Draw the buttons.
@@ -2150,7 +2517,7 @@ void	BuildLayout(uARG *A, int G)
 
 			// If the MDI mode is enabled then draw a separator line.
 			if(_IS_MDI_) {
-				XSetForeground(A->display, A->W[G].gc, MDI_SEP_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_MDI_SEP].RGB);
 				XDrawLine(A->display, A->W[G].pixmap.B, A->W[G].gc,
 					A->L.Axes[G].Segment[1].x1,
 					A->L.Axes[G].Segment[1].y2 + Footer_Height(G) + 1,
@@ -2167,7 +2534,7 @@ void	BuildLayout(uARG *A, int G)
 							GetHFrame(G) * One_Char_Width(G),
 							GetVFrame(G) * One_Char_Height(G));
 					// Draw the Output log in a scrolling area.
-					XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
+					XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 
 					MaxText Listing=XPrint(A->display, A->L.Page[G].Pixmap, A->W[G].gc,
 								Half_Char_Width(G),
@@ -2192,7 +2559,7 @@ void	BuildLayout(uARG *A, int G)
 							} };
  					XSetClipRectangles(A->display, A->W[G].gc, 0, 0, R, 1, Unsorted);
 
- 					XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
+ 					XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 					A->L.Page[G].Listing=XPrint(A->display, A->W[G].pixmap.B, A->W[G].gc,
 								One_Char_Width(G),
 								One_Char_Height(G),
@@ -2218,7 +2585,7 @@ void	BuildLayout(uARG *A, int G)
 						( One_Char_Height(G) * (cpu + 1 + 1) ),
 						str, strlen(str) );
 			}
-			XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawString(	A->display,
 					A->W[G].pixmap.B,
 					A->W[G].gc,
@@ -2237,21 +2604,21 @@ void	BuildLayout(uARG *A, int G)
 					One_Char_Width(G) * ((5 + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					"5", 1);
-			XSetForeground(A->display, A->W[G].gc, LOW_VALUE_COLOR);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LOW_VALUE].RGB);
 			XDrawString(	A->display,
 					A->W[G].pixmap.B,
 					A->W[G].gc,
 					One_Char_Width(G) * ((A->P.Platform.MinimumRatio + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					&A->P.Boost[0], 2);
-			XSetForeground(A->display, A->W[G].gc, MED_VALUE_COLOR);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_MED_VALUE].RGB);
 			XDrawString(	A->display,
 					A->W[G].pixmap.B,
 					A->W[G].gc,
 					One_Char_Width(G) * ((A->P.Platform.MaxNonTurboRatio + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					&A->P.Boost[2], 2);
-			XSetForeground(A->display, A->W[G].gc, HIGH_VALUE_COLOR);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_HIGH_VALUE].RGB);
 			XDrawString(	A->display,
 					A->W[G].pixmap.B,
 					A->W[G].gc,
@@ -2264,7 +2631,7 @@ void	BuildLayout(uARG *A, int G)
 		{
 			char str[sizeof(CORE_NUM)];
 
-			XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawImageString(A->display, A->W[G].pixmap.B, A->W[G].gc,
 					A->W[G].width - One_Half_Char_Width(G) - Quarter_Char_Width(G),
 					One_Char_Height(G)
@@ -2310,7 +2677,7 @@ void	BuildLayout(uARG *A, int G)
 						One_Char_Height(G),
 						str, strlen(str) );
 				if(A->P.Topology[cpu].CPU == NULL) {
-					XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+					XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 					XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 							One_Half_Char_Width(G) + ((cpu * CSTATES_TEXT_SPACING) * One_Half_Char_Width(G)),
 							One_Char_Height(G)
@@ -2324,7 +2691,7 @@ void	BuildLayout(uARG *A, int G)
 		{
 			char str[sizeof(CORE_NUM)];
 
-			XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawImageString(A->display,
 					A->W[G].pixmap.B,
 					A->W[G].gc,
@@ -2367,7 +2734,7 @@ void	BuildLayout(uARG *A, int G)
 			memcpy(&A->L.WB.String[padding], str, strlen(str));
 
 			sprintf(str, "Loop(%d usecs)", (IDLE_BASE_USEC * A->P.IdleTime) );
-			XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawImageString(A->display, A->W[G].pixmap.B, A->W[G].gc,
 					A->W[G].width - (24 * One_Char_Width(G)),
 					A->W[G].height - Quarter_Char_Height(G),
@@ -2386,7 +2753,7 @@ void	BuildLayout(uARG *A, int G)
 					(A->P.Features.Std.EAX.ExtModel << 4) + A->P.Features.Std.EAX.Model,
 					A->P.Features.Std.EAX.Stepping,
 					A->P.Features.ThreadCount,
-					ARCH[A->P.ArchID].Architecture,
+					A->P.Arch[A->P.ArchID].Architecture,
 					powered[A->P.Features.Std.EDX.VME],
 					powered[A->P.Features.Std.EDX.DE],
 					powered[A->P.Features.Std.EDX.PSE],
@@ -2536,7 +2903,7 @@ void	BuildLayout(uARG *A, int G)
 						GetHFrame(G) * One_Char_Width(G),
 						GetVFrame(G) * One_Char_Height(G));
 				// Draw the system information.
-				XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 				A->L.Page[G].Listing=XPrint(A->display, A->L.Page[G].Pixmap, A->W[G].gc,
 							Half_Char_Width(G),
 							One_Char_Height(G),
@@ -2546,7 +2913,7 @@ void	BuildLayout(uARG *A, int G)
 			}
 			else {
 				sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Platform.MaxNonTurboRatio * A->P.ClockSpeed);
-				XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 				XDrawString(A->display, A->W[G].pixmap.B, A->W[G].gc,
 						Half_Char_Width(G),
 						Header_Height(G) + One_Char_Height(G),
@@ -2601,7 +2968,7 @@ void	DrawLayout(uARG *A, int G)
 			// Draw the buffer if it is not empty.
 			if(A->L.Input.KeyLength > 0)
 			{
-				XSetForeground(A->display, A->W[G].gc, PROMPT_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PROMPT].RGB);
 				XDrawImageString(A->display, A->W[G].pixmap.F, A->W[G].gc,
 						Quarter_Char_Width(G),
 						edline - Quarter_Char_Height(G),
@@ -2609,7 +2976,7 @@ void	DrawLayout(uARG *A, int G)
 			}
 			// Flash the TextCursor.
 			A->L.Play.flashCursor=!A->L.Play.flashCursor;
-			XSetForeground(A->display, A->W[G].gc, A->L.Play.flashCursor ? CURSOR_COLOR : A->W[G].background);
+			XSetForeground(A->display, A->W[G].gc, A->L.Play.flashCursor ? A->L.Colors[COLOR_CURSOR].RGB : A->W[G].background);
 
 			XPoint Origin=	{
 					x:(A->L.Input.KeyLength * One_Char_Width(G)) + Quarter_Char_Width(G),
@@ -2629,13 +2996,13 @@ void	DrawLayout(uARG *A, int G)
 					// Select a color based ratio.
 					unsigned long BarBg, BarFg;
 					if(A->P.Topology[cpu].CPU->RelativeRatio <= A->P.Platform.MinimumRatio)
-						{ BarBg=INIT_VALUE_COLOR; BarFg=DYNAMIC_COLOR; }
+						{ BarBg=A->L.Colors[COLOR_INIT_VALUE].RGB; BarFg=A->L.Colors[COLOR_DYNAMIC].RGB; }
 					if(A->P.Topology[cpu].CPU->RelativeRatio >  A->P.Platform.MinimumRatio)
-						{ BarBg=LOW_VALUE_COLOR; BarFg=CORES_BACKGROUND; }
+						{ BarBg=A->L.Colors[COLOR_LOW_VALUE].RGB; BarFg=A->L.Colors[BACKGROUND_CORES].RGB; }
 					if(A->P.Topology[cpu].CPU->RelativeRatio >= A->P.Platform.MaxNonTurboRatio)
-						{ BarBg=MED_VALUE_COLOR; BarFg=CORES_BACKGROUND; }
+						{ BarBg=A->L.Colors[COLOR_MED_VALUE].RGB; BarFg=A->L.Colors[BACKGROUND_CORES].RGB; }
 					if(A->P.Topology[cpu].CPU->RelativeRatio >= A->P.Turbo.MaxRatio_4C)
-						{ BarBg=HIGH_VALUE_COLOR; BarFg=CORES_BACKGROUND; }
+						{ BarBg=A->L.Colors[COLOR_HIGH_VALUE].RGB; BarFg=A->L.Colors[BACKGROUND_CORES].RGB; }
 
 					// Draw the Core frequency.
 					XSetForeground(A->display, A->W[G].gc, BarBg);
@@ -2655,7 +3022,7 @@ void	DrawLayout(uARG *A, int G)
 								str, strlen(str) );
 					}
 
-					XSetForeground(A->display, A->W[G].gc, DYNAMIC_COLOR);
+					XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 					if(A->L.Play.cycleValues) {
 						sprintf(str,	CORE_DELTA,
 								A->P.Topology[cpu].CPU->Delta.C0.UCC / (IDLE_BASE_USEC * A->P.IdleTime),
@@ -2686,7 +3053,7 @@ void	DrawLayout(uARG *A, int G)
 								str, strlen(str) );
 					}
 				} else {
-					XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+					XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							Twice_Char_Width(G) * A->P.Turbo.MaxRatio_1C,
 							One_Char_Height(G) * (cpu + 1 + 1),
@@ -2734,11 +3101,11 @@ void	DrawLayout(uARG *A, int G)
 						str, strlen(str) );
 
 			// Draw C0, C3 & C6 states.
-			XSetForeground(A->display, A->W[G].gc, GRAPH1_COLOR);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH1].RGB);
 			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C0, A->P.CPU);
-			XSetForeground(A->display, A->W[G].gc, GRAPH2_COLOR);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH2].RGB);
 			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C3, A->P.CPU);
-			XSetForeground(A->display, A->W[G].gc, GRAPH3_COLOR);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH3].RGB);
 			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C6, A->P.CPU);
 
 			if(A->L.Play.cStatePercent)
@@ -2752,7 +3119,7 @@ void	DrawLayout(uARG *A, int G)
 								One_Char_Height(G) * (cpu + 1 + 1),
 								str, strlen(str) );
 
-						XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
+						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 						sprintf(str, CSTATES_PERCENT,	100.f * A->P.Topology[cpu].CPU->State.Turbo,
 										100.f * A->P.Topology[cpu].CPU->State.C0,
 										100.f * A->P.Topology[cpu].CPU->State.C3,
@@ -2784,7 +3151,7 @@ void	DrawLayout(uARG *A, int G)
 			U->y2=(A->W[G].height * A->P.Topology[A->P.Hot].CPU->ThermStat.DTS)
 				/ A->P.Topology[A->P.Hot].CPU->TjMax.Target;
 
-			XSetForeground(A->display, A->W[G].gc, GRAPH1_COLOR);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH1].RGB);
 			XDrawSegments(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Axes[G].Segment, A->L.Axes[G].N - 2);
 
 			// Display the Core temperature.
@@ -2799,7 +3166,7 @@ void	DrawLayout(uARG *A, int G)
 							One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1),
 							str, strlen(str));
 				} else {
-					XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+					XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							(One_Char_Width(G) * 5) + Quarter_Char_Width(G) + (cpu << 1) * Twice_Char_Width(G),
 							One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1),
@@ -2807,7 +3174,7 @@ void	DrawLayout(uARG *A, int G)
 				}
 			// Show Temperature Thresholds
 /*
-			XSetForeground(A->display, A->W[G].gc, GRAPH2_COLOR);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH2].RGB);
 			int Threshold[2]={
 					(( (TEMPS_TEXT_HEIGHT * A->P.Topology[A->P.Hot].CPU->ThermIntr.Threshold1)
 					/ A->P.Topology[A->P.Hot].CPU->TjMax.Target) + 2) * One_Char_Height(G),
@@ -2819,7 +3186,7 @@ void	DrawLayout(uARG *A, int G)
 					Threshold[0],
 					U->x2,
 					Threshold[1]);
-			XSetForeground(A->display, A->W[G].gc, DYNAMIC_COLOR);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 			XDrawString(A->display,
 					A->W[G].pixmap.F,
 					A->W[G].gc,
@@ -2837,13 +3204,13 @@ void	DrawLayout(uARG *A, int G)
 			int	HotValue=A->P.Topology[A->P.Hot].CPU->TjMax.Target - A->P.Topology[A->P.Hot].CPU->ThermStat.DTS;
 
 			if(HotValue <= LOW_TEMP_VALUE)
-				XSetForeground(A->display, A->W[G].gc, INIT_VALUE_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_INIT_VALUE].RGB);
 			if(HotValue > LOW_TEMP_VALUE)
-				XSetForeground(A->display, A->W[G].gc, LOW_VALUE_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LOW_VALUE].RGB);
 			if(HotValue > MED_TEMP_VALUE)
-				XSetForeground(A->display, A->W[G].gc, MED_VALUE_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_MED_VALUE].RGB);
 			if(HotValue >= HIGH_TEMP_VALUE)
-				XSetForeground(A->display, A->W[G].gc, HIGH_VALUE_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_HIGH_VALUE].RGB);
 			sprintf(str, TEMPERATURE, HotValue);
 			XDrawImageString(A->display,
 					A->W[G].pixmap.F,
@@ -2856,13 +3223,13 @@ void	DrawLayout(uARG *A, int G)
 				yCold=(A->W[G].height * A->P.Cold) / A->P.Topology[A->P.Hot].CPU->TjMax.Target;
 
 			if(ColdValue <= LOW_TEMP_VALUE)
-				XSetForeground(A->display, A->W[G].gc, INIT_VALUE_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_INIT_VALUE].RGB);
 			if(ColdValue > LOW_TEMP_VALUE)
-				XSetForeground(A->display, A->W[G].gc, LOW_VALUE_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LOW_VALUE].RGB);
 			if(ColdValue > MED_TEMP_VALUE)
-				XSetForeground(A->display, A->W[G].gc, MED_VALUE_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_MED_VALUE].RGB);
 			if(ColdValue >= HIGH_TEMP_VALUE)
-				XSetForeground(A->display, A->W[G].gc, HIGH_VALUE_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_HIGH_VALUE].RGB);
 			sprintf(str, TEMPERATURE, ColdValue);
 			XDrawImageString(A->display,
 					A->W[G].pixmap.F,
@@ -2883,7 +3250,7 @@ void	DrawLayout(uARG *A, int G)
 					A->L.WB.Scroll=0;
 				int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
 
-				XSetForeground(A->display, A->W[G].gc, LABEL_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 				XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 						One_Char_Width(G) * (strlen(A->L.Page[G].Title) + 2),
 						One_Char_Height(G),
@@ -2931,7 +3298,7 @@ void	DrawLayout(uARG *A, int G)
 						GetHFrame(G) * One_Char_Width(G),
 						GetVFrame(G) * One_Char_Height(G));
 				// Draw the Registers in a scrolling area.
-				XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 				A->L.Page[G].Listing=XPrint(A->display, A->L.Page[G].Pixmap, A->W[G].gc,
 							One_Char_Width(G),
 							One_Char_Height(G),
@@ -2939,7 +3306,7 @@ void	DrawLayout(uARG *A, int G)
 							One_Char_Height(G));
 			} else {
 				// Draw the Registers in a fixed height area.
-				XSetForeground(A->display, A->W[G].gc, PRINT_COLOR);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 				A->L.Page[G].Listing=XPrint(A->display, A->W[G].pixmap.F, A->W[G].gc,
 							One_Char_Width(G),
 							Header_Height(G) + One_Char_Height(G),
@@ -3315,6 +3682,10 @@ bool	StoreSettings(uARG *A)
 			sprintf(strVal, "%s.%s.%s: %d", _IS_MDI_ ? "MDI":"", xrmClass[G], XDB_KEY_TOP, A->W[G].y);
 			XrmPutLineResource(&xdb, strVal);
 		}
+		for(i=0; i < COLOR_COUNT; i++) {
+			sprintf(strVal, "%s.%s: 0x%x", A->L.Colors[i].xrmClass, A->L.Colors[i].xrmKey, A->L.Colors[i].RGB);
+			XrmPutLineResource(&xdb, strVal);
+		}
 		XrmPutFileDatabase(xdb, FQN);
 		XrmDestroyDatabase(xdb);
 		free(FQN);
@@ -3420,7 +3791,8 @@ static void *uLoop(uARG *A)
 			if(E.xany.window == A->W[G].window)
 				break;
 
-		switch(E.type) {
+		if(G < WIDGETS)
+		    switch(E.type) {
 			case Expose: {
 				if(!E.xexpose.count)
 					FlushLayout(A, G);
@@ -3636,7 +4008,7 @@ static void *uLoop(uARG *A)
 			}
 				break;
 			case FocusIn:
-				XSetWindowBorder(A->display, A->W[G].window, FOCUS_COLOR);
+				XSetWindowBorder(A->display, A->W[G].window, A->L.Colors[COLOR_FOCUS].RGB);
 				break;
 			case FocusOut:
 				XSetWindowBorder(A->display, A->W[G].window, A->W[G].foreground);
@@ -3679,9 +4051,12 @@ static void *uLoop(uARG *A)
 // Load settings
 int	LoadSettings(uARG *A, int argc, char *argv[])
 {
-	bool noerr=true;
 	XrmDatabase xdb=NULL;
+	char *xtype;
+	XrmValue xvalue;
+	char xrmKey[32]={0};
 	int i=0, j=0, G=0;
+	bool noerr=true;
 
 	char *FQN=FQN_Settings(XDB_SETTINGS_FILE);
 	if(FQN != NULL)
@@ -3690,12 +4065,15 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 		free(FQN);
 		if(xdb != NULL)
 		{
-			char     *xtype;
-			XrmValue xvalue;
-
 			for(i=0; i < OPTIONS_COUNT; i++)
 				if((A->Options[i].xrmName != NULL) && XrmGetResource(xdb, A->Options[i].xrmName, NULL, &xtype, &xvalue))
 					sscanf(xvalue.addr, A->Options[i].format, A->Options[i].pointer);
+
+			for(i=0; i < COLOR_COUNT; i++) {
+				sprintf(xrmKey, "%s.%s", A->L.Colors[i].xrmClass, A->L.Colors[i].xrmKey);
+				if(XrmGetResource(xdb, xrmKey, NULL, &xtype, &xvalue))
+					sscanf(xvalue.addr, "%x", &A->L.Colors[i].RGB);
+			}
 		}
 	}
 	//  Parse the command line arguments which may override settings.
@@ -3714,9 +4092,9 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 		// If the settings file was not found then dispose Widgets from one to each other,
 		// such as: [Right & Bottom + width & height] Or -[1,-1] = X,Y origin + Margins.
 		if(noerr) {
-			if(!xdb || A->L.Start.H || A->L.Start.V)
+			if(!xdb)
 			{
-				for(G=MAIN; noerr && (G < WIDGETS); G++)
+				for(G=MAIN; G < WIDGETS; G++)
 				{
 					int U=A->W[G].x;
 					int V=A->W[G].y;
@@ -3760,6 +4138,12 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 						else
 							A->W[G].y=A->L.Margin.V + A->W[V].y + A->W[V].height;
 					}
+					// Override the compiled colors with argument.
+					if(A->L.globalBackground != _BACKGROUND_GLOBAL)
+						A->W[G].background=A->L.globalBackground;
+
+					if(A->L.globalForeground != _FOREGROUND_GLOBAL)
+						A->W[G].foreground=A->L.globalForeground;
 				}
 			} else {
 				const char *xrmClass[WIDGETS]={	XDB_CLASS_MAIN,
@@ -3768,18 +4152,26 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 								XDB_CLASS_TEMPS,
 								XDB_CLASS_SYSINFO,
 								XDB_CLASS_DUMP};
-				char *xtype, xrmKey[32]={0};
-				XrmValue xvalue;
-
 				for(G=MAIN; G < WIDGETS; G++)
 				{
-				sprintf(xrmKey, "%s.%s.%s", _IS_MDI_ ? "MDI":"", xrmClass[G], XDB_KEY_LEFT);
-				if(XrmGetResource(xdb, xrmKey, NULL, &xtype, &xvalue))
-					sscanf(xvalue.addr, "%d", &A->W[G].x);
+					sprintf(xrmKey, "%s.%s.%s", _IS_MDI_ ? "MDI":"", xrmClass[G], XDB_KEY_LEFT);
+					if(XrmGetResource(xdb, xrmKey, NULL, &xtype, &xvalue))
+						sscanf(xvalue.addr, "%d", &A->W[G].x);
 
-				sprintf(xrmKey, "%s.%s.%s", _IS_MDI_ ? "MDI":"", xrmClass[G], XDB_KEY_TOP);
-				if(XrmGetResource(xdb, xrmKey, NULL, &xtype, &xvalue))
-					sscanf(xvalue.addr, "%d", &A->W[G].y);
+					sprintf(xrmKey, "%s.%s.%s", _IS_MDI_ ? "MDI":"", xrmClass[G], XDB_KEY_TOP);
+					if(XrmGetResource(xdb, xrmKey, NULL, &xtype, &xvalue))
+						sscanf(xvalue.addr, "%d", &A->W[G].y);
+
+					//  Override or use loaded colors.
+					if(A->L.globalBackground != _BACKGROUND_GLOBAL)
+						A->W[G].background=A->L.Colors[(G << 1) + 0].RGB=A->L.globalBackground;
+					else
+						A->W[G].background=A->L.Colors[(G << 1) + 0].RGB;
+
+					if(A->L.globalForeground != _FOREGROUND_GLOBAL)
+						A->W[G].foreground=A->L.Colors[(G << 1) + 1].RGB=A->L.globalForeground;
+					else
+						A->W[G].foreground=A->L.Colors[(G << 1) + 1].RGB;
 				}
 			}
 		}
@@ -3794,8 +4186,19 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 		printf("Usage: %s [OPTION...]\n\n", argv[0]);
 		for(i=0; i < OPTIONS_COUNT; i++)
 			printf("\t%s\t%s\n", A->Options[i].argument, A->Options[i].manual);
-		printf("\nExit status:\n0\tif OK,\n1\tif problems,\n2\tif serious trouble.\n");
-		printf("\nReport bugs to webmaster@cyring.fr\n");
+
+		printf(	"\nExit status:\n0\tif OK,\n1\tif problems,\n2\tif serious trouble.\n" \
+			"\nReport bugs to webmaster@cyring.fr\n");
+
+		if(!strcmp(argv[1], "-A"))
+		{
+			printf(	"\n" \
+				"     Architecture            CPU        FSB Clock\n" \
+				"  #                         [max]        [ MHz ]\n");
+			for(i=0; i < ARCHITECTURES; i++)
+				printf(	"%3d  %-22s  %3d         %6.2f\n",
+					i, A->P.Arch[i].Architecture, A->P.Arch[i].MaxOfCores, A->P.Arch[i].ClockSpeed());
+		}
 	}
 	return(noerr);
 }
@@ -3806,12 +4209,38 @@ int main(int argc, char *argv[])
 	uARG	A= {
 			display:NULL,
 			screen:NULL,
-			TID_Draw: 0,
+			TID_Draw:0,
 			fontName:malloc(sizeof(char)*256),
 			xfont:NULL,
 			MouseCursor:{0},
 			P: {
-				ArchID:-1,
+				ArchID:ARCHITECTURES,
+				Arch: {
+					{ GenuineIntel,         2,  ClockSpeed_GenuineIntel,         "GenuineIntel",         uCycle_GenuineIntel, Init_MSR_GenuineIntel },
+					{ Core_Duo,             2,  ClockSpeed_Core_Duo,             "Core/Duo",             uCycle_GenuineIntel, Init_MSR_GenuineIntel },
+					{ Core_2Duo,            4,  ClockSpeed_Core_2Duo,            "Core/2 Duo",           uCycle_GenuineIntel, Init_MSR_GenuineIntel },
+					{ Core_Kentsfield,      4,  ClockSpeed_Core_2Duo,            "Core/2 Kentsfield",    uCycle_GenuineIntel, Init_MSR_GenuineIntel },
+					{ Core_Yorkfield,       4,  ClockSpeed_Core_2Duo,            "Core/2 Yorkfield",     uCycle_GenuineIntel, Init_MSR_GenuineIntel },
+					{ Atom_Bonnell,         2,  ClockSpeed_Atom,                 "Atom/Bonnell",         uCycle_GenuineIntel, Init_MSR_GenuineIntel },
+					{ Atom_Silvermont,      8,  ClockSpeed_Atom,                 "Atom/Silvermont",      uCycle_GenuineIntel, Init_MSR_GenuineIntel },
+					{ Atom_27,              8,  ClockSpeed_Atom,                 "Atom/27",              uCycle_GenuineIntel, Init_MSR_GenuineIntel },
+					{ Atom_35,              8,  ClockSpeed_Atom,                 "Atom/35",              uCycle_GenuineIntel, Init_MSR_GenuineIntel },
+					{ Atom_Saltwell,        2,  ClockSpeed_Atom,                 "Atom/Saltwell",        uCycle_GenuineIntel, Init_MSR_GenuineIntel },
+					{ Nehalem_Bloomfield,   4,  ClockSpeed_Nehalem_Bloomfield,   "Nehalem/Bloomfield",   uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ Nehalem_Lynnfield,    4,  ClockSpeed_Nehalem_Lynnfield,    "Nehalem/Lynnfield",    uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ Nehalem_0F,           4,  ClockSpeed_Nehalem_Lynnfield,    "Nehalem/Lynnfield 0F", uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ Nehalem_NehalemEP,    4,  ClockSpeed_Nehalem_NehalemEP,    "Nehalem/EP",           uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ Westmere_Arrandale,   6,  ClockSpeed_Westmere_Arrandale,   "Westmere/Arrandale",   uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ Westmere_Gulftown,    6,  ClockSpeed_Westmere_Gulftown,    "Westmere/Gulftown",    uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ Westmere_WestmereEP,  6,  ClockSpeed_Westmere_WestmereEP,  "Westmere/EP",          uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ SandyBridge_1G,       6,  ClockSpeed_SandyBridge_1G,       "SandyBridge/1G",       uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ SandyBridge_Bromolow, 4,  ClockSpeed_SandyBridge_Bromolow, "SandyBridge/Bromolow", uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ IvyBridge,            6,  ClockSpeed_IvyBridge,            "IvyBridge",            uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ IvyBridgeEP,          12, ClockSpeed_IvyBridgeEP,          "IvyBridge/EP",         uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ Haswell_3C,           4,  ClockSpeed_Haswell_3C,           "Haswell/3G",           uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ Haswell_45,           4,  ClockSpeed_Haswell_45,           "Haswell/45",           uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ Haswell_46,           4,  ClockSpeed_Haswell_46,           "Haswell/46",           uCycle_Nehalem     , Init_MSR_Nehalem      },
+				},
 				Features: {
 					Std:{{0}},
 					ThreadCount:0,
@@ -3858,8 +4287,8 @@ int main(int argc, char *argv[])
 					charWidth:6,
 					charHeight:13,
 				},
-				background:MAIN_BACKGROUND,
-				foreground:MAIN_FOREGROUND,
+				background:_BACKGROUND_MAIN,
+				foreground:_FOREGROUND_MAIN,
 				wButton:{NULL},
 				},
 				// CORES
@@ -3880,8 +4309,8 @@ int main(int argc, char *argv[])
 					charWidth:6,
 					charHeight:13,
 				},
-				background:CORES_BACKGROUND,
-				foreground:CORES_FOREGROUND,
+				background:_BACKGROUND_CORES,
+				foreground:_FOREGROUND_CORES,
 				wButton:{NULL},
 				},
 				// CSTATES
@@ -3902,8 +4331,8 @@ int main(int argc, char *argv[])
 					charWidth:6,
 					charHeight:13,
 				},
-				background:CSTATES_BACKGROUND,
-				foreground:CSTATES_FOREGROUND,
+				background:_BACKGROUND_CSTATES,
+				foreground:_FOREGROUND_CSTATES,
 				wButton:{NULL},
 				},
 				// TEMPS
@@ -3924,8 +4353,8 @@ int main(int argc, char *argv[])
 					charWidth:6,
 					charHeight:13,
 				},
-				background:TEMPS_BACKGROUND,
-				foreground:TEMPS_FOREGROUND,
+				background:_BACKGROUND_TEMPS,
+				foreground:_FOREGROUND_TEMPS,
 				wButton:{NULL},
 				},
 				// SYSINFO
@@ -3946,8 +4375,8 @@ int main(int argc, char *argv[])
 					charWidth:6,
 					charHeight:13,
 				},
-				background:SYSINFO_BACKGROUND,
-				foreground:SYSINFO_FOREGROUND,
+				background:_BACKGROUND_SYSINFO,
+				foreground:_FOREGROUND_SYSINFO,
 				wButton:{NULL},
 				},
 				// DUMP
@@ -3968,8 +4397,8 @@ int main(int argc, char *argv[])
 					charWidth:6,
 					charHeight:13,
 				},
-				background:DUMP_BACKGROUND,
-				foreground:DUMP_FOREGROUND,
+				background:_BACKGROUND_DUMP,
+				foreground:_FOREGROUND_DUMP,
 				wButton:{NULL},
 				},
 			},
@@ -3980,8 +4409,38 @@ int main(int argc, char *argv[])
 				dy:0,
 			},
 			L: {
-				globalBackground:GLOBAL_BACKGROUND,
-				globalForeground:GLOBAL_FOREGROUND,
+				globalBackground:_BACKGROUND_GLOBAL,
+				globalForeground:_FOREGROUND_GLOBAL,
+				Colors: {
+					{RGB:_BACKGROUND_MAIN,    xrmClass:"Background", xrmKey:"Main"       },
+					{RGB:_FOREGROUND_MAIN,    xrmClass:"Foreground", xrmKey:"Main"       },
+					{RGB:_BACKGROUND_CORES,   xrmClass:"Background", xrmKey:"Cores"      },
+					{RGB:_FOREGROUND_CORES,   xrmClass:"Foreground", xrmKey:"Cores"      },
+					{RGB:_BACKGROUND_CSTATES, xrmClass:"Background", xrmKey:"CStates"    },
+					{RGB:_FOREGROUND_CSTATES, xrmClass:"Foreground", xrmKey:"CStates"    },
+					{RGB:_BACKGROUND_TEMPS,   xrmClass:"Background", xrmKey:"Temps"      },
+					{RGB:_FOREGROUND_TEMPS,   xrmClass:"Foreground", xrmKey:"Temps"      },
+					{RGB:_BACKGROUND_SYSINFO, xrmClass:"Background", xrmKey:"SysInfo"    },
+					{RGB:_FOREGROUND_SYSINFO, xrmClass:"Foreground", xrmKey:"SysInfo"    },
+					{RGB:_BACKGROUND_DUMP,    xrmClass:"Background", xrmKey:"Dump"       },
+					{RGB:_FOREGROUND_DUMP,    xrmClass:"Foreground", xrmKey:"Dump"       },
+					{RGB:_COLOR_AXES,         xrmClass:"Color",      xrmKey:"Axes"       },
+					{RGB:_COLOR_LABEL,        xrmClass:"Color",      xrmKey:"Label"      },
+					{RGB:_COLOR_PRINT,        xrmClass:"Color",      xrmKey:"Print"      },
+					{RGB:_COLOR_PROMPT,       xrmClass:"Color",      xrmKey:"Prompt"     },
+					{RGB:_COLOR_CURSOR,       xrmClass:"Color",      xrmKey:"Cursor"     },
+					{RGB:_COLOR_DYNAMIC,      xrmClass:"Color",      xrmKey:"Dynamic"    },
+					{RGB:_COLOR_GRAPH1,       xrmClass:"Color",      xrmKey:"Graph1"     },
+					{RGB:_COLOR_GRAPH2,       xrmClass:"Color",      xrmKey:"Graph2"     },
+					{RGB:_COLOR_GRAPH3,       xrmClass:"Color",      xrmKey:"Graph3"     },
+					{RGB:_COLOR_INIT_VALUE,   xrmClass:"Color",      xrmKey:"InitValue"  },
+					{RGB:_COLOR_LOW_VALUE,    xrmClass:"Color",      xrmKey:"LowValue"   },
+					{RGB:_COLOR_MED_VALUE,    xrmClass:"Color",      xrmKey:"MediumValue"},
+					{RGB:_COLOR_HIGH_VALUE,   xrmClass:"Color",      xrmKey:"HighValue"  },
+					{RGB:_COLOR_PULSE,        xrmClass:"Color",      xrmKey:"Pulse"      },
+					{RGB:_COLOR_FOCUS,        xrmClass:"Color",      xrmKey:"Focus"      },
+					{RGB:_COLOR_MDI_SEP,      xrmClass:"Color",      xrmKey:"MDIlineSep" },
+				},
 				// Margins must be initialized with a zero size.
 				Margin: {
 					H:16,
@@ -4115,10 +4574,11 @@ int main(int argc, char *argv[])
 				{"-D", "%d", &A.MDI,                  "Enable MDI Window (0/1)",                           NULL                                       },
 				{"-F", "%s", A.fontName,              "Font name",                                         XDB_CLASS_MAIN"."XDB_KEY_FONT              },
 				{"-a", "%c", &A.xACL,                 "Enable or disable X ACL (Y/N)",                     NULL                                       },
-				{"-x", "%d", &A.L.Start.H,            "Left position (pixel value)",                       NULL                                       },
-				{"-y", "%d", &A.L.Start.V,            "Top position (pixel value)",                        NULL                                       },
-				{"-b", "%x", &A.L.globalBackground,   "Background color (Hex. value)",                     XDB_CLASS_MAIN"."XDB_KEY_BACKGROUND        },
-				{"-f", "%x", &A.L.globalForeground,   "Foreground color (Hex. value)",                     XDB_CLASS_MAIN"."XDB_KEY_FOREGROUND        },
+				{"-x", "%d", &A.L.Start.H,            "Initial left position (pixel value)",               NULL                                       },
+				{"-y", "%d", &A.L.Start.V,            "Initial top position (pixel value)",                NULL                                       },
+				{"-b", "%x", &A.L.globalBackground,   "Background color (Hex. value)",                     NULL                                       },
+				{"-f", "%x", &A.L.globalForeground,   "Foreground color (Hex. value)",                     NULL                                       },
+				{"-c", "%d", &A.P.ArchID,             "Pick up an architecture# (-A to dump list)",        NULL                                       },
 				{"-S", "%u", &A.P.ClockSrc,           "Clock source TSC(0) BIOS(1) SPEC(2) ROM(3) USER(4)",XDB_CLASS_SYSINFO"."XDB_KEY_CLOCK_SOURCE   },
 				{"-M", "%x", &A.P.BClockROMaddr,      "ROM memory address of the Base Clock (Hex. value)", XDB_CLASS_SYSINFO"."XDB_KEY_ROM_ADDRESS    },
 				{"-s", "%u", &A.P.IdleTime,           "Idle time ratio where N x 50000 (usec)",            NULL                                       },
@@ -4131,6 +4591,18 @@ int main(int argc, char *argv[])
 				{"-i", "%u", &A.L.Play.hideSplash,    "Hide the splash screen (0/1)",                      NULL                                       },
 			},
 		};
+	{
+		A.P.Platform.MinimumRatio=10;
+		A.P.Platform.MaxNonTurboRatio=20;
+		A.P.Turbo.MaxRatio_1C=60;
+		A.P.Turbo.MaxRatio_2C=55;
+		A.P.Turbo.MaxRatio_3C=50;
+		A.P.Turbo.MaxRatio_4C=45;
+		A.P.Turbo.MaxRatio_5C=40;
+		A.P.Turbo.MaxRatio_6C=35;
+		A.P.Turbo.MaxRatio_7C=30;
+		A.P.Turbo.MaxRatio_8C=25;
+	}
 	uid_t	UID=geteuid();
 	bool	ROOT=(UID == 0);	// Check root access.
 	char	BootLog[1024]={0};
@@ -4151,13 +4623,16 @@ int main(int argc, char *argv[])
 			// Read the CPU Features.
 			Read_Features(&A.P.Features);
 
-			// Find the Processor Architecture.
-			for(A.P.ArchID=ARCHITECTURES; A.P.ArchID >=0 ; A.P.ArchID--)
-				if(!(ARCH[A.P.ArchID].Signature.ExtFamily ^ A.P.Features.Std.EAX.ExtFamily)
-				&& !(ARCH[A.P.ArchID].Signature.Family ^ A.P.Features.Std.EAX.Family)
-				&& !(ARCH[A.P.ArchID].Signature.ExtModel ^ A.P.Features.Std.EAX.ExtModel)
-				&& !(ARCH[A.P.ArchID].Signature.Model ^ A.P.Features.Std.EAX.Model))
-					break;
+			// Find or force the Architecture specifications.
+			if((A.P.ArchID < 0) || (A.P.ArchID >= ARCHITECTURES))
+				do {
+					A.P.ArchID--;
+					if(!(A.P.Arch[A.P.ArchID].Signature.ExtFamily ^ A.P.Features.Std.EAX.ExtFamily)
+					&& !(A.P.Arch[A.P.ArchID].Signature.Family ^ A.P.Features.Std.EAX.Family)
+					&& !(A.P.Arch[A.P.ArchID].Signature.ExtModel ^ A.P.Features.Std.EAX.ExtModel)
+					&& !(A.P.Arch[A.P.ArchID].Signature.Model ^ A.P.Features.Std.EAX.Model))
+						break;
+				} while(A.P.ArchID >=0);
 
 			if(!(A.P.CPU=A.P.Features.ThreadCount))
 			{
@@ -4180,13 +4655,13 @@ int main(int argc, char *argv[])
 
 				if(A.P.ArchID != -1)
 				{
-					A.P.CPU=ARCH[A.P.ArchID].MaxOfCores;
-					strcat(BootLog, ARCH[A.P.ArchID].Architecture);
+					A.P.CPU=A.P.Arch[A.P.ArchID].MaxOfCores;
+					strcat(BootLog, A.P.Arch[A.P.ArchID].Architecture);
 				}
 				else
 				{
-					A.P.CPU=ARCH[0].MaxOfCores;
-					strcat(BootLog, ARCH[0].Architecture);
+					A.P.CPU=A.P.Arch[0].MaxOfCores;
+					strcat(BootLog, A.P.Arch[0].Architecture);
 				}
 				strcat(BootLog, "specifications.\n");
 			}
@@ -4202,7 +4677,7 @@ int main(int argc, char *argv[])
 				A.P.PerCore=true;
 
 			// Open once the MSR gate.
-			if(!(A.MSR=(Open_MSR(&A) != 0)))
+			if(!(A.MSR=A.P.Arch[A.P.ArchID].Init_MSR(&A)))
 				strcat(BootLog, "Warning: can not read the MSR registers\nCheck if the 'msr' kernel module is loaded.\n");
 
 			// Read the Integrated Memory Controler information.
@@ -4224,7 +4699,7 @@ int main(int argc, char *argv[])
 					XMapWindow(A.display, A.W[G].window);
 				}
 				pthread_t TID_Cycle=0;
-				if(!pthread_create(&TID_Cycle, NULL, uCycle, &A)) {
+				if((A.P.ArchID != -1) && !pthread_create(&TID_Cycle, NULL, A.P.Arch[A.P.ArchID].uCycle, &A)) {
 					Output(&A, BootLog);
 					Output(&A, "Welcome to X-Freq\nEnter help to list commands.\n");
 

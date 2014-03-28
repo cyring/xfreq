@@ -29,7 +29,7 @@
  * + GPU sensors.
  *     compile with the NVIDIA (first), the AMD & Intel frameworks (seconds) ?
  *
- * + other processors are claimed. Call to beta testers.
+ * + other processors are claimed: Core2 Duo added.
  * + implement the procstat API to trace high cpu load processes.
  * + scripting, editor, push alarms : write user defined bit values in MSR.
  *
@@ -82,8 +82,24 @@
  *
  * + Fast-Strings reported as not available in CPUID but enabled in MSR.
  *
+ * + Virtual memory leak : investigation in progress with Valgrind
+ *
  *
  * [HISTORY]
+ *
+ * R 0.23 : 03/28 2014 SR-1
+ *        - Added the '-A' program argument to dump the list of compiled Architectures.
+ *        - Fixed an infinite loop in uReadAPIC() which locks when processing with Core2 architectures.
+ *
+ * R 0.23 : 03/27 2014
+ *        - Added the '-c' program argument to force specifications of another architecture.
+ *        - Redefined the Architecture table to allow the addition of other Processors and their associated processing loop,
+ *
+ * R 0.22 : 03/26 2014 SR-5
+ *        - Fixed a bug in uLoop() if G >= WIDGETS.
+ *
+ * R 0.22 : 03/25 2014 SR-4
+ *        - Save & load colors from the settings file.
  *
  * R 0.22 : 03/24 2014 SR-3
  *        - Save settings into the '.xfreq' file in home directory.
