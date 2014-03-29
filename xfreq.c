@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.23 SR1 by CyrIng
+ * XFreq.c #0.23 SR2 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -1800,12 +1800,12 @@ void	CloseWidgets(uARG *A)
 int	OpenWidgets(uARG *A)
 {
 	int noerr=true;
-	char str[sizeof(HDSIZE)];
+	char str[sizeof(HDSIZE)]={0};
 
 	// Allocate memory for chart elements.
-	A->L.Usage.C0=malloc(A->P.CPU * sizeof(XRectangle));
-	A->L.Usage.C3=malloc(A->P.CPU * sizeof(XRectangle));
-	A->L.Usage.C6=malloc(A->P.CPU * sizeof(XRectangle));
+	A->L.Usage.C0=calloc(A->P.CPU, sizeof(XRectangle));
+	A->L.Usage.C3=calloc(A->P.CPU, sizeof(XRectangle));
+	A->L.Usage.C6=calloc(A->P.CPU, sizeof(XRectangle));
 
 	XSetWindowAttributes swa={
 	/* Pixmap: background, None, or ParentRelative	*/	background_pixmap:None,
@@ -2573,7 +2573,7 @@ void	BuildLayout(uARG *A, int G)
 			break;
 		case CORES:
 		{
-			char str[sizeof(CORE_NUM)];
+			char str[sizeof(CORE_NUM)]={0};
 
 			// Draw the Core identifiers, the header, and the footer on the chart.
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
@@ -2629,7 +2629,7 @@ void	BuildLayout(uARG *A, int G)
 			break;
 		case CSTATES:
 		{
-			char str[sizeof(CORE_NUM)];
+			char str[sizeof(CORE_NUM)]={0};
 
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawImageString(A->display, A->W[G].pixmap.B, A->W[G].gc,
@@ -2689,7 +2689,7 @@ void	BuildLayout(uARG *A, int G)
 			break;
 		case TEMPS:
 		{
-			char str[sizeof(CORE_NUM)];
+			char str[sizeof(CORE_NUM)]={0};
 
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawImageString(A->display,
@@ -2842,7 +2842,7 @@ void	BuildLayout(uARG *A, int G)
 							A->P.Topology[cpu].Thread_ID,
 							enabled[1]);
 					else
-						sprintf(str, "     #%02u       -       -       -   [%3s]\n",
+						sprintf(str, "%03u        -       -       -   [%3s]\n",
 							cpu,
 							enabled[0]);
 					strcat(items, str);
@@ -2866,7 +2866,7 @@ void	BuildLayout(uARG *A, int G)
 							A->P.Topology[cpu].CPU->FixedPerfCounter.EN2_Usr,
 							A->P.Topology[cpu].CPU->FixedPerfCounter.AnyThread_EN2);
 					else
-						sprintf(str, " - \n");
+						sprintf(str, "%03u      -     -     -            -     -     -            -     -     -\n", cpu);
 					strcat(items, str);
 				}
 
@@ -2988,7 +2988,7 @@ void	DrawLayout(uARG *A, int G)
 			break;
 		case CORES:
 		{
-			char str[16];
+			char str[16]={0};
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++)
 				if(A->P.Topology[cpu].CPU != NULL)
@@ -3048,14 +3048,14 @@ void	DrawLayout(uARG *A, int G)
 					if(A->L.Play.ratioValues) {
 						sprintf(str, CORE_RATIO, A->P.Topology[cpu].CPU->RelativeRatio);
 						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-								Twice_Char_Width(G) * A->P.Turbo.MaxRatio_1C,
+								Twice_Char_Width(G) * CORES_TEXT_WIDTH,
 								One_Char_Height(G) * (cpu + 1 + 1),
 								str, strlen(str) );
 					}
 				} else {
 					XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-							Twice_Char_Width(G) * A->P.Turbo.MaxRatio_1C,
+							Twice_Char_Width(G) * CORES_TEXT_WIDTH,
 							One_Char_Height(G) * (cpu + 1 + 1),
 							"OFF", 3 );
 				}
@@ -3063,7 +3063,7 @@ void	DrawLayout(uARG *A, int G)
 			break;
 		case CSTATES:
 		{
-			char str[32];
+			char str[32]={0};
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++)
@@ -3134,7 +3134,7 @@ void	DrawLayout(uARG *A, int G)
 			break;
 		case TEMPS:
 		{
-			char str[16];
+			char str[16]={0};
 			// Update & draw the temperature histogram.
 			int i=0;
 			XSegment *U=&A->L.Axes[G].Segment[i], *V=&A->L.Axes[G].Segment[i+1];
@@ -3322,7 +3322,7 @@ void	DrawLayout(uARG *A, int G)
 // Update the Widget name with the Top Core frequency, temperature, c-states.
 void	UpdateWidgetName(uARG *A, int G)
 {
-	char str[32];
+	char str[32]={0};
 	switch(G) {
 		case MAIN:
 			if(_IS_MDI_) {

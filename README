@@ -87,6 +87,12 @@
  *
  * [HISTORY]
  *
+ * R 0.23 : 03/29 2014 SR-2
+ *        - For any disable CPU:
+ *            fixed the chart drawing in the CStates Widget
+ *            change some texts in the SysInfo Widget.
+ *        - Auto adjusting the width of the Widgets & the positions of Ratios & Temps values.
+ *
  * R 0.23 : 03/28 2014 SR-1
  *        - Added the '-A' program argument to dump the list of compiled Architectures.
  *        - Fixed an infinite loop in uReadAPIC() which locks when processing with Core2 architectures.

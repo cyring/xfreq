@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.23 SR1 by CyrIng
+ * XFreq.h #0.23 SR2 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,7 +7,7 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "23"
-#define _NIGHTLY "1"
+#define _NIGHTLY "2"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 
@@ -902,7 +902,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CSTATES_TEXT_WIDTH	( MAX(A->P.CPU, 8) * CSTATES_TEXT_SPACING )
 #define	CSTATES_TEXT_HEIGHT	10
 
-#define	TEMPS_TEXT_WIDTH	(A->P.Features.ThreadCount << 2)
+#define	TEMPS_TEXT_WIDTH	MAX((A->P.Features.ThreadCount << 2), 32)
 #define	TEMPS_TEXT_HEIGHT	18
 
 #define	SYSINFO_TEXT_WIDTH	80
