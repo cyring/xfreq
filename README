@@ -23,13 +23,11 @@
  *
  * + memory fetch : to remove dependancies with the dmi_sysfs & msr Linux modules.
  *     using a R/O mmap to "/dev/mem".
- *     base clock is a 2 bytes word found at address 0xf08d9 + 0x12 (Rampage II GENE) : done.
  *     rather use the msr assembler instruction.
  *
  * + GPU sensors.
  *     compile with the NVIDIA (first), the AMD & Intel frameworks (seconds) ?
  *
- * + other processors are claimed: Core2 Duo added.
  * + implement the procstat API to trace high cpu load processes.
  * + scripting, editor, push alarms : write user defined bit values in MSR.
  *
@@ -51,13 +49,10 @@
  * + screenshot key.
  * + resize footer separator w/ MDI.
  * + give a better disposal of the Widgets using % of screen size and absolute positions.
- * + save and load settings : done.
- * + show the minimum value in the Temp Widget : on the graphic, left side=min & right side=max : done.
  *
  *
  *  Source code
  * -------------
- * + clean makefile : remove my previous Raspberry instructions : done.
  * + clang compliant : rewrite code to remove any "warning: use of GNU old-style ..."
  * + provide some configure and install scripts, especially an ArchLinux PKGBUILD.
  * + split the code between GUI and hardware parts.
@@ -72,13 +67,7 @@
  * + The temperature thresholds MSR does not return any value.
  *     Need to investigate ACPI.
  *
- * + Using the TWM manager, the first disposal of the Widgets is not applied : solved.
- *
  * + Program freeze after a long run. Probably due to a semaphore lock overload.
- *
- * + XFreq tested ok with a 3770K, however BIOS DMI is not reliable : solved.
- *     Thus, the number of active Cores or Threads will be count from CPUID and the appropriate MSR.
- *     Solved with Processor topology enumeration.
  *
  * + Fast-Strings reported as not available in CPUID but enabled in MSR.
  *
@@ -86,6 +75,25 @@
  *
  *
  * [HISTORY]
+ *
+ * R 0.23 : 04/03/2014 SR-4
+ *        - Store all Ratios in a Boost array which is also display at the section Boost of the Widget SysInfo.
+ *        - Change the Code::Blocks project to be like the Makefile. Thus 'xfreq' is the only binary produced.
+ *        - Check if an invariant TSC is available and display result in the SysInfo Widget.
+ *        - Fixed some major memory leak.
+ *            pthread : OK
+ *            font : OK
+ *            display : OK
+ *            xrm database : still an issue
+ *        - Change the argument '-h' to '-z' to show the frequencies in the Core Widget. the menu key is modified the same way.
+ *        - Change the architecture detection to handle the processors of generation Core and above.
+ *            So far, 3 arlgorithms are implemented in the following functions.
+ *              uCycle_GenuineIntel(): C0 state only. Based on MSR IA32_APERF / IA32_MPERF
+ *              uCycle_Core()        : C0 state only. Based on MSR IA32_FIXED_CTR1 / IA32_FIXED_CTR2
+ *              uCycle_Nehalem()     : C0, C3, C6 states. Based on the fixed counters.
+ *
+ * R 0.23 : 03/30 2014 SR-3
+ *        - Added an emergency exit function if a POSIX signal is caught.
  *
  * R 0.23 : 03/29 2014 SR-2
  *        - For any disable CPU:
@@ -112,7 +120,7 @@
  *
  * R 0.22 : 03/23 2014 SR-2
  *        - Load settings from .xfreq file in home directory.
- *        - Provided a new button to Reset the coldest temperature.
+ *        - Provid a new button to Reset the coldest temperature.
  *        - Added the '-i' command line argument to hide the Splash screen.
  *        - Fixed margins when in non MDI.
  *        - Fixed the scale of the Cold Temperature.

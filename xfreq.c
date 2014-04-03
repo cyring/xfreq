@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.23 SR2 by CyrIng
+ * XFreq.c #0.23 SR4 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <pthread.h>
+#include <signal.h>
 #include <errno.h>
 
 #include "xfreq.h"
@@ -87,23 +88,23 @@ void	ClearMsg(uARG *A) {
 		free(A->L.Output);
 		A->L.Output=NULL;
 
-		SetHListing(MESSAGE, 0);
-		SetVListing(MESSAGE, 0);
-		SetHScrolling(MESSAGE, 0);
-		SetVScrolling(MESSAGE, 0);
+		SetHListing(MAIN, 0);
+		SetVListing(MAIN, 0);
+		SetHScrolling(MAIN, 0);
+		SetVScrolling(MAIN, 0);
 
-		XSetForeground(A->display, A->W[MESSAGE].gc, A->W[MESSAGE].background);
-		XFillRectangle(A->display, A->L.Page[MESSAGE].Pixmap, A->W[MESSAGE].gc,
+		XSetForeground(A->display, A->W[MAIN].gc, A->W[MAIN].background);
+		XFillRectangle(A->display, A->L.Page[MAIN].Pixmap, A->W[MAIN].gc,
 				0,
 				0,
-				GetHFrame(MESSAGE) * One_Char_Width(MESSAGE),
-				GetVFrame(MESSAGE) * One_Char_Height(MESSAGE));
+				GetHFrame(MAIN) * One_Char_Width(MAIN),
+				GetVFrame(MAIN) * One_Char_Height(MAIN));
 	}
 }
 
 void	Output(uARG *A, const char *message)
 {
-	if(A->L.Output != NULL && GetVListing(MESSAGE) > GetVFrame(MESSAGE))
+	if(A->L.Output != NULL && GetVListing(MAIN) > GetVFrame(MAIN))
 		ClearMsg(A);
 
 	const size_t requestBlock=strlen(message) + 1;
@@ -126,23 +127,90 @@ bool	Init_MSR_GenuineIntel(void *uArg)
 	bool	rc=true;
 	// Read the minimum, maximum & the turbo ratios from Core number 0
 	if(tmpFD != -1)
+	{	// Retrieve Ratios from the Architectural MSR.
+		rc=((retval=Read_MSR(tmpFD, IA32_MISC_ENABLE,  (MISC_PROC_FEATURES *) &A->P.MiscFeatures)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->P.PlatformId)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->P.PerfStatus)) != -1);
+		// MSR_PLATFORM_INFO may be available in this Intel Architecture ?
+		if((rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->P.PlatformInfo)) != -1)) == true)
+		{	//  Then, we get the Min & Max non Turbo Ratios which might inverted.
+			A->P.Boost[0]=MIN(A->P.PlatformInfo.MinimumRatio, A->P.PlatformInfo.MaxNonTurboRatio);
+			A->P.Boost[1]=MAX(A->P.PlatformInfo.MinimumRatio, A->P.PlatformInfo.MaxNonTurboRatio);
+		}
+		else	// Otherwise, set the Min & Max Ratios to the first non zero value found in the following MSR order:
+			//	IA32_PLATFORM_ID[MaxBusRatio] , IA32_PERF_STATUS[MaxBusRatio] , IA32_PERF_STATUS[CurrentRatio]
+			A->P.Boost[0]=A->P.Boost[1]=(A->P.PlatformId.MaxBusRatio) ? A->P.PlatformId.MaxBusRatio:(A->P.PerfStatus.MaxBusRatio) ? A->P.PerfStatus.MaxBusRatio:A->P.PerfStatus.CurrentRatio;
+		// MSR_TURBO_RATIO_LIMIT may also be available ?
+		if((rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->P.Turbo)) != -1)) == true)
+		{
+			A->P.Boost[2]=A->P.Turbo.MaxRatio_8C;
+			A->P.Boost[3]=A->P.Turbo.MaxRatio_7C;
+			A->P.Boost[4]=A->P.Turbo.MaxRatio_6C;
+			A->P.Boost[5]=A->P.Turbo.MaxRatio_5C;
+			A->P.Boost[6]=A->P.Turbo.MaxRatio_4C;
+			A->P.Boost[7]=A->P.Turbo.MaxRatio_3C;
+			A->P.Boost[8]=A->P.Turbo.MaxRatio_2C;
+			A->P.Boost[9]=A->P.Turbo.MaxRatio_1C;
+		}
+		else	// In any case, last Ratio is equal to the maximum non Turbo Ratio.
+			A->P.Boost[9]=A->P.Boost[1];
+
+		close(tmpFD);
+	}
+	else rc=false;
+
+	char	pathname[]="/dev/cpu/999/msr";
+	int	cpu=0;
+	for(cpu=0; cpu < A->P.CPU; cpu++)
+		if(A->P.Topology[cpu].CPU != NULL)
+		{
+			sprintf(pathname, "/dev/cpu/%d/msr", cpu);
+			if( (rc=((A->P.Topology[cpu].CPU->FD=open(pathname, O_RDWR)) != -1)) )
+			{
+				rc=((retval=Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->P.Topology[cpu].CPU->ThermIntr)) != -1);
+			}
+			A->P.Topology[cpu].CPU->TjMax.Target=100;
+		}
+	return(rc);
+}
+
+bool	Init_MSR_Core(void *uArg)
+{
+	uARG *A=(uARG *) uArg;
+
+	ssize_t	retval=0;
+	int	tmpFD=open("/dev/cpu/0/msr", O_RDONLY);
+	bool	rc=true;
+	// Read the minimum, maximum & the turbo ratios from Core number 0
+	if(tmpFD != -1)
 	{
 		rc=((retval=Read_MSR(tmpFD, IA32_MISC_ENABLE,  (MISC_PROC_FEATURES *) &A->P.MiscFeatures)) != -1);
-		rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM *) &A->P.Platform)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->P.PlatformId)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->P.PerfStatus)) != -1);
-		close(tmpFD);
-
-		if(rc == true)
+		// MSR_PLATFORM_INFO may be available with Core2 ?
+		if((rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->P.PlatformInfo)) != -1)) == true)
 		{
-			unsigned long long Swap=A->P.Platform.MaxNonTurboRatio;
-			A->P.Platform.MaxNonTurboRatio=A->P.Platform.MinimumRatio;
-			A->P.Platform.MinimumRatio=Swap;
-			A->P.Turbo.MaxRatio_1C=A->P.Turbo.MaxRatio_2C=A->P.Turbo.MaxRatio_3C=A->P.Turbo.MaxRatio_4C=A->P.Turbo.MaxRatio_5C=A->P.Turbo.MaxRatio_6C=A->P.Turbo.MaxRatio_7C=A->P.Turbo.MaxRatio_8C=A->P.PerfStatus.MaxBusRatio;
+			A->P.Boost[0]=MIN(A->P.PlatformInfo.MinimumRatio, A->P.PlatformInfo.MaxNonTurboRatio);
+			A->P.Boost[1]=MAX(A->P.PlatformInfo.MinimumRatio, A->P.PlatformInfo.MaxNonTurboRatio);
 		}
 		else
+			A->P.Boost[0]=A->P.Boost[1]=(A->P.PlatformId.MaxBusRatio) ? A->P.PlatformId.MaxBusRatio:(A->P.PerfStatus.MaxBusRatio) ? A->P.PerfStatus.MaxBusRatio:A->P.PerfStatus.CurrentRatio;
+		// MSR_TURBO_RATIO_LIMIT may also be available with Core2 ?
+		if((rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->P.Turbo)) != -1)) == true)
 		{
-			A->P.Turbo.MaxRatio_1C=A->P.Turbo.MaxRatio_2C=A->P.Turbo.MaxRatio_3C=A->P.Turbo.MaxRatio_4C=A->P.Turbo.MaxRatio_5C=A->P.Turbo.MaxRatio_6C=A->P.Turbo.MaxRatio_7C=A->P.Turbo.MaxRatio_8C=A->P.Platform.MinimumRatio;
+			A->P.Boost[2]=A->P.Turbo.MaxRatio_8C;
+			A->P.Boost[3]=A->P.Turbo.MaxRatio_7C;
+			A->P.Boost[4]=A->P.Turbo.MaxRatio_6C;
+			A->P.Boost[5]=A->P.Turbo.MaxRatio_5C;
+			A->P.Boost[6]=A->P.Turbo.MaxRatio_4C;
+			A->P.Boost[7]=A->P.Turbo.MaxRatio_3C;
+			A->P.Boost[8]=A->P.Turbo.MaxRatio_2C;
+			A->P.Boost[9]=A->P.Turbo.MaxRatio_1C;
 		}
+		else
+			A->P.Boost[9]=A->P.Boost[1];
+
+		close(tmpFD);
 	}
 	else rc=false;
 
@@ -241,9 +309,20 @@ bool	Init_MSR_Nehalem(void *uArg)
 	if(tmpFD != -1)
 	{
 		rc=((retval=Read_MSR(tmpFD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &A->P.MiscFeatures)) != -1);
-		rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM *) &A->P.Platform)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->P.PlatformInfo)) != -1);
 		rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->P.Turbo)) != -1);
 		close(tmpFD);
+
+		A->P.Boost[0]=A->P.PlatformInfo.MinimumRatio;
+		A->P.Boost[1]=A->P.PlatformInfo.MaxNonTurboRatio;
+		A->P.Boost[2]=A->P.Turbo.MaxRatio_8C;
+		A->P.Boost[3]=A->P.Turbo.MaxRatio_7C;
+		A->P.Boost[4]=A->P.Turbo.MaxRatio_6C;
+		A->P.Boost[5]=A->P.Turbo.MaxRatio_5C;
+		A->P.Boost[6]=A->P.Turbo.MaxRatio_4C;
+		A->P.Boost[7]=A->P.Turbo.MaxRatio_3C;
+		A->P.Boost[8]=A->P.Turbo.MaxRatio_2C;
+		A->P.Boost[9]=A->P.Turbo.MaxRatio_1C;
 	}
 	else rc=false;
 
@@ -379,7 +458,7 @@ double	ClockSpeed_GenuineIntel()
 };
 
 // [Core]
-double	ClockSpeed_Core_Duo()
+double	ClockSpeed_Core()
 {
 	int FD=0;
 	if( (FD=open("/dev/cpu/0/msr", O_RDONLY)) != -1) {
@@ -406,7 +485,10 @@ double	ClockSpeed_Core_Duo()
 	else
 		return(100.00f);
 };
-double	ClockSpeed_Core_2Duo()
+
+
+// [Core2]
+double	ClockSpeed_Core2()
 {
 	int FD=0;
 	if( (FD=open("/dev/cpu/0/msr", O_RDONLY)) != -1) {
@@ -446,6 +528,7 @@ double	ClockSpeed_Core_2Duo()
 		return(100.00f);
 };
 
+
 // [Atom]
 double	ClockSpeed_Atom()
 {
@@ -478,6 +561,45 @@ double	ClockSpeed_Atom()
 		return(83.00f);
 };
 
+
+// [Silvermont]
+double	ClockSpeed_Silvermont()
+{
+	int FD=0;
+	if( (FD=open("/dev/cpu/0/msr", O_RDONLY)) != -1) {
+		FSB_FREQ FSB={0};
+		Read_MSR(FD, MSR_FSB_FREQ, (unsigned long long *) &FSB);
+		close(FD);
+
+		switch(FSB.Bus_Speed)
+		{
+			case 0b100:
+				return(80.0f);
+				break;
+			case 0b000:
+				return(83.3f);
+				break;
+			case 0b001:
+				return(100.0f);
+				break;
+			case 0b010:
+				return(133.33f);
+				break;
+			case 0b011:
+				return(116.7f);
+				break;
+			default:
+				return(83.3f);
+				break;
+		}
+	}
+	else
+		return(83.3f);
+};
+
+
+
+// [GenuineIntel]
 static void *uCycle_GenuineIntel(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
@@ -492,8 +614,7 @@ static void *uCycle_GenuineIntel(void *uArg)
 			// Initial read of the TSC in relation to the Logical Core.
 			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[0]);
 			/* Initial read of other C-States.
-			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C3[0]);
-			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C6[0]);*/
+			ToDo*/
 		}
 	if(A->P.IdleTime < IDLE_COEF_MIN)	A->P.IdleTime=IDLE_COEF_MIN;
 	if(A->P.IdleTime > IDLE_COEF_MAX)	A->P.IdleTime=IDLE_COEF_MAX;
@@ -513,8 +634,7 @@ static void *uCycle_GenuineIntel(void *uArg)
 				// Update TSC.
 				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[1]);
 				/* Update C-States.
-				Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C3[1]);
-				Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C6[1]);*/
+				ToDo*/
 			}
 /* CRITICAL_OUT */
 
@@ -532,10 +652,6 @@ static void *uCycle_GenuineIntel(void *uArg)
 
 				A->P.Topology[cpu].CPU->Delta.C0.URC=	A->P.Topology[cpu].CPU->Cycles.C0[1].URC - A->P.Topology[cpu].CPU->Cycles.C0[0].URC;
 
-				A->P.Topology[cpu].CPU->Delta.C3=	A->P.Topology[cpu].CPU->Cycles.C3[1] - A->P.Topology[cpu].CPU->Cycles.C3[0];
-
-				A->P.Topology[cpu].CPU->Delta.C6=	A->P.Topology[cpu].CPU->Cycles.C6[1] - A->P.Topology[cpu].CPU->Cycles.C6[0];
-
 				A->P.Topology[cpu].CPU->Delta.TSC=	A->P.Topology[cpu].CPU->Cycles.TSC[1] - A->P.Topology[cpu].CPU->Cycles.TSC[0];
 
 				// Compute Turbo State per Cycles Delta. (Protect against a division by zero)
@@ -544,10 +660,8 @@ static void *uCycle_GenuineIntel(void *uArg)
 							: 0.0f;
 				// Compute C-States.
 				A->P.Topology[cpu].CPU->State.C0=(double) (A->P.Topology[cpu].CPU->Delta.C0.URC) / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
-				A->P.Topology[cpu].CPU->State.C3=(double) (A->P.Topology[cpu].CPU->Delta.C3)  / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
-				A->P.Topology[cpu].CPU->State.C6=(double) (A->P.Topology[cpu].CPU->Delta.C6)  / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
 
-				A->P.Topology[cpu].CPU->RelativeRatio=A->P.Topology[cpu].CPU->State.Turbo * A->P.Topology[cpu].CPU->State.C0 * (double) A->P.PerfStatus.MaxBusRatio;
+				A->P.Topology[cpu].CPU->RelativeRatio=A->P.Topology[cpu].CPU->State.Turbo * A->P.Topology[cpu].CPU->State.C0 * (double) A->P.Boost[1];
 
 				// Relative Frequency = Relative Ratio x Bus Clock Frequency
 				A->P.Topology[cpu].CPU->RelativeFreq=A->P.Topology[cpu].CPU->RelativeRatio * A->P.ClockSpeed;
@@ -557,15 +671,10 @@ static void *uCycle_GenuineIntel(void *uArg)
 				// Save the Unhalted Core & Reference Cycles for next iteration.
 				A->P.Topology[cpu].CPU->Cycles.C0[0].UCC=A->P.Topology[cpu].CPU->Cycles.C0[1].UCC;
 				A->P.Topology[cpu].CPU->Cycles.C0[0].URC =A->P.Topology[cpu].CPU->Cycles.C0[1].URC;
-				/* Save also the C-State Reference Cycles.
-				A->P.Topology[cpu].CPU->Cycles.C3[0]=A->P.Topology[cpu].CPU->Cycles.C3[1];
-				A->P.Topology[cpu].CPU->Cycles.C6[0]=A->P.Topology[cpu].CPU->Cycles.C6[1];*/
 
 				// Sum the C-States before the average.
 				A->P.Avg.Turbo+=A->P.Topology[cpu].CPU->State.Turbo;
 				A->P.Avg.C0+=A->P.Topology[cpu].CPU->State.C0;
-			/*	A->P.Avg.C3+=A->P.Topology[cpu].CPU->State.C3;
-				A->P.Avg.C6+=A->P.Topology[cpu].CPU->State.C6;*/
 
 				// Index the Top CPU speed.
 				if(maxFreq < A->P.Topology[cpu].CPU->RelativeFreq) {
@@ -589,8 +698,119 @@ static void *uCycle_GenuineIntel(void *uArg)
 		// Average the C-States.
 		A->P.Avg.Turbo/=A->P.CPU;
 		A->P.Avg.C0/=A->P.CPU;
-	/*	A->P.Avg.C3/=A->P.CPU;
-		A->P.Avg.C6/=A->P.CPU;*/
+
+		// Fire the drawing thread.
+		if(pthread_mutex_trylock(&uDraw_mutex) == 0)
+			pthread_create(&A->TID_Draw, NULL, uDraw, A);
+	}
+	// Is drawing still processing ?
+	if(pthread_mutex_trylock(&uDraw_mutex) == EBUSY)
+		pthread_join(A->TID_Draw, NULL);
+
+	return(NULL);
+}
+
+
+
+// [Core]
+static void *uCycle_Core(void *uArg)
+{
+	uARG *A=(uARG *) uArg;
+
+	unsigned int cpu=0;
+	for(cpu=0; cpu < A->P.CPU; cpu++)
+		if(A->P.Topology[cpu].CPU != NULL)
+		{
+			// Initial read of the Unhalted Core & Reference Cycles.
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].UCC);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].URC);
+			// Initial read of the TSC in relation to the Logical Core.
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[0]);
+			/* Initial read of other C-States.
+			ToDo*/
+		}
+	if(A->P.IdleTime < IDLE_COEF_MIN)	A->P.IdleTime=IDLE_COEF_MIN;
+	if(A->P.IdleTime > IDLE_COEF_MAX)	A->P.IdleTime=IDLE_COEF_MAX;
+
+	while(A->LOOP)
+	{
+		// Settle down N x 50000 microseconds as specified by the command argument.
+		usleep(IDLE_BASE_USEC * A->P.IdleTime);
+
+/* CRITICAL_IN  */
+		for(cpu=0; cpu < A->P.CPU; cpu++)
+			if(A->P.Topology[cpu].CPU != NULL)
+			{
+				// Update the Unhalted Core & the Reference Cycles.
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].UCC);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
+				// Update TSC.
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[1]);
+				/* Update C-States.
+				ToDo*/
+			}
+/* CRITICAL_OUT */
+
+		// Reset C-States average.
+		A->P.Avg.Turbo=A->P.Avg.C0=A->P.Avg.C3=A->P.Avg.C6=0;
+
+		unsigned int maxFreq=0, maxTemp=A->P.Topology[0].CPU->TjMax.Target;
+		for(cpu=0; cpu < A->P.CPU; cpu++)
+			if(A->P.Topology[cpu].CPU != NULL)
+			{
+				// Compute the absolute Delta of Unhalted (Core & Ref) C0 Cycles = Current[1] - Previous[0].
+				A->P.Topology[cpu].CPU->Delta.C0.UCC=	(A->P.Topology[cpu].CPU->Cycles.C0[0].UCC > A->P.Topology[cpu].CPU->Cycles.C0[1].UCC) ?
+								A->P.Topology[cpu].CPU->Cycles.C0[0].UCC - A->P.Topology[cpu].CPU->Cycles.C0[1].UCC
+								:A->P.Topology[cpu].CPU->Cycles.C0[1].UCC - A->P.Topology[cpu].CPU->Cycles.C0[0].UCC;
+
+				A->P.Topology[cpu].CPU->Delta.C0.URC=	A->P.Topology[cpu].CPU->Cycles.C0[1].URC - A->P.Topology[cpu].CPU->Cycles.C0[0].URC;
+
+				A->P.Topology[cpu].CPU->Delta.TSC=	A->P.Topology[cpu].CPU->Cycles.TSC[1] - A->P.Topology[cpu].CPU->Cycles.TSC[0];
+
+				// Compute Turbo State per Cycles Delta. (Protect against a division by zero)
+				A->P.Topology[cpu].CPU->State.Turbo=(double) (A->P.Topology[cpu].CPU->Delta.C0.URC != 0) ?
+							(double) (A->P.Topology[cpu].CPU->Delta.C0.UCC) / (double) A->P.Topology[cpu].CPU->Delta.C0.URC
+							: 0.0f;
+				// Compute C-States.
+				A->P.Topology[cpu].CPU->State.C0=(double) (A->P.Topology[cpu].CPU->Delta.C0.URC) / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
+
+				A->P.Topology[cpu].CPU->RelativeRatio=A->P.Topology[cpu].CPU->State.Turbo * A->P.Topology[cpu].CPU->State.C0 * (double) A->P.Boost[1];
+
+				// Relative Frequency = Relative Ratio x Bus Clock Frequency
+				A->P.Topology[cpu].CPU->RelativeFreq=A->P.Topology[cpu].CPU->RelativeRatio * A->P.ClockSpeed;
+
+				// Save TSC.
+				A->P.Topology[cpu].CPU->Cycles.TSC[0]=A->P.Topology[cpu].CPU->Cycles.TSC[1];
+				// Save the Unhalted Core & Reference Cycles for next iteration.
+				A->P.Topology[cpu].CPU->Cycles.C0[0].UCC=A->P.Topology[cpu].CPU->Cycles.C0[1].UCC;
+				A->P.Topology[cpu].CPU->Cycles.C0[0].URC =A->P.Topology[cpu].CPU->Cycles.C0[1].URC;
+
+				// Sum the C-States before the average.
+				A->P.Avg.Turbo+=A->P.Topology[cpu].CPU->State.Turbo;
+				A->P.Avg.C0+=A->P.Topology[cpu].CPU->State.C0;
+
+				// Index the Top CPU speed.
+				if(maxFreq < A->P.Topology[cpu].CPU->RelativeFreq) {
+					maxFreq=A->P.Topology[cpu].CPU->RelativeFreq;
+					A->P.Top=cpu;
+				}
+
+				// Update the Digital Thermal Sensor.
+				if( (Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_THERM_STATUS, (THERM_STATUS *) &A->P.Topology[cpu].CPU->ThermStat)) == -1)
+					A->P.Topology[cpu].CPU->ThermStat.DTS=0;
+
+				// Index which Core is hot.
+				if(A->P.Topology[cpu].CPU->ThermStat.DTS < maxTemp) {
+					maxTemp=A->P.Topology[cpu].CPU->ThermStat.DTS;
+					A->P.Hot=cpu;
+				}
+				// Store the coldest temperature.
+				if(A->P.Topology[cpu].CPU->ThermStat.DTS > A->P.Cold)
+					A->P.Cold=A->P.Topology[cpu].CPU->ThermStat.DTS;
+			}
+		// Average the C-States.
+		A->P.Avg.Turbo/=A->P.CPU;
+		A->P.Avg.C0/=A->P.CPU;
 
 		// Fire the drawing thread.
 		if(pthread_mutex_trylock(&uDraw_mutex) == 0)
@@ -611,7 +831,8 @@ double	ClockSpeed_Nehalem_Bloomfield()
 	return(133.33f);
 };
 #define	ClockSpeed_Nehalem_Lynnfield	ClockSpeed_Nehalem_Bloomfield
-#define	ClockSpeed_Nehalem_NehalemEP	ClockSpeed_Nehalem_Bloomfield
+#define	ClockSpeed_Nehalem_MB		ClockSpeed_Nehalem_Bloomfield
+#define	ClockSpeed_Nehalem_EX		ClockSpeed_Nehalem_Bloomfield
 
 static void *uCycle_Nehalem(void *uArg)
 {
@@ -682,7 +903,7 @@ static void *uCycle_Nehalem(void *uArg)
 				A->P.Topology[cpu].CPU->State.C3=(double) (A->P.Topology[cpu].CPU->Delta.C3)  / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
 				A->P.Topology[cpu].CPU->State.C6=(double) (A->P.Topology[cpu].CPU->Delta.C6)  / (double) (A->P.Topology[cpu].CPU->Delta.TSC);
 
-				A->P.Topology[cpu].CPU->RelativeRatio=A->P.Topology[cpu].CPU->State.Turbo * A->P.Topology[cpu].CPU->State.C0 * (double) A->P.Platform.MaxNonTurboRatio;
+				A->P.Topology[cpu].CPU->RelativeRatio=A->P.Topology[cpu].CPU->State.Turbo * A->P.Topology[cpu].CPU->State.C0 * (double) A->P.Boost[1];
 
 				// Relative Frequency = Relative Ratio x Bus Clock Frequency
 				A->P.Topology[cpu].CPU->RelativeFreq=A->P.Topology[cpu].CPU->RelativeRatio * A->P.ClockSpeed;
@@ -740,20 +961,20 @@ static void *uCycle_Nehalem(void *uArg)
 
 
 // [Westmere]
-double	ClockSpeed_Westmere_Arrandale()
+double	ClockSpeed_Westmere()
 {
 	return(133.33f);
 };
-#define	ClockSpeed_Westmere_Gulftown	ClockSpeed_Westmere_Arrandale
-#define	ClockSpeed_Westmere_WestmereEP	ClockSpeed_Westmere_Gulftown
+#define	ClockSpeed_Westmere_EP	ClockSpeed_Westmere
+#define	ClockSpeed_Westmere_EX	ClockSpeed_Westmere
 
 
 // [SandyBridge]
-double	ClockSpeed_SandyBridge_1G()
+double	ClockSpeed_SandyBridge_EP()
 {
 	return(100.00f);
 };
-#define	ClockSpeed_SandyBridge_Bromolow	ClockSpeed_SandyBridge_1G
+#define	ClockSpeed_SandyBridge	ClockSpeed_SandyBridge_EP
 
 
 // [IvyBridge]
@@ -761,16 +982,17 @@ double	ClockSpeed_IvyBridge()
 {
 	return(100.00f);
 };
-#define	ClockSpeed_IvyBridgeEP	ClockSpeed_IvyBridge
+#define	ClockSpeed_IvyBridge_EP	ClockSpeed_IvyBridge
 
 
 // [Haswell]
-double	ClockSpeed_Haswell_3C()
+double	ClockSpeed_Haswell_DT()
 {
 	return(100.00f);
 };
-#define	ClockSpeed_Haswell_45	ClockSpeed_Haswell_3C
-#define	ClockSpeed_Haswell_46	ClockSpeed_Haswell_3C
+#define	ClockSpeed_Haswell_MB	ClockSpeed_Haswell_DT
+#define	ClockSpeed_Haswell_ULT	ClockSpeed_Haswell_DT
+#define	ClockSpeed_Haswell_ULX	ClockSpeed_Haswell_DT
 
 
 
@@ -860,14 +1082,27 @@ int	Get_CoreCount()
 // Call the CPUID instruction.
 void	Read_Features(FEATURES *features)
 {
+	int BX=0, DX=0, CX=0;
+	__asm__ volatile
+	(
+		"xorq	%%rax, %%rax;"
+		"cpuid;"
+		: "=b"	(BX),
+		  "=d"	(DX),
+		  "=c"	(CX)
+	);
+	features->VendorID[0]=BX; features->VendorID[1]=(BX >> 8); features->VendorID[2]= (BX >> 16); features->VendorID[3]= (BX >> 24);
+	features->VendorID[4]=DX; features->VendorID[5]=(DX >> 8); features->VendorID[6]= (DX >> 16); features->VendorID[7]= (DX >> 24);
+	features->VendorID[8]=CX; features->VendorID[9]=(CX >> 8); features->VendorID[10]=(CX >> 16); features->VendorID[11]=(CX >> 24);
+
 	__asm__ volatile
 	(
 		"movq	$0x1, %%rax;"
 		"cpuid;"
-		: "=a"	(features->Std.EAX),
-		  "=b"	(features->Std.EBX),
-		  "=c"	(features->Std.ECX),
-		  "=d"	(features->Std.EDX)
+		: "=a"	(features->Std.AX),
+		  "=b"	(features->Std.BX),
+		  "=c"	(features->Std.CX),
+		  "=d"	(features->Std.DX)
 	);
 	__asm__ volatile
 	(
@@ -883,10 +1118,10 @@ void	Read_Features(FEATURES *features)
 	(
 		"movq	$0x6, %%rax;"
 		"cpuid;"
-		: "=a"	(features->Thermal_Power_Leaf.EAX),
-		  "=b"	(features->Thermal_Power_Leaf.EBX),
-		  "=c"	(features->Thermal_Power_Leaf.ECX),
-		  "=d"	(features->Thermal_Power_Leaf.EDX)
+		: "=a"	(features->Thermal_Power_Leaf.AX),
+		  "=b"	(features->Thermal_Power_Leaf.BX),
+		  "=c"	(features->Thermal_Power_Leaf.CX),
+		  "=d"	(features->Thermal_Power_Leaf.DX)
 	);
 	__asm__ volatile
 	(
@@ -895,19 +1130,19 @@ void	Read_Features(FEATURES *features)
 		"xorq	%%rcx, %%rcx;"
 		"xorq	%%rdx, %%rdx;"
 		"cpuid;"
-		: "=a"	(features->ExtFeature.EAX),
-		  "=b"	(features->ExtFeature.EBX),
-		  "=c"	(features->ExtFeature.ECX),
-		  "=d"	(features->ExtFeature.EDX)
+		: "=a"	(features->ExtFeature.AX),
+		  "=b"	(features->ExtFeature.BX),
+		  "=c"	(features->ExtFeature.CX),
+		  "=d"	(features->ExtFeature.DX)
 	);
 	__asm__ volatile
 	(
 		"movq	$0xa, %%rax;"
 		"cpuid;"
-		: "=a"	(features->Perf_Monitoring_Leaf.EAX),
-		  "=b"	(features->Perf_Monitoring_Leaf.EBX),
-		  "=c"	(features->Perf_Monitoring_Leaf.ECX),
-		  "=d"	(features->Perf_Monitoring_Leaf.EDX)
+		: "=a"	(features->Perf_Monitoring_Leaf.AX),
+		  "=b"	(features->Perf_Monitoring_Leaf.BX),
+		  "=c"	(features->Perf_Monitoring_Leaf.CX),
+		  "=d"	(features->Perf_Monitoring_Leaf.DX)
 	);
 	__asm__ volatile
 	(
@@ -919,17 +1154,25 @@ void	Read_Features(FEATURES *features)
 	{
 		__asm__ volatile
 		(
+			"movq	$0x80000007, %%rax;"
+			"cpuid;"
+			"and	$0x100, %%rdx;"
+			"shr	$8, %%rdx;"
+			: "=d"	(features->InvariantTSC)
+		);
+		__asm__ volatile
+		(
 			"movq	$0x80000001, %%rax;"
 			"cpuid;"
-			: "=c"	(features->ExtFunc.ECX),
-			  "=d"	(features->ExtFunc.EDX)
+			: "=c"	(features->ExtFunc.CX),
+			  "=d"	(features->ExtFunc.DX)
 		);
 		struct
 		{
 			struct
 			{
 			unsigned char Chr[4];
-			} EAX, EBX, ECX, EDX;
+			} AX, BX, CX, DX;
 		} Brand;
 		char tmpString[48+1]={0x20};
 		int ix=0, jx=0, px=0;
@@ -938,20 +1181,20 @@ void	Read_Features(FEATURES *features)
 			__asm__ volatile
 			(
 				"cpuid;"
-				: "=a"	(Brand.EAX),
-				  "=b"	(Brand.EBX),
-				  "=c"	(Brand.ECX),
-				  "=d"	(Brand.EDX)
+				: "=a"	(Brand.AX),
+				  "=b"	(Brand.BX),
+				  "=c"	(Brand.CX),
+				  "=d"	(Brand.DX)
 				: "a"	(0x80000002 + ix)
 			);
 				for(jx=0; jx<4; jx++, px++)
-					tmpString[px]=Brand.EAX.Chr[jx];
+					tmpString[px]=Brand.AX.Chr[jx];
 				for(jx=0; jx<4; jx++, px++)
-					tmpString[px]=Brand.EBX.Chr[jx];
+					tmpString[px]=Brand.BX.Chr[jx];
 				for(jx=0; jx<4; jx++, px++)
-					tmpString[px]=Brand.ECX.Chr[jx];
+					tmpString[px]=Brand.CX.Chr[jx];
 				for(jx=0; jx<4; jx++, px++)
-					tmpString[px]=Brand.EDX.Chr[jx];
+					tmpString[px]=Brand.DX.Chr[jx];
 		}
 		for(ix=jx=0; jx < px; jx++)
 			if(!(tmpString[jx] == 0x20 && tmpString[jx+1] == 0x20))
@@ -983,23 +1226,24 @@ static void *uReadAPIC(void *uApic)
 				(
 				"movq	$0xb, %%rax;"
 				"cpuid;"
-				: "=a"	(ExtTopology.EAX),
-				  "=b"	(ExtTopology.EBX),
-				  "=c"	(ExtTopology.ECX),
-				  "=d"	(ExtTopology.EDX)
+				: "=a"	(ExtTopology.AX),
+				  "=b"	(ExtTopology.BX),
+				  "=c"	(ExtTopology.CX),
+				  "=d"	(ExtTopology.DX)
 				: "c"	(InputLevel)
 				);
-			if(!ExtTopology.EBX.Register || (InputLevel > LEVEL_CORE))
+			// Exit from the loop if the BX register equals 0; or if the requested level exceeds the level of a Core.
+			if(!ExtTopology.BX.Register || (InputLevel > LEVEL_CORE))
 				NoMoreLevels=1;
 			else
 				{
-				switch(ExtTopology.ECX.Type)
+				switch(ExtTopology.CX.Type)
 					{
 					case LEVEL_THREAD:
 						{
-						SMT_Mask_Width = ExtTopology.EAX.SHRbits;
+						SMT_Mask_Width = ExtTopology.AX.SHRbits;
 						SMT_Select_Mask= ~((-1) << SMT_Mask_Width );
-						A->P.Topology[cpu].Thread_ID=ExtTopology.EDX.x2APIC_ID & SMT_Select_Mask;
+						A->P.Topology[cpu].Thread_ID=ExtTopology.DX.x2APIC_ID & SMT_Select_Mask;
 
 						if((A->P.Topology[cpu].Thread_ID > 0) && (A->P.Features.HTT_enabled == false))
 							A->P.Features.HTT_enabled=true;
@@ -1007,9 +1251,9 @@ static void *uReadAPIC(void *uApic)
 						break;
 					case LEVEL_CORE:
 						{
-						CorePlus_Mask_Width = ExtTopology.EAX.SHRbits;
+						CorePlus_Mask_Width = ExtTopology.AX.SHRbits;
 						CoreOnly_Select_Mask = (~((-1) << CorePlus_Mask_Width ) ) ^ SMT_Select_Mask;
-						A->P.Topology[cpu].Core_ID = (ExtTopology.EDX.x2APIC_ID & CoreOnly_Select_Mask) >> SMT_Mask_Width;
+						A->P.Topology[cpu].Core_ID = (ExtTopology.DX.x2APIC_ID & CoreOnly_Select_Mask) >> SMT_Mask_Width;
 						}
 						break;
 					}
@@ -1018,9 +1262,10 @@ static void *uReadAPIC(void *uApic)
 			}
 		while(!NoMoreLevels);
 
-		A->P.Topology[cpu].APIC_ID=ExtTopology.EDX.x2APIC_ID;
+		A->P.Topology[cpu].APIC_ID=ExtTopology.DX.x2APIC_ID;
 
 		if(A->P.Topology[cpu].CPU == NULL)
+			// If the CPU is enable then allocate its structure.
 			A->P.Topology[cpu].CPU=calloc(1, sizeof(CPU_STRUCT));
 		}
 	else
@@ -1032,9 +1277,9 @@ static void *uReadAPIC(void *uApic)
 unsigned int Create_Topology(uARG *A)
 {
 	int cpu=0, CountEnabledCPU=0;
-
+	// Allocate the Topology structure.
 	A->P.Topology=calloc(A->P.CPU, sizeof(TOPOLOGY));
-
+	// Allocate a temporary structure to keep a link with each CPU during the uApic() function thread.
 	uAPIC *uApic=calloc(A->P.CPU, sizeof(uAPIC));
 
 	for(cpu=0; cpu < A->P.CPU; cpu++)
@@ -1123,8 +1368,8 @@ void	SelectBaseClock(uARG *A)
 	switch(A->P.ClockSrc) {
 		default:
 		case SRC_TSC:	// Base Clock = TSC divided by the maximum ratio (without Turbo).
-			if(A->MSR) {
-				A->P.ClockSpeed=Compute_ExtClock(IDLE_COEF_DEF) / A->P.Platform.MaxNonTurboRatio;
+			if(A->MSR && A->P.Features.InvariantTSC) {
+				A->P.ClockSpeed=Compute_ExtClock(IDLE_COEF_DEF) / A->P.Boost[1];
 				A->P.ClockSrc=SRC_TSC;
 				break;
 			}
@@ -1722,11 +1967,11 @@ void	CloseDisplay(uARG *A)
 			XFreeCursor(A->display, A->MouseCursor[MC]);
 	} while(MC);
 
-	if(A->xfont->fid)
-		XUnloadFont(A->display, A->xfont->fid);
-	free(A->fontName);
+	if(A->xfont)
+		XFreeFont(A->display, A->xfont);
 
-	XCloseDisplay(A->display);
+	if(A->display)
+		XCloseDisplay(A->display);
 }
 
 // Initialize a new X-Window display.
@@ -2264,7 +2509,7 @@ int	OpenWidgets(uARG *A)
 
 						// Prepare a Wallboard string with the Processor information.
 						int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
-						sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Platform.MaxNonTurboRatio * A->P.ClockSpeed);
+						sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Boost[1] * A->P.ClockSpeed);
 						A->L.WB.Length=strlen(str) + (padding << 1);
 						A->L.WB.String=calloc(A->L.WB.Length, 1);
 						memset(A->L.WB.String, 0x20, A->L.WB.Length);
@@ -2478,11 +2723,6 @@ int	OpenWidgets(uARG *A)
 			XSelectInput(A->display, A->W[G].window, EventProfile);
 		}
 		else	noerr=false;
-
-	// Store some Ratios into a string for future chart drawing.
-	sprintf(A->P.Boost, "%02d%02d%02d",	A->P.Platform.MinimumRatio,
-						A->P.Platform.MaxNonTurboRatio,
-						A->P.Turbo.MaxRatio_1C);
 	return(noerr);
 }
 
@@ -2573,7 +2813,7 @@ void	BuildLayout(uARG *A, int G)
 			break;
 		case CORES:
 		{
-			char str[sizeof(CORE_NUM)]={0};
+			char str[16]={0};
 
 			// Draw the Core identifiers, the header, and the footer on the chart.
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
@@ -2585,6 +2825,8 @@ void	BuildLayout(uARG *A, int G)
 						( One_Char_Height(G) * (cpu + 1 + 1) ),
 						str, strlen(str) );
 			}
+			sprintf(str, "%02d%02d%02d", A->P.Boost[0], A->P.Boost[1], A->P.Boost[9]);
+
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawString(	A->display,
 					A->W[G].pixmap.B,
@@ -2608,28 +2850,28 @@ void	BuildLayout(uARG *A, int G)
 			XDrawString(	A->display,
 					A->W[G].pixmap.B,
 					A->W[G].gc,
-					One_Char_Width(G) * ((A->P.Platform.MinimumRatio + 1) * 2),
+					One_Char_Width(G) * ((A->P.Boost[0] + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
-					&A->P.Boost[0], 2);
+					&str[0], 2);
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_MED_VALUE].RGB);
 			XDrawString(	A->display,
 					A->W[G].pixmap.B,
 					A->W[G].gc,
-					One_Char_Width(G) * ((A->P.Platform.MaxNonTurboRatio + 1) * 2),
+					One_Char_Width(G) * ((A->P.Boost[1] + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
-					&A->P.Boost[2], 2);
+					&str[2], 2);
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_HIGH_VALUE].RGB);
 			XDrawString(	A->display,
 					A->W[G].pixmap.B,
 					A->W[G].gc,
-					One_Char_Width(G) * ((A->P.Turbo.MaxRatio_1C + 1) * 2),
+					One_Char_Width(G) * ((A->P.Boost[9] + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
-					&A->P.Boost[4], 2);
+					&str[4], 2);
 		}
 			break;
 		case CSTATES:
 		{
-			char str[sizeof(CORE_NUM)]={0};
+			char str[16]={0};
 
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawImageString(A->display, A->W[G].pixmap.B, A->W[G].gc,
@@ -2689,7 +2931,7 @@ void	BuildLayout(uARG *A, int G)
 			break;
 		case TEMPS:
 		{
-			char str[sizeof(CORE_NUM)]={0};
+			char str[16]={0};
 
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawImageString(A->display,
@@ -2730,7 +2972,7 @@ void	BuildLayout(uARG *A, int G)
 			char str[256]={0};
 
 			int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
-			sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Platform.MaxNonTurboRatio * A->P.ClockSpeed);
+			sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Boost[1] * A->P.ClockSpeed);
 			memcpy(&A->L.WB.String[padding], str, strlen(str));
 
 			sprintf(str, "Loop(%d usecs)", (IDLE_BASE_USEC * A->P.IdleTime) );
@@ -2749,86 +2991,87 @@ void	BuildLayout(uARG *A, int G)
 				sprintf(items, PROC_FORMAT,
 					A->P.Features.BrandString,
 					A->P.ClockSpeed,					ClockSrcStr[A->P.ClockSrc],
-					A->P.Features.Std.EAX.ExtFamily + A->P.Features.Std.EAX.Family,
-					(A->P.Features.Std.EAX.ExtModel << 4) + A->P.Features.Std.EAX.Model,
-					A->P.Features.Std.EAX.Stepping,
+					A->P.Features.Std.AX.ExtFamily + A->P.Features.Std.AX.Family,
+					(A->P.Features.Std.AX.ExtModel << 4) + A->P.Features.Std.AX.Model,
+					A->P.Features.Std.AX.Stepping,
 					A->P.Features.ThreadCount,
 					A->P.Arch[A->P.ArchID].Architecture,
-					powered[A->P.Features.Std.EDX.VME],
-					powered[A->P.Features.Std.EDX.DE],
-					powered[A->P.Features.Std.EDX.PSE],
-					powered[A->P.Features.Std.EDX.TSC],
-					powered[A->P.Features.Std.EDX.MSR],			enabled[A->MSR],
-					powered[A->P.Features.Std.EDX.PAE],
-					powered[A->P.Features.Std.EDX.APIC],
-					powered[A->P.Features.Std.EDX.MTRR],
-					powered[A->P.Features.Std.EDX.PGE],
-					powered[A->P.Features.Std.EDX.MCA],
-					powered[A->P.Features.Std.EDX.PAT],
-					powered[A->P.Features.Std.EDX.PSE36],
-					powered[A->P.Features.Std.EDX.PSN],
-					powered[A->P.Features.Std.EDX.DS_PEBS],			enabled[!A->P.MiscFeatures.PEBS],
-					powered[A->P.Features.Std.EDX.ACPI],
-					powered[A->P.Features.Std.EDX.SS],
-					powered[A->P.Features.Std.EDX.HTT],			enabled[A->P.Features.HTT_enabled],
-					powered[A->P.Features.Std.EDX.TM1],
-					powered[A->P.Features.Std.ECX.TM2],
-					powered[A->P.Features.Std.EDX.PBE],
-					powered[A->P.Features.Std.ECX.DTES64],
-					powered[A->P.Features.Std.ECX.DS_CPL],
-					powered[A->P.Features.Std.ECX.VMX],
-					powered[A->P.Features.Std.ECX.SMX],
-					powered[A->P.Features.Std.ECX.EIST],			enabled[A->P.MiscFeatures.EIST],
-					powered[A->P.Features.Std.ECX.CNXT_ID],
-					powered[A->P.Features.Std.ECX.FMA],
-					powered[A->P.Features.Std.ECX.xTPR],			enabled[!A->P.MiscFeatures.xTPR],
-					powered[A->P.Features.Std.ECX.PDCM],
-					powered[A->P.Features.Std.ECX.PCID],
-					powered[A->P.Features.Std.ECX.DCA],
-					powered[A->P.Features.Std.ECX.x2APIC],
-					powered[A->P.Features.Std.ECX.TSCDEAD],
-					powered[A->P.Features.Std.ECX.XSAVE],
-					powered[A->P.Features.Std.ECX.OSXSAVE],
-					powered[A->P.Features.ExtFunc.EDX.XD_Bit],		enabled[!A->P.MiscFeatures.XD_Bit],
-					powered[A->P.Features.ExtFunc.EDX.PG_1GB],
-					powered[A->P.Features.ExtFeature.EBX.HLE],
-					powered[A->P.Features.ExtFeature.EBX.RTM],
-					powered[A->P.Features.ExtFeature.EBX.FastStrings],	enabled[A->P.MiscFeatures.FastStrings],
+					powered[A->P.Features.Std.DX.VME],
+					powered[A->P.Features.Std.DX.DE],
+					powered[A->P.Features.Std.DX.PSE],
+					A->P.Features.InvariantTSC ? "INVARIANT":"VARIANT",	powered[A->P.Features.Std.DX.TSC],
+					powered[A->P.Features.Std.DX.MSR],			enabled[A->MSR],
+					powered[A->P.Features.Std.DX.PAE],
+					powered[A->P.Features.Std.DX.APIC],
+					powered[A->P.Features.Std.DX.MTRR],
+					powered[A->P.Features.Std.DX.PGE],
+					powered[A->P.Features.Std.DX.MCA],
+					powered[A->P.Features.Std.DX.PAT],
+					powered[A->P.Features.Std.DX.PSE36],
+					powered[A->P.Features.Std.DX.PSN],
+					powered[A->P.Features.Std.DX.DS_PEBS],			enabled[!A->P.MiscFeatures.PEBS],
+					powered[A->P.Features.Std.DX.ACPI],
+					powered[A->P.Features.Std.DX.SS],
+					powered[A->P.Features.Std.DX.HTT],			enabled[A->P.Features.HTT_enabled],
+					powered[A->P.Features.Std.DX.TM1],
+					powered[A->P.Features.Std.CX.TM2],
+					powered[A->P.Features.Std.DX.PBE],
+					powered[A->P.Features.Std.CX.DTES64],
+					powered[A->P.Features.Std.CX.DS_CPL],
+					powered[A->P.Features.Std.CX.VMX],
+					powered[A->P.Features.Std.CX.SMX],
+					powered[A->P.Features.Std.CX.EIST],			enabled[A->P.MiscFeatures.EIST],
+					powered[A->P.Features.Std.CX.CNXT_ID],
+					powered[A->P.Features.Std.CX.FMA],
+					powered[A->P.Features.Std.CX.xTPR],			enabled[!A->P.MiscFeatures.xTPR],
+					powered[A->P.Features.Std.CX.PDCM],
+					powered[A->P.Features.Std.CX.PCID],
+					powered[A->P.Features.Std.CX.DCA],
+					powered[A->P.Features.Std.CX.x2APIC],
+					powered[A->P.Features.Std.CX.TSCDEAD],
+					powered[A->P.Features.Std.CX.XSAVE],
+					powered[A->P.Features.Std.CX.OSXSAVE],
+					powered[A->P.Features.ExtFunc.DX.XD_Bit],		enabled[!A->P.MiscFeatures.XD_Bit],
+					powered[A->P.Features.ExtFunc.DX.PG_1GB],
+					powered[A->P.Features.ExtFeature.BX.HLE],
+					powered[A->P.Features.ExtFeature.BX.RTM],
+					powered[A->P.Features.ExtFeature.BX.FastStrings],	enabled[A->P.MiscFeatures.FastStrings],
+					powered[A->P.Features.Thermal_Power_Leaf.AX.DTS],
 												enabled[A->P.MiscFeatures.TCC],
 												enabled[A->P.MiscFeatures.PerfMonitoring],
 												enabled[!A->P.MiscFeatures.BTS],
 												enabled[A->P.MiscFeatures.CPUID_MaxVal],
+					powered[A->P.Features.Thermal_Power_Leaf.AX.TurboIDA],	enabled[!A->P.MiscFeatures.Turbo_IDA],
 
-					A->P.Turbo.MaxRatio_4C, A->P.Turbo.MaxRatio_3C, A->P.Turbo.MaxRatio_2C, A->P.Turbo.MaxRatio_1C,
-					powered[A->P.Features.Thermal_Power_Leaf.EAX.Turbo],	enabled[!A->P.MiscFeatures.Turbo],
+					A->P.Boost[0], A->P.Boost[1], A->P.Boost[2], A->P.Boost[3], A->P.Boost[4], A->P.Boost[5], A->P.Boost[6], A->P.Boost[7], A->P.Boost[8], A->P.Boost[9],
 
-					powered[A->P.Features.Std.EDX.FPU],
-					powered[A->P.Features.Std.EDX.CX8],
-					powered[A->P.Features.Std.EDX.SEP],
-					powered[A->P.Features.Std.EDX.CMOV],
-					powered[A->P.Features.Std.EDX.CLFSH],
-					powered[A->P.Features.Std.EDX.MMX],
-					powered[A->P.Features.Std.EDX.FXSR],
-					powered[A->P.Features.Std.EDX.SSE],
-					powered[A->P.Features.Std.EDX.SSE2],
-					powered[A->P.Features.Std.ECX.SSE3],
-					powered[A->P.Features.Std.ECX.SSSE3],
-					powered[A->P.Features.Std.ECX.SSE41],
-					powered[A->P.Features.Std.ECX.SSE42],
-					powered[A->P.Features.Std.ECX.PCLMULDQ],
-					powered[A->P.Features.Std.ECX.MONITOR],			enabled[A->P.MiscFeatures.FSM],
-					powered[A->P.Features.Std.ECX.CX16],
-					powered[A->P.Features.Std.ECX.MOVBE],
-					powered[A->P.Features.Std.ECX.POPCNT],
-					powered[A->P.Features.Std.ECX.AES],
-					powered[A->P.Features.Std.ECX.AVX], powered[A->P.Features.ExtFeature.EBX.AVX2],
-					powered[A->P.Features.Std.ECX.F16C],
-					powered[A->P.Features.Std.ECX.RDRAND],
-					powered[A->P.Features.ExtFunc.ECX.LAHFSAHF],
-					powered[A->P.Features.ExtFunc.EDX.SYSCALL],
-					powered[A->P.Features.ExtFunc.EDX.RDTSCP],
-					powered[A->P.Features.ExtFunc.EDX.IA64],
-					powered[A->P.Features.ExtFeature.EBX.BMI1], powered[A->P.Features.ExtFeature.EBX.BMI2]);
+					powered[A->P.Features.Std.DX.FPU],
+					powered[A->P.Features.Std.DX.CX8],
+					powered[A->P.Features.Std.DX.SEP],
+					powered[A->P.Features.Std.DX.CMOV],
+					powered[A->P.Features.Std.DX.CLFSH],
+					powered[A->P.Features.Std.DX.MMX],
+					powered[A->P.Features.Std.DX.FXSR],
+					powered[A->P.Features.Std.DX.SSE],
+					powered[A->P.Features.Std.DX.SSE2],
+					powered[A->P.Features.Std.CX.SSE3],
+					powered[A->P.Features.Std.CX.SSSE3],
+					powered[A->P.Features.Std.CX.SSE41],
+					powered[A->P.Features.Std.CX.SSE42],
+					powered[A->P.Features.Std.CX.PCLMULDQ],
+					powered[A->P.Features.Std.CX.MONITOR],			enabled[A->P.MiscFeatures.FSM],
+					powered[A->P.Features.Std.CX.CX16],
+					powered[A->P.Features.Std.CX.MOVBE],
+					powered[A->P.Features.Std.CX.POPCNT],
+					powered[A->P.Features.Std.CX.AES],
+					powered[A->P.Features.Std.CX.AVX], powered[A->P.Features.ExtFeature.BX.AVX2],
+					powered[A->P.Features.Std.CX.F16C],
+					powered[A->P.Features.Std.CX.RDRAND],
+					powered[A->P.Features.ExtFunc.CX.LAHFSAHF],
+					powered[A->P.Features.ExtFunc.DX.SYSCALL],
+					powered[A->P.Features.ExtFunc.DX.RDTSCP],
+					powered[A->P.Features.ExtFunc.DX.IA64],
+					powered[A->P.Features.ExtFeature.BX.BMI1], powered[A->P.Features.ExtFeature.BX.BMI2]);
 
 				sprintf(str, TOPOLOGY_SECTION, A->P.OnLine);
 				strcat(items, str);
@@ -2849,8 +3092,8 @@ void	BuildLayout(uARG *A, int G)
 				}
 
 				sprintf(str, PERF_SECTION,
-						A->P.Features.Perf_Monitoring_Leaf.EAX.MonCtrs, A->P.Features.Perf_Monitoring_Leaf.EAX.MonWidth,
-						A->P.Features.Perf_Monitoring_Leaf.EDX.FixCtrs, A->P.Features.Perf_Monitoring_Leaf.EDX.FixWidth);
+						A->P.Features.Perf_Monitoring_Leaf.AX.MonCtrs, A->P.Features.Perf_Monitoring_Leaf.AX.MonWidth,
+						A->P.Features.Perf_Monitoring_Leaf.DX.FixCtrs, A->P.Features.Perf_Monitoring_Leaf.DX.FixWidth);
 				strcat(items, str);
 				for(cpu=0; cpu < A->P.CPU; cpu++) {
 					if(A->P.Topology[cpu].CPU != NULL)
@@ -2912,7 +3155,7 @@ void	BuildLayout(uARG *A, int G)
 				free(items);
 			}
 			else {
-				sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Platform.MaxNonTurboRatio * A->P.ClockSpeed);
+				sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Boost[1] * A->P.ClockSpeed);
 				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 				XDrawString(A->display, A->W[G].pixmap.B, A->W[G].gc,
 						Half_Char_Width(G),
@@ -2994,18 +3237,29 @@ void	DrawLayout(uARG *A, int G)
 				if(A->P.Topology[cpu].CPU != NULL)
 				{
 					// Select a color based ratio.
-					unsigned long BarBg, BarFg;
-					if(A->P.Topology[cpu].CPU->RelativeRatio <= A->P.Platform.MinimumRatio)
-						{ BarBg=A->L.Colors[COLOR_INIT_VALUE].RGB; BarFg=A->L.Colors[COLOR_DYNAMIC].RGB; }
-					if(A->P.Topology[cpu].CPU->RelativeRatio >  A->P.Platform.MinimumRatio)
-						{ BarBg=A->L.Colors[COLOR_LOW_VALUE].RGB; BarFg=A->L.Colors[BACKGROUND_CORES].RGB; }
-					if(A->P.Topology[cpu].CPU->RelativeRatio >= A->P.Platform.MaxNonTurboRatio)
-						{ BarBg=A->L.Colors[COLOR_MED_VALUE].RGB; BarFg=A->L.Colors[BACKGROUND_CORES].RGB; }
-					if(A->P.Topology[cpu].CPU->RelativeRatio >= A->P.Turbo.MaxRatio_4C)
-						{ BarBg=A->L.Colors[COLOR_HIGH_VALUE].RGB; BarFg=A->L.Colors[BACKGROUND_CORES].RGB; }
+					const struct {
+						unsigned long Bg, Fg;
+					} Bar[10]
+					= {
+						{A->L.Colors[COLOR_INIT_VALUE].RGB, A->L.Colors[COLOR_DYNAMIC].RGB},
+						{A->L.Colors[COLOR_LOW_VALUE].RGB,  A->L.Colors[BACKGROUND_CORES].RGB},
+						{A->L.Colors[COLOR_MED_VALUE].RGB,  A->L.Colors[BACKGROUND_CORES].RGB},
+						{A->L.Colors[COLOR_MED_VALUE].RGB,  A->L.Colors[BACKGROUND_CORES].RGB},
+						{A->L.Colors[COLOR_MED_VALUE].RGB,  A->L.Colors[BACKGROUND_CORES].RGB},
+						{A->L.Colors[COLOR_MED_VALUE].RGB,  A->L.Colors[BACKGROUND_CORES].RGB},
+						{A->L.Colors[COLOR_MED_VALUE].RGB,  A->L.Colors[BACKGROUND_CORES].RGB},
+						{A->L.Colors[COLOR_MED_VALUE].RGB,  A->L.Colors[BACKGROUND_CORES].RGB},
+						{A->L.Colors[COLOR_HIGH_VALUE].RGB, A->L.Colors[BACKGROUND_CORES].RGB},
+						{A->L.Colors[COLOR_HIGH_VALUE].RGB, A->L.Colors[BACKGROUND_CORES].RGB},
+					};
+					unsigned int i=0;
+					for(i=0; i < 9; i++)
+						if(A->P.Boost[i] != 0)
+							if(!(A->P.Topology[cpu].CPU->RelativeRatio > A->P.Boost[i]))
+								break;
 
 					// Draw the Core frequency.
-					XSetForeground(A->display, A->W[G].gc, BarBg);
+					XSetForeground(A->display, A->W[G].gc, Bar[i].Bg);
 					XFillRectangle(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							One_Char_Width(G) * 3,
 							3 + ( One_Char_Height(G) * (cpu + 1) ),
@@ -3014,7 +3268,7 @@ void	DrawLayout(uARG *A, int G)
 
 					// For each Core, display its frequency, C-STATE & ratio.
 					if(A->L.Play.freqHertz && (A->P.Topology[cpu].CPU->RelativeRatio >= 5.0f) ) {
-						XSetForeground(A->display, A->W[G].gc, BarFg);
+						XSetForeground(A->display, A->W[G].gc, Bar[i].Fg);
 						sprintf(str, CORE_FREQ, A->P.Topology[cpu].CPU->RelativeFreq);
 						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 								One_Char_Width(G) * 5,
@@ -3360,6 +3614,8 @@ void	UpdateWidgetName(uARG *A, int G)
 static void *uDraw(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
+	pthread_detach(A->TID_Draw);
+
 	int G=0;
 	for(G=MAIN; G < WIDGETS; G++) {
 		if(!A->PAUSE[G]) {
@@ -3507,6 +3763,16 @@ void	Play(uARG *A, int G, char ID)
 		case ID_PAUSE: {
 			A->PAUSE[G]=!A->PAUSE[G];
 			XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT * A->PAUSE[G]]);
+			}
+			break;
+		case ID_STOP: {
+			A->PAUSE[G]=true;
+			XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
+			}
+			break;
+		case ID_RESUME: {
+			A->PAUSE[G]=false;
+			XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
 		case ID_INCLOOP:
@@ -3719,6 +3985,7 @@ COMMAND	Command[]={
 			{"help", Proc_Help},
 			{"menu", Proc_Menu},
 			{"quit", Proc_Quit},
+			{"clear", ClearMsg},
 			{"version", Proc_Release},
 			{NULL, NULL},
 		};
@@ -3845,11 +4112,6 @@ static void *uLoop(uARG *A)
 						if(G != MAIN)
 							Play(A, G, ID_PAUSE);
 						break;
-					case XK_h:
-					case XK_H:
-						if(E.xkey.state & ControlMask)
-							Play(A, G, ID_FREQ);
-						break;
 					case XK_l:
 					case XK_L:
 						// Fire the drawing thread.
@@ -3884,6 +4146,11 @@ static void *uLoop(uARG *A)
 					case XK_Y:
 						if(E.xkey.state & ControlMask)
 							Play(A, G, ID_CYCLE);
+						break;
+					case XK_z:
+					case XK_Z:
+						if(E.xkey.state & ControlMask)
+							Play(A, G, ID_FREQ);
 						break;
 					case XK_Up:
 					case XK_KP_Up:
@@ -4077,7 +4344,8 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 		}
 	}
 	//  Parse the command line arguments which may override settings.
-	if( (argc - ((argc >> 1) << 1)) ) {
+	if( (argc - ((argc >> 1) << 1)) )
+	{
 		for(j=1; j < argc; j+=2) {
 			for(i=0; i < OPTIONS_COUNT; i++)
 				if(!strcmp(argv[j], A->Options[i].argument)) {
@@ -4183,24 +4451,65 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 		XrmDestroyDatabase(xdb);
 
 	if(noerr == false) {
-		printf("Usage: %s [OPTION...]\n\n", argv[0]);
-		for(i=0; i < OPTIONS_COUNT; i++)
-			printf("\t%s\t%s\n", A->Options[i].argument, A->Options[i].manual);
+		if(!strcmp(argv[1], "-h"))
+		{
+			printf("Usage: %s [OPTION...]\n\n", argv[0]);
+			for(i=0; i < OPTIONS_COUNT; i++)
+				printf("\t%s\t%s\n", A->Options[i].argument, A->Options[i].manual);
 
-		printf(	"\nExit status:\n0\tif OK,\n1\tif problems,\n2\tif serious trouble.\n" \
-			"\nReport bugs to webmaster@cyring.fr\n");
-
-		if(!strcmp(argv[1], "-A"))
+			printf(	"\nExit status:\n0\tif OK,\n1\tif problems,\n2\tif serious trouble.\n" \
+				"\nReport bugs to webmaster@cyring.fr\n");
+		}
+		else if(!strcmp(argv[1], "-A"))
 		{
 			printf(	"\n" \
-				"     Architecture            CPU        FSB Clock\n" \
-				"  #                         [max]        [ MHz ]\n");
+				"     Architecture              Family         CPU        FSB Clock\n" \
+				"  #                            _Model        [max]        [ MHz ]\n");
 			for(i=0; i < ARCHITECTURES; i++)
-				printf(	"%3d  %-22s  %3d         %6.2f\n",
-					i, A->P.Arch[i].Architecture, A->P.Arch[i].MaxOfCores, A->P.Arch[i].ClockSpeed());
+				printf(	"%3d  %-25s %1X%1X_%1X%1X          %3d         %6.2f\n",
+					i, A->P.Arch[i].Architecture,
+					A->P.Arch[i].Signature.ExtFamily, A->P.Arch[i].Signature.Family,
+					A->P.Arch[i].Signature.ExtModel, A->P.Arch[i].Signature.Model,
+					A->P.Arch[i].MaxOfCores, A->P.Arch[i].ClockSpeed());
+		}
+		else
+		{
+			if(j > 0)
+				printf("%s: unrecognized option '%s'\nTry '%s -h' for more information.\n", basename(argv[0]), argv[j], basename(argv[0]));
+			else
+				printf("%s: malformed options.\nTry '%s -h' for more information.\n", basename(argv[0]), basename(argv[0]));
 		}
 	}
 	return(noerr);
+}
+
+static void *uEmergency(void *uArg)
+{
+	uARG *A=(uARG *) uArg;
+	int caught=0;
+	while(A->LOOP && !sigwait(&A->Signal, &caught))
+		switch(caught)
+		{
+			case SIGINT:
+			case SIGQUIT:
+			case SIGUSR1:
+			case SIGTERM:
+				A->LOOP=false;
+				break;
+			case SIGCONT: {
+/*				int G=0;
+				for(G=FIRST_WIDGET; G <= LAST_WIDGET; G++)
+					Play(A, G, ID_RESUME);*/
+			}
+				break;
+			case SIGUSR2:
+			case SIGTSTP: {
+/*				int G=0;
+				for(G=FIRST_WIDGET; G <= LAST_WIDGET; G++)
+					Play(A, G, ID_STOP);*/
+			}
+		}
+	return(NULL);
 }
 
 // Verify the prerequisites & start the threads.
@@ -4210,38 +4519,43 @@ int main(int argc, char *argv[])
 			display:NULL,
 			screen:NULL,
 			TID_Draw:0,
-			fontName:malloc(sizeof(char)*256),
+			fontName:calloc(256, sizeof(char)),
 			xfont:NULL,
 			MouseCursor:{0},
 			P: {
 				ArchID:ARCHITECTURES,
 				Arch: {
-					{ GenuineIntel,         2,  ClockSpeed_GenuineIntel,         "GenuineIntel",         uCycle_GenuineIntel, Init_MSR_GenuineIntel },
-					{ Core_Duo,             2,  ClockSpeed_Core_Duo,             "Core/Duo",             uCycle_GenuineIntel, Init_MSR_GenuineIntel },
-					{ Core_2Duo,            4,  ClockSpeed_Core_2Duo,            "Core/2 Duo",           uCycle_GenuineIntel, Init_MSR_GenuineIntel },
-					{ Core_Kentsfield,      4,  ClockSpeed_Core_2Duo,            "Core/2 Kentsfield",    uCycle_GenuineIntel, Init_MSR_GenuineIntel },
-					{ Core_Yorkfield,       4,  ClockSpeed_Core_2Duo,            "Core/2 Yorkfield",     uCycle_GenuineIntel, Init_MSR_GenuineIntel },
-					{ Atom_Bonnell,         2,  ClockSpeed_Atom,                 "Atom/Bonnell",         uCycle_GenuineIntel, Init_MSR_GenuineIntel },
-					{ Atom_Silvermont,      8,  ClockSpeed_Atom,                 "Atom/Silvermont",      uCycle_GenuineIntel, Init_MSR_GenuineIntel },
-					{ Atom_27,              8,  ClockSpeed_Atom,                 "Atom/27",              uCycle_GenuineIntel, Init_MSR_GenuineIntel },
-					{ Atom_35,              8,  ClockSpeed_Atom,                 "Atom/35",              uCycle_GenuineIntel, Init_MSR_GenuineIntel },
-					{ Atom_Saltwell,        2,  ClockSpeed_Atom,                 "Atom/Saltwell",        uCycle_GenuineIntel, Init_MSR_GenuineIntel },
-					{ Nehalem_Bloomfield,   4,  ClockSpeed_Nehalem_Bloomfield,   "Nehalem/Bloomfield",   uCycle_Nehalem     , Init_MSR_Nehalem      },
-					{ Nehalem_Lynnfield,    4,  ClockSpeed_Nehalem_Lynnfield,    "Nehalem/Lynnfield",    uCycle_Nehalem     , Init_MSR_Nehalem      },
-					{ Nehalem_0F,           4,  ClockSpeed_Nehalem_Lynnfield,    "Nehalem/Lynnfield 0F", uCycle_Nehalem     , Init_MSR_Nehalem      },
-					{ Nehalem_NehalemEP,    4,  ClockSpeed_Nehalem_NehalemEP,    "Nehalem/EP",           uCycle_Nehalem     , Init_MSR_Nehalem      },
-					{ Westmere_Arrandale,   6,  ClockSpeed_Westmere_Arrandale,   "Westmere/Arrandale",   uCycle_Nehalem     , Init_MSR_Nehalem      },
-					{ Westmere_Gulftown,    6,  ClockSpeed_Westmere_Gulftown,    "Westmere/Gulftown",    uCycle_Nehalem     , Init_MSR_Nehalem      },
-					{ Westmere_WestmereEP,  6,  ClockSpeed_Westmere_WestmereEP,  "Westmere/EP",          uCycle_Nehalem     , Init_MSR_Nehalem      },
-					{ SandyBridge_1G,       6,  ClockSpeed_SandyBridge_1G,       "SandyBridge/1G",       uCycle_Nehalem     , Init_MSR_Nehalem      },
-					{ SandyBridge_Bromolow, 4,  ClockSpeed_SandyBridge_Bromolow, "SandyBridge/Bromolow", uCycle_Nehalem     , Init_MSR_Nehalem      },
-					{ IvyBridge,            6,  ClockSpeed_IvyBridge,            "IvyBridge",            uCycle_Nehalem     , Init_MSR_Nehalem      },
-					{ IvyBridgeEP,          12, ClockSpeed_IvyBridgeEP,          "IvyBridge/EP",         uCycle_Nehalem     , Init_MSR_Nehalem      },
-					{ Haswell_3C,           4,  ClockSpeed_Haswell_3C,           "Haswell/3G",           uCycle_Nehalem     , Init_MSR_Nehalem      },
-					{ Haswell_45,           4,  ClockSpeed_Haswell_45,           "Haswell/45",           uCycle_Nehalem     , Init_MSR_Nehalem      },
-					{ Haswell_46,           4,  ClockSpeed_Haswell_46,           "Haswell/46",           uCycle_Nehalem     , Init_MSR_Nehalem      },
+					{ _GenuineIntel,         2,  ClockSpeed_GenuineIntel,         calloc(12 + 1, 1),           uCycle_GenuineIntel, Init_MSR_GenuineIntel },
+					{ _Core_Yonah,           2,  ClockSpeed_Core,                 "Core/Yonah",                uCycle_GenuineIntel, Init_MSR_GenuineIntel },
+					{ _Core_Conroe,          2,  ClockSpeed_Core2,                "Core2/Conroe",              uCycle_Core,         Init_MSR_Core         },
+					{ _Core_Kentsfield,      4,  ClockSpeed_Core2,                "Core2/Kentsfield",          uCycle_Core,         Init_MSR_Core         },
+					{ _Core_Yorkfield,       4,  ClockSpeed_Core2,                "Core2/Yorkfield",           uCycle_Core,         Init_MSR_Core         },
+					{ _Core_Dunnington,      6,  ClockSpeed_Core2,                "Xeon/Dunnington",           uCycle_Core,         Init_MSR_Core         },
+					{ _Atom_Bonnell,         2,  ClockSpeed_Atom,                 "Atom/Bonnell",              uCycle_Core,         Init_MSR_Core         },
+					{ _Atom_Silvermont,      8,  ClockSpeed_Atom,                 "Atom/Silvermont",           uCycle_Core,         Init_MSR_Core         },
+					{ _Atom_Lincroft,        1,  ClockSpeed_Atom,                 "Atom/Lincroft",             uCycle_Core,         Init_MSR_Core         },
+					{ _Atom_Clovertrail,     2,  ClockSpeed_Atom,                 "Atom/Clovertrail",          uCycle_Core,         Init_MSR_Core         },
+					{ _Atom_Saltwell,        2,  ClockSpeed_Atom,                 "Atom/Saltwell",             uCycle_Core,         Init_MSR_Core         },
+					{ _Silvermont_637,       4,  ClockSpeed_Silvermont,           "Silvermont",                uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _Silvermont_64D,       4,  ClockSpeed_Silvermont,           "Silvermont",                uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _Nehalem_Bloomfield,   4,  ClockSpeed_Nehalem_Bloomfield,   "Nehalem/Bloomfield",        uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _Nehalem_Lynnfield,    4,  ClockSpeed_Nehalem_Lynnfield,    "Nehalem/Lynnfield",         uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _Nehalem_MB,           2,  ClockSpeed_Nehalem_MB,           "Nehalem/Mobile",            uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _Nehalem_EX,           8,  ClockSpeed_Nehalem_EX,           "Nehalem/eXtreme.EP",        uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _Westmere,             2,  ClockSpeed_Westmere,             "Westmere",                  uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _Westmere_EP,          6,  ClockSpeed_Westmere_EP,          "Westmere/EP",               uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _Westmere_EX,         10,  ClockSpeed_Westmere_EX,          "Westmere/eXtreme",          uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _SandyBridge,          4,  ClockSpeed_SandyBridge,          "SandyBridge",               uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _SandyBridge_EP,       6,  ClockSpeed_SandyBridge_EP,       "SandyBridge/eXtreme.EP",    uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _IvyBridge,            4,  ClockSpeed_IvyBridge,            "IvyBridge",                 uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _IvyBridge_EP,         6,  ClockSpeed_IvyBridge_EP,         "IvyBridge/EP",              uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _Haswell_DT,           4,  ClockSpeed_Haswell_DT,           "Haswell/Desktop",           uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _Haswell_MB,           4,  ClockSpeed_Haswell_MB,           "Haswell/Mobile",            uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _Haswell_ULT,          2,  ClockSpeed_Haswell_ULT,          "Haswell/Ultra Low TDP",     uCycle_Nehalem,      Init_MSR_Nehalem      },
+					{ _Haswell_ULX,          2,  ClockSpeed_Haswell_ULX,          "Haswell/Ultra Low eXtreme", uCycle_Nehalem,      Init_MSR_Nehalem      },
 				},
 				Features: {
+					VendorID:{0},
 					Std:{{0}},
 					ThreadCount:0,
 					Thermal_Power_Leaf:{{0}},
@@ -4250,16 +4564,21 @@ int main(int argc, char *argv[])
 					LargestExtFunc:0,
 					ExtFunc:{{0}},
 					BrandString:{0},
+					InvariantTSC:false,
 					HTT_enabled:false,
 				},
 				Topology:NULL,
+				PlatformId:{0},
+				PerfStatus:{0},
 				MiscFeatures:{0},
-				Platform:{0},
+				PlatformInfo:{0, MinimumRatio:7, MaxNonTurboRatio:30},
 				Turbo:{0},
 				BClockROMaddr:BCLK_ROM_ADDR,
 				ClockSpeed:0,
 				CPU:0,
+				OnLine:0,
 				Boost:{0},
+				Avg:{0},
 				Top:0,
 				Hot:0,
 				Cold:0,
@@ -4547,17 +4866,17 @@ int main(int argc, char *argv[])
 				},
 				Usage:{C0:NULL, C3:NULL, C6:NULL},
 				DumpTable: {
-					{"IA32_PERF_STATUS", IA32_PERF_STATUS},
-					{"IA32_CLOCK_MODULATION", IA32_CLOCK_MODULATION},
+					{"IA32_PERF_STATUS",        IA32_PERF_STATUS},
+					{"IA32_PLATFORM_ID",        IA32_PLATFORM_ID},
 					{"IA32_PKG_THERM_INTERRUP", IA32_PKG_THERM_INTERRUPT},
-					{"IA32_THERM_STATUS", IA32_THERM_STATUS},
-					{"IA32_MISC_ENABLE", IA32_MISC_ENABLE},
-					{"IA32_FIXED_CTR1", IA32_FIXED_CTR1},
-					{"IA32_FIXED_CTR_CTRL", IA32_FIXED_CTR_CTRL},
-					{"IA32_PERF_GLOBAL_CTRL", IA32_PERF_GLOBAL_CTRL},
-					{"MSR_PLATFORM_INFO", MSR_PLATFORM_INFO},
-					{"MSR_TURBO_RATIO_LIMIT", MSR_TURBO_RATIO_LIMIT},
-					{"MSR_TEMPERATURE_TARGET", MSR_TEMPERATURE_TARGET},
+					{"IA32_THERM_STATUS",       IA32_THERM_STATUS},
+					{"IA32_MISC_ENABLE",        IA32_MISC_ENABLE},
+					{"IA32_FIXED_CTR1",         IA32_FIXED_CTR1},
+					{"IA32_FIXED_CTR_CTRL",     IA32_FIXED_CTR_CTRL},
+					{"IA32_PERF_GLOBAL_CTRL",   IA32_PERF_GLOBAL_CTRL},
+					{"MSR_PLATFORM_INFO",       MSR_PLATFORM_INFO},
+					{"MSR_TURBO_RATIO_LIMIT",   MSR_TURBO_RATIO_LIMIT},
+					{"MSR_TEMPERATURE_TARGET",  MSR_TEMPERATURE_TARGET},
 				},
 				Axes:{{0, NULL}},
 				// Design the TextCursor
@@ -4582,29 +4901,21 @@ int main(int argc, char *argv[])
 				{"-S", "%u", &A.P.ClockSrc,           "Clock source TSC(0) BIOS(1) SPEC(2) ROM(3) USER(4)",XDB_CLASS_SYSINFO"."XDB_KEY_CLOCK_SOURCE   },
 				{"-M", "%x", &A.P.BClockROMaddr,      "ROM memory address of the Base Clock (Hex. value)", XDB_CLASS_SYSINFO"."XDB_KEY_ROM_ADDRESS    },
 				{"-s", "%u", &A.P.IdleTime,           "Idle time ratio where N x 50000 (usec)",            NULL                                       },
-				{"-h", "%u", &A.L.Play.freqHertz,     "CPU frequency (0/1)",                               XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
+				{"-z", "%u", &A.L.Play.freqHertz,     "CPU frequency (0/1)",                               XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
 				{"-l", "%u", &A.L.Play.cycleValues,   "Cycle Values (0/1)",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
 				{"-r", "%u", &A.L.Play.ratioValues,   "Ratio Values (0/1)",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
-				{"-p", "%u", &A.L.Play.cStatePercent, "C-STATE percentage (0/1)",                          XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
+				{"-p", "%u", &A.L.Play.cStatePercent, "C-State percentage (0/1)",                          XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
 				{"-t", "%u", &A.L.Play.alwaysOnTop,   "Always On Top (0/1)",                               NULL                                       },
 				{"-w", "%u", &A.L.Play.wallboard,     "Scroll wallboard (0/1)",                            XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
 				{"-i", "%u", &A.L.Play.hideSplash,    "Hide the splash screen (0/1)",                      NULL                                       },
 			},
 		};
 	{
-		A.P.Platform.MinimumRatio=10;
-		A.P.Platform.MaxNonTurboRatio=20;
-		A.P.Turbo.MaxRatio_1C=60;
-		A.P.Turbo.MaxRatio_2C=55;
-		A.P.Turbo.MaxRatio_3C=50;
-		A.P.Turbo.MaxRatio_4C=45;
-		A.P.Turbo.MaxRatio_5C=40;
-		A.P.Turbo.MaxRatio_6C=35;
-		A.P.Turbo.MaxRatio_7C=30;
-		A.P.Turbo.MaxRatio_8C=25;
+		strcpy(A.P.Arch[0].Architecture, "Genuine");
 	}
 	uid_t	UID=geteuid();
-	bool	ROOT=(UID == 0);	// Check root access.
+	bool	ROOT=(UID == 0),	// Check root access.
+		SIGNAL=false;
 	char	BootLog[1024]={0};
 	int	rc=0;
 
@@ -4614,6 +4925,21 @@ int main(int argc, char *argv[])
 		// Initialize & run the Widget.
 		if(XInitThreads() && OpenDisplay(&A))
 		{
+			sigemptyset(&A.Signal);
+			sigaddset(&A.Signal, SIGINT);	// [CTRL] + [C]
+			sigaddset(&A.Signal, SIGQUIT);
+			sigaddset(&A.Signal, SIGUSR1);
+			sigaddset(&A.Signal, SIGUSR2);
+			sigaddset(&A.Signal, SIGTERM);
+			sigaddset(&A.Signal, SIGCONT);
+			sigaddset(&A.Signal, SIGTSTP);	// [CTRL] + [Z]
+
+			if(!pthread_sigmask(SIG_BLOCK, &A.Signal, NULL)
+			&& !pthread_create(&A.TID_SigHandler, NULL, uEmergency, &A))
+				SIGNAL=true;
+			else
+				strcat(BootLog, "Remark: can not start the signal handler.\n");
+
 			if(!A.L.Play.hideSplash)
 				StartSplash(&A);
 
@@ -4622,23 +4948,27 @@ int main(int argc, char *argv[])
 
 			// Read the CPU Features.
 			Read_Features(&A.P.Features);
+			strcpy(A.P.Arch[0].Architecture, A.P.Features.VendorID);
 
 			// Find or force the Architecture specifications.
 			if((A.P.ArchID < 0) || (A.P.ArchID >= ARCHITECTURES))
+			{
+				if(A.P.ArchID < 0) A.P.ArchID=ARCHITECTURES;
 				do {
 					A.P.ArchID--;
-					if(!(A.P.Arch[A.P.ArchID].Signature.ExtFamily ^ A.P.Features.Std.EAX.ExtFamily)
-					&& !(A.P.Arch[A.P.ArchID].Signature.Family ^ A.P.Features.Std.EAX.Family)
-					&& !(A.P.Arch[A.P.ArchID].Signature.ExtModel ^ A.P.Features.Std.EAX.ExtModel)
-					&& !(A.P.Arch[A.P.ArchID].Signature.Model ^ A.P.Features.Std.EAX.Model))
+					if(!(A.P.Arch[A.P.ArchID].Signature.ExtFamily ^ A.P.Features.Std.AX.ExtFamily)
+					&& !(A.P.Arch[A.P.ArchID].Signature.Family ^ A.P.Features.Std.AX.Family)
+					&& !(A.P.Arch[A.P.ArchID].Signature.ExtModel ^ A.P.Features.Std.AX.ExtModel)
+					&& !(A.P.Arch[A.P.ArchID].Signature.Model ^ A.P.Features.Std.AX.Model))
 						break;
 				} while(A.P.ArchID >=0);
+			}
 
 			if(!(A.P.CPU=A.P.Features.ThreadCount))
 			{
 				strcat(BootLog, "Warning: can not read the maximum number of Cores from CPUID.\n");
 
-				if(A.P.Features.Std.EDX.HTT)
+				if(A.P.Features.Std.DX.HTT)
 				{
 					if(!(A.BIOS=(A.P.CPU=Get_ThreadCount()) != 0))
 						strcat(BootLog, "Warning: can not read the maximum number of Threads from BIOS DMI\nCheck if 'dmi' kernel module is loaded.\n");
@@ -4665,8 +4995,6 @@ int main(int argc, char *argv[])
 				}
 				strcat(BootLog, "specifications.\n");
 			}
-
-			// Allocate the Cores working structure.
 			pthread_mutex_init(&uDraw_mutex, NULL);
 
 			A.P.OnLine=Create_Topology(&A);
@@ -4713,6 +5041,10 @@ int main(int argc, char *argv[])
 			else rc=2;
 
 			// Release the ressources.
+			if(SIGNAL)
+				if(!pthread_kill(A.TID_SigHandler, SIGUSR1))
+					pthread_join(A.TID_SigHandler, NULL);
+
 			IMC_Free_Info(A.M);
 
 			Close_MSR(&A);
@@ -4720,11 +5052,16 @@ int main(int argc, char *argv[])
 			Delete_Topology(&A);
 
 			pthread_mutex_destroy(&uDraw_mutex);
-
-			CloseDisplay(&A);
 		}
 		else	rc=2;
+
+		CloseDisplay(&A);
 	}
 	else	rc=1;
+
+	free(A.fontName);
+
+	free(A.P.Arch[0].Architecture);
+
 	return(rc);
 }

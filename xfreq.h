@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.23 SR2 by CyrIng
+ * XFreq.h #0.23 SR4 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,7 +7,7 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "23"
-#define _NIGHTLY "2"
+#define _NIGHTLY "4-5"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 
@@ -18,6 +18,7 @@ typedef enum {false=0, true=1} bool;
 
 typedef struct
 {
+	char		VendorID[12 + 1];
 	struct
 	{
 		struct SIGNATURE
@@ -31,7 +32,7 @@ typedef struct
 			ExtModel	: 20-16,
 			ExtFamily	: 28-20,
 			Unused2		: 32-28;
-		} EAX;
+		} AX;
 		struct
 		{
 			unsigned
@@ -39,7 +40,7 @@ typedef struct
 			CLFSH_Size	: 16-8,
 			MaxThread	: 24-16,
 			APIC_ID		: 32-24;
-		} EBX;
+		} BX;
 		struct
 		{
 			unsigned
@@ -75,7 +76,7 @@ typedef struct
 			F16C	: 30-29,
 			RDRAND	: 31-30,
 			Unused3	: 32-31;
-		} ECX;
+		} CX;
 		struct
 		{
 			unsigned
@@ -111,7 +112,7 @@ typedef struct
 			TM1	: 30-29,
 			Unused3	: 31-30,
 			PBE	: 32-31;
-		} EDX;
+		} DX;
 	} Std;
 	unsigned	ThreadCount;
 	struct
@@ -120,20 +121,20 @@ typedef struct
 		{
 			unsigned
 			DTS	:  1-0,
-			Turbo	:  2-1,
+			TurboIDA:  2-1,
 			ARAT	:  3-2,
 			Unused1	:  4-3,
 			PLN	:  5-4,
 			ECMD	:  6-5,
 			PTM	:  7-6,
 			Unused2	: 32-7;
-		} EAX;
+		} AX;
 		struct
 		{
 			unsigned
 			Threshld:  4-0,
 			Unused1	: 32-4;
-		} EBX;
+		} BX;
 		struct
 		{
 			unsigned
@@ -142,12 +143,12 @@ typedef struct
 			Unused1	:  3-2,
 			PEB_Cap	:  4-3,
 			Unused2	: 32-4;
-		} ECX;
+		} CX;
 		struct
 		{
 			unsigned
 			Unused1	: 32-0;
-		} EDX;
+		} DX;
 	} Thermal_Power_Leaf;
 	struct
 	{
@@ -158,7 +159,7 @@ typedef struct
 			MonCtrs	: 16-8,
 			MonWidth: 24-16,
 			VectorSz: 32-24;
-		} EAX;
+		} AX;
 		struct
 		{
 			unsigned
@@ -170,19 +171,19 @@ typedef struct
 			BrInRet	:  6-5,
 			BrMispre:  7-6,
 			Unused1	: 32-7;
-		} EBX;
+		} BX;
 		struct
 		{
 			unsigned
 			Unused1	: 32-0;
-		} ECX;
+		} CX;
 		struct
 		{
 			unsigned
 			FixCtrs	:  5-0,
 			FixWidth: 13-5,
 			Unused1	: 32-13;
-		} EDX;
+		} DX;
 	} Perf_Monitoring_Leaf;
 	struct
 	{
@@ -190,7 +191,7 @@ typedef struct
 		{
 			unsigned
 			MaxSubLeaf	: 32-0;
-		} EAX;
+		} AX;
 		struct
 		{
 			unsigned
@@ -209,10 +210,10 @@ typedef struct
 			QM		: 13-12,
 			FPU_CS_DS	: 14-13,
 			Unused3		: 32-14;
-		} EBX;
+		} BX;
 			unsigned
-		ECX			: 32-0,
-		EDX			: 32-0;
+		CX			: 32-0,
+		DX			: 32-0;
 
 	} ExtFeature;
 	unsigned	LargestExtFunc;
@@ -223,7 +224,7 @@ typedef struct
 			unsigned
 			LAHFSAHF:  1-0,
 			Unused1	: 32-1;
-		} ECX;
+		} CX;
 		struct
 		{
 			unsigned
@@ -237,10 +238,11 @@ typedef struct
 			Unused4	: 29-28,
 			IA64	: 30-29,
 			Unused5	: 32-30;
-		} EDX;
+		} DX;
 	} ExtFunc;
 	char		BrandString[48+1];
-	bool		HTT_enabled;
+	bool		InvariantTSC,
+			HTT_enabled;
 } FEATURES;
 
 typedef	struct {
@@ -252,7 +254,7 @@ typedef	struct {
 				Unused1	: 32-5;
 			};
 			unsigned Register;
-		} EAX;
+		} AX;
 		union {
 			struct
 			{
@@ -261,7 +263,7 @@ typedef	struct {
 				Unused1	: 32-16;
 			};
 			unsigned Register;
-		} EBX;
+		} BX;
 		union {
 			struct
 			{
@@ -271,7 +273,7 @@ typedef	struct {
 				Unused1 : 32-16;
 			};
 			unsigned Register;
-		} ECX;
+		} CX;
 		union {
 			struct
 			{
@@ -279,7 +281,7 @@ typedef	struct {
 				 x2APIC_ID: 32-0;
 			};
 			unsigned Register;
-		} EDX;
+		} DX;
 } CPUID_TOPOLOGY;
 
 // Memory address of the Base Clock in the ROM of the ASUS Rampage II GENE.
@@ -318,7 +320,7 @@ struct IMCINFO
 #define	Write_MSR(FD, offset, msr) pwrite(FD, msr, sizeof(*msr), offset)
 
 #define	IA32_TIME_STAMP_COUNTER		0x10
-#define	MSR_FSB_FREQ			0xcd
+#define	IA32_PLATFORM_ID		0x17
 #define	IA32_MPERF			0xe7
 #define	IA32_APERF			0xe8
 #define	IA32_PERF_STATUS		0x198
@@ -336,6 +338,7 @@ struct IMCINFO
 #define	IA32_PERF_GLOBAL_OVF_CTRL	0x390
 #define	MSR_CORE_C3_RESIDENCY		0x3fc
 #define	MSR_CORE_C6_RESIDENCY		0x3fd
+#define	MSR_FSB_FREQ			0xcd
 #define	MSR_PLATFORM_INFO		0xce
 #define	MSR_TURBO_RATIO_LIMIT		0x1ad
 #define	MSR_TEMPERATURE_TARGET		0x1a2
@@ -349,6 +352,16 @@ struct IMCINFO
 typedef	struct
 {
 	unsigned long long
+		ReservedBits1	:  8-0,
+		MaxBusRatio	: 13-8,
+		ReservedBits2	: 50-13,
+		PlatformId	: 53-50,
+		ReservedBits3	: 64-53;
+} PLATFORM_ID;
+
+typedef	struct
+{
+	unsigned long long
 		Bus_Speed	:  3-0,
 		ReservedBits	: 64-3;
 } FSB_FREQ;
@@ -356,7 +369,7 @@ typedef	struct
 typedef	struct
 {
 	unsigned long long
-		Ratio		: 16-0,
+		CurrentRatio	: 16-0,
 		ReservedBits1	: 31-16,
 		XE		: 32-31,
 		ReservedBits2	: 40-32,
@@ -374,10 +387,14 @@ typedef struct
 		ReservedBits2	: 28-16,
 		Ratio_Limited	: 29-28,
 		TDC_TDP_Limited	: 30-29,
-		ReservedBits3	: 40-30,
+		ReservedBits3	: 32-30,
+		LowPowerMode	: 33-32,
+		ConfigTDPlevels	: 35-33,
+		ReservedBits4	: 40-35,
 		MinimumRatio	: 48-40,
-		ReservedBits4	: 64-48;
-} PLATFORM;
+		MinOpeRatio	: 56-48,
+		ReservedBits5	: 64-56;
+} PLATFORM_INFO;
 
 typedef struct
 {
@@ -412,9 +429,11 @@ typedef	struct
 		xTPR		: 24-23,
 		ReservedBits7	: 34-24,
 		XD_Bit		: 35-34,
-		ReservedBits8	: 38-35,
-		Turbo		: 39-38,
-		ReservedBits9	: 64-39;
+		ReservedBits8	: 37-35,
+		DCU_Prefetcher	: 38-37,
+		Turbo_IDA	: 39-38,
+		IP_Prefetcher	: 40-39,
+		ReservedBits9	: 64-40;
 } MISC_PROC_FEATURES;
 
 typedef struct
@@ -531,46 +550,82 @@ typedef struct
 		ReservedBits2	: 64-24;
 } TJMAX;
 
-#define	ARCHITECTURES 24
+enum {	GenuineIntel,		\
+	Core_Yonah,		\
+	Core_Conroe,		\
+	Core_Kentsfield,	\
+	Core_Yorkfield,		\
+	Core_Dunnington,	\
+	Atom_Bonnell,		\
+	Atom_Silvermont,	\
+	Atom_Lincroft,		\
+	Atom_Clovertrail,	\
+	Atom_Saltwell,		\
+	Silvermont_637,		\
+	Silvermont_64D,		\
+	Nehalem_Bloomfield,	\
+	Nehalem_Lynnfield,	\
+	Nehalem_MB,		\
+	Nehalem_EX,		\
+	Westmere,		\
+	Westmere_EP,		\
+	Westmere_EX,		\
+	SandyBridge,		\
+	SandyBridge_EP,		\
+	IvyBridge,		\
+	IvyBridge_EP,		\
+	Haswell_DT,		\
+	Haswell_MB,		\
+	Haswell_ULT,		\
+	Haswell_ULX,		\
+	ARCHITECTURES
+};
+
 //	[GenuineIntel]
-#define	GenuineIntel			{ExtFamily:0x0, Family:0x0, ExtModel:0x0, Model:0x0}
-//	[Core]
-#define	Core_Duo			{ExtFamily:0x0, Family:0x6, ExtModel:0x0, Model:0xE}
-#define	Core_2Duo			{ExtFamily:0x0, Family:0x6, ExtModel:0x0, Model:0xF}
-#define	Core_Kentsfield			{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0x5}
-#define	Core_Yorkfield			{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0x7}
-//	[Atom]
-#define	Atom_Bonnell			{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xC}
-#define	Atom_Silvermont			{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0x6}
-#define	Atom_27				{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0x7}
-#define	Atom_35				{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0x5}
-#define	Atom_Saltwell			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0x6}
-//	[Nehalem]
-#define	Nehalem_Bloomfield		{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xA}
-#define	Nehalem_Lynnfield		{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xE}
-#define	Nehalem_0F			{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xF}
-#define	Nehalem_NehalemEP		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xE}
-//	[Westmere]
-#define	Westmere_Arrandale		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0x5}
-#define	Westmere_Gulftown		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xC}
-#define	Westmere_WestmereEP		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xF}
-//	[Sandy Bridge]
-#define	SandyBridge_1G			{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xD}
-#define	SandyBridge_Bromolow		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xA}
-//	[Ivy Bridge]
-#define	IvyBridge			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xA}
-#define	IvyBridgeEP			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xE}
-//	[Haswell]
-#define	Haswell_3C			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xC}
-#define	Haswell_45			{ExtFamily:0x0, Family:0x6, ExtModel:0x4, Model:0x5}
-#define	Haswell_46			{ExtFamily:0x0, Family:0x6, ExtModel:0x4, Model:0x6}
+#define	_GenuineIntel			{ExtFamily:0x0, Family:0x0, ExtModel:0x0, Model:0x0}
+//	[Core]		06_0EH (32 bits)
+#define	_Core_Yonah			{ExtFamily:0x0, Family:0x6, ExtModel:0x0, Model:0xE}
+//	[Core2]		06_0FH, 06_15H, 06_17H, 06_1D
+#define	_Core_Conroe			{ExtFamily:0x0, Family:0x6, ExtModel:0x0, Model:0xF}
+#define	_Core_Kentsfield		{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0x5}
+#define	_Core_Yorkfield			{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0x7}
+#define	_Core_Dunnington		{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xD}
+//	[Atom]		06_1CH, 06_26H, 06_27H (32 bits), 06_35H (32 bits), 06_36H
+#define	_Atom_Bonnell			{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xC}
+#define	_Atom_Silvermont		{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0x6}
+#define	_Atom_Lincroft			{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0x7}
+#define	_Atom_Clovertrail		{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0x5}
+#define	_Atom_Saltwell			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0x6}
+//	[Silvermont]	06_37H, 06_4DH
+#define	_Silvermont_637			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0x7}
+#define	_Silvermont_64D			{ExtFamily:0x0, Family:0x6, ExtModel:0x4, Model:0xD}
+//	[Nehalem]	06_1AH, 06_1EH, 06_1FH, 06_2EH
+#define	_Nehalem_Bloomfield		{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xA}
+#define	_Nehalem_Lynnfield		{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xE}
+#define	_Nehalem_MB			{ExtFamily:0x0, Family:0x6, ExtModel:0x1, Model:0xF}
+#define	_Nehalem_EX			{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xE}
+//	[Westmere]	06_25H, 06_2CH, 06_2FH
+#define	_Westmere			{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0x5}
+#define	_Westmere_EP			{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xC}
+#define	_Westmere_EX			{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xF}
+//	[Sandy Bridge]	06_2AH, 06_2DH
+#define	_SandyBridge			{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xA}
+#define	_SandyBridge_EP			{ExtFamily:0x0, Family:0x6, ExtModel:0x2, Model:0xD}
+//	[Ivy Bridge]	06_3AH, 06_3EH
+#define	_IvyBridge			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xA}
+#define	_IvyBridge_EP			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xE}
+//	[Haswell]	06_3CH, 06_3FH, 06_45H, 06_46H
+#define	_Haswell_DT			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xC}
+#define	_Haswell_MB			{ExtFamily:0x0, Family:0x6, ExtModel:0x3, Model:0xF}
+#define	_Haswell_ULT			{ExtFamily:0x0, Family:0x6, ExtModel:0x4, Model:0x5}
+#define	_Haswell_ULX			{ExtFamily:0x0, Family:0x6, ExtModel:0x4, Model:0x6}
 
 typedef	const struct
 {
 	struct	SIGNATURE	Signature;
 		unsigned int	MaxOfCores;
 		double		(*ClockSpeed)();
-	const	char		*Architecture;
+		char		*Architecture;
 		void		*(*uCycle)(void *);
 		bool		(*Init_MSR)(void *);
 } ARCH;
@@ -642,15 +697,16 @@ typedef struct
 		ARCH				Arch[ARCHITECTURES];
 		FEATURES			Features;
 		TOPOLOGY			*Topology;
+		PLATFORM_ID			PlatformId;
 		PERF_STATUS			PerfStatus;
 		MISC_PROC_FEATURES		MiscFeatures;
-		PLATFORM			Platform;
+		PLATFORM_INFO			PlatformInfo;
 		TURBO				Turbo;
 		off_t				BClockROMaddr;
 		double				ClockSpeed;
 		unsigned int			CPU,
 						OnLine;
-		char				Boost[2+2+2+1];
+		unsigned int			Boost[1+1+8];
 
 		struct {
 			double			Turbo,
@@ -758,8 +814,10 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 #define	ID_CTRLHOME	'{'
 #define	ID_CTRLEND	'}'
 #define	ID_PAUSE	'I'
+#define	ID_STOP		'&'
+#define	ID_RESUME	'!'
 #define	ID_RESET	'Z'
-#define	ID_FREQ		'H'
+#define	ID_FREQ		'z'
 #define	ID_CYCLE	'Y'
 #define	ID_RATIO	'R'
 #define	ID_STATE	'P'
@@ -871,7 +929,6 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 
 #define	FIRST_WIDGET	(MAIN + 1)
 #define	LAST_WIDGET	(WIDGETS - 1)
-#define	MESSAGE		MAIN
 
 #define	Quarter_Char_Width(N)		(A->W[N].extents.charWidth >> 2)
 #define	Half_Char_Width(N)		(A->W[N].extents.charWidth >> 1)
@@ -895,7 +952,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 
 #define	MAIN_SECTION		"X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" CyrIng"
 
-#define	CORES_TEXT_WIDTH	MAX(A->P.Turbo.MaxRatio_1C, 22)
+#define	CORES_TEXT_WIDTH	MAX(A->P.Boost[9], 22)
 #define	CORES_TEXT_HEIGHT	(A->P.CPU)
 
 #define	CSTATES_TEXT_SPACING	3
@@ -931,7 +988,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"[Home]   Page Begin       [End]    Page End\n"           \
 			"[L][l]   Refresh page     \n"                            \
 			"[Y][y]   Cycles           [W][w]   Wallboard\n"          \
-			"[H][h]   Frequency Hz     [P][p]   C-States %\n"         \
+			"[Z][z]   Frequency Hz     [P][p]   C-States %\n"         \
 			"[R][r]   Ratio values     [Q][q]   Quit\n\n"             \
 			"Commands :\n"                                            \
 			"[Backspace] Remove the rightmost character\n"            \
@@ -963,7 +1020,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"Virtual Mode Extension                                        VME [%c]\n"		\
 			"Debugging Extension                                            DE [%c]\n"		\
 			"Page Size Extension                                           PSE [%c]\n"		\
-			"Time Stamp Counter                                            TSC [%c]\n"		\
+			"Time Stamp Counter                                [%-9s] TSC [%c]\n"			\
 			"Model Specific Registers                                      MSR [%c]   [%s]\n"	\
 			"Physical Address Extension                                    PAE [%c]\n"		\
 			"Advanced Programmable Interrupt Controller                   APIC [%c]\n"		\
@@ -999,12 +1056,15 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"Hardware Lock Elision                                         HLE [%c]\n"		\
 			"Restricted Transactional Memory                               RTM [%c]\n"		\
 			"Fast-Strings                                      REP MOVSB/STOSB [%c]   [%s]\n"	\
+			"Digital Thermal Sensor                                        DTS [%c]\n"		\
 			"Automatic Thermal Control Circuit Enable                      TCC       [%s]\n"	\
 			"Performance Monitoring Available                               PM       [%s]\n"	\
 			"Branch Trace Storage Unavailable                              BTS       [%s]\n"	\
 			"Limit CPUID Maxval                                    Limit-CPUID       [%s]\n"	\
+			"Turbo Boost Technology/Dynamic Acceleration             TURBO/IDA [%c]   [%s]\n"	\
 			"\n"											\
-			"Turbo Boost:       x %2d    x %2d    x %2d    x %2d             TURBO [%c]   [%s]\n"	\
+			"Ratio Boost:   Min   Max    8C    7C    6C    5C    4C    3C    2C    1C\n"		\
+			"               %3d   %3d   %3d   %3d   %3d   %3d   %3d   %3d   %3d   %3d\n"		\
 			"\n"											\
 			"Instruction set:\n"									\
 			"FPU       [%c]           CX8 [%c]          SEP [%c]    CMOV [%c]        CLFSH [%c]\n"	\
@@ -1197,6 +1257,8 @@ typedef struct
 	XTARGET		T;
 	bool		MDI;
 	LAYOUT		L;
+	sigset_t	Signal;
+	pthread_t	TID_SigHandler;
 	bool		LOOP,
 			PAUSE[WIDGETS],
 			MSR,
