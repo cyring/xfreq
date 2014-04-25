@@ -76,6 +76,11 @@
  *
  * [HISTORY]
  *
+ * R 0.24 : 04/25/2014
+ *        - Added 2 arguments:
+ *            '-C' to load and store settings from an alternate configuration file.
+ *            '-U' with a bitmask of unmap Widgets.
+ *
  * R 0.23 : 04/03/2014 SR-4
  *        - Store all Ratios in a Boost array which is also display at the section Boost of the Widget SysInfo.
  *        - Change the Code::Blocks project to be like the Makefile. Thus 'xfreq' is the only binary produced.

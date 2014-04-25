@@ -1,13 +1,13 @@
 /*
- * XFreq.h #0.23 SR4 by CyrIng
+ * XFreq.h #0.24 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
 #define _MAJOR   "0"
-#define _MINOR   "23"
-#define _NIGHTLY "4-5"
+#define _MINOR   "24"
+#define _NIGHTLY "0"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 
@@ -1145,6 +1145,7 @@ typedef struct
 
 typedef struct
 {
+	unsigned int		UnMapBitmask;
 	struct	{
 		int		H,
 				V;
@@ -1231,7 +1232,7 @@ typedef struct
 #define	XDB_KEY_PLAY_CSTATES	"PlayCStates"
 #define	XDB_KEY_PLAY_WALLBOARD	"PlayBrand"
 
-#define	OPTIONS_COUNT	18
+#define	OPTIONS_COUNT	20
 typedef struct
 {
 	char		*argument;
@@ -1263,6 +1264,7 @@ typedef struct
 			PAUSE[WIDGETS],
 			MSR,
 			BIOS;
+	char		*configFile;
 	OPTIONS		Options[OPTIONS_COUNT];
 } uARG;
 

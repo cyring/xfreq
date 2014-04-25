@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.23 SR4 by CyrIng
+ * XFreq.c #0.24 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -3623,7 +3623,8 @@ static void *uDraw(void *uArg)
 			DrawLayout(A, G);
 			FlushLayout(A, G);
 		}
-		UpdateWidgetName(A, G);
+		if(!(A->L.UnMapBitmask & (1 << G)))
+			UpdateWidgetName(A, G);
 	}
 	// Drawing is done.
 	pthread_mutex_unlock(&uDraw_mutex);
@@ -3888,10 +3889,22 @@ char	*FQN_Settings(const char *fName)
 
 bool	StoreSettings(uARG *A)
 {
-	char *FQN=FQN_Settings(XDB_SETTINGS_FILE);
-	if(FQN != NULL)
+	char storePath[1024]={0};
+
+	if(strlen(A->configFile) > 0)
+		strcpy(storePath, A->configFile);
+	else
 	{
-		XrmDatabase xdb=XrmGetFileDatabase(FQN);
+		char *FQN=FQN_Settings(XDB_SETTINGS_FILE);
+		if(FQN != NULL)
+		{
+			strcpy(storePath, FQN);
+			free(FQN);
+		}
+	}
+	if(strlen(storePath) > 0)
+	{
+		XrmDatabase xdb=XrmGetFileDatabase(storePath);
 
 		char strVal[256]={0};
 		char strKey[32]={0};
@@ -3952,9 +3965,8 @@ bool	StoreSettings(uARG *A)
 			sprintf(strVal, "%s.%s: 0x%x", A->L.Colors[i].xrmClass, A->L.Colors[i].xrmKey, A->L.Colors[i].RGB);
 			XrmPutLineResource(&xdb, strVal);
 		}
-		XrmPutFileDatabase(xdb, FQN);
+		XrmPutFileDatabase(xdb, storePath);
 		XrmDestroyDatabase(xdb);
-		free(FQN);
 
 		return(true);
 	}
@@ -4325,12 +4337,20 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 	int i=0, j=0, G=0;
 	bool noerr=true;
 
-	char *FQN=FQN_Settings(XDB_SETTINGS_FILE);
-	if(FQN != NULL)
+	if((argc >= 3) && !strcmp(argv[1], "-C"))
+		sscanf(argv[2], "%s", A->configFile);
+	if(strlen(A->configFile) > 0)
+		xdb=XrmGetFileDatabase(A->configFile);
+	else
 	{
-		xdb=XrmGetFileDatabase(FQN);
-		free(FQN);
-		if(xdb != NULL)
+		char *FQN=FQN_Settings(XDB_SETTINGS_FILE);
+		if(FQN != NULL)
+		{
+			xdb=XrmGetFileDatabase(FQN);
+			free(FQN);
+		}
+	}
+	if(xdb != NULL)
 		{
 			for(i=0; i < OPTIONS_COUNT; i++)
 				if((A->Options[i].xrmName != NULL) && XrmGetResource(xdb, A->Options[i].xrmName, NULL, &xtype, &xvalue))
@@ -4342,7 +4362,6 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 					sscanf(xvalue.addr, "%x", &A->L.Colors[i].RGB);
 			}
 		}
-	}
 	//  Parse the command line arguments which may override settings.
 	if( (argc - ((argc >> 1) << 1)) )
 	{
@@ -4728,6 +4747,7 @@ int main(int argc, char *argv[])
 				dy:0,
 			},
 			L: {
+				UnMapBitmask: 0,
 				globalBackground:_BACKGROUND_GLOBAL,
 				globalForeground:_FOREGROUND_GLOBAL,
 				Colors: {
@@ -4888,9 +4908,12 @@ int main(int argc, char *argv[])
 			},
 			LOOP: true,
 			PAUSE: {false},
+			configFile:calloc(1024, sizeof(char)),
 			Options:
 			{
+				{"-C", "%s", A.configFile,            "Configuration path and file name",                  NULL                                       },
 				{"-D", "%d", &A.MDI,                  "Enable MDI Window (0/1)",                           NULL                                       },
+				{"-U", "%x", &A.L.UnMapBitmask,       "Bitmap of unmap Widgets (Hex. value)",              NULL                                       },
 				{"-F", "%s", A.fontName,              "Font name",                                         XDB_CLASS_MAIN"."XDB_KEY_FONT              },
 				{"-a", "%c", &A.xACL,                 "Enable or disable X ACL (Y/N)",                     NULL                                       },
 				{"-x", "%d", &A.L.Start.H,            "Initial left position (pixel value)",               NULL                                       },
@@ -5024,7 +5047,10 @@ int main(int argc, char *argv[])
 				for(G=MAIN; G < WIDGETS; G++) {
 					BuildLayout(&A, G);
 					MapLayout(&A, G);
-					XMapWindow(A.display, A.W[G].window);
+					if(!(A.L.UnMapBitmask & (1 << G)))
+						XMapWindow(A.display, A.W[G].window);
+					else
+						A.PAUSE[G]=true;
 				}
 				pthread_t TID_Cycle=0;
 				if((A.P.ArchID != -1) && !pthread_create(&TID_Cycle, NULL, A.P.Arch[A.P.ArchID].uCycle, &A)) {
@@ -5060,6 +5086,7 @@ int main(int argc, char *argv[])
 	else	rc=1;
 
 	free(A.fontName);
+	free(A.configFile);
 
 	free(A.P.Arch[0].Architecture);
 
