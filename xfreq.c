@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.24 SR0 by CyrIng
+ * XFreq.c #0.25 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -1397,6 +1397,62 @@ void	SelectBaseClock(uARG *A)
 	}
 }
 
+static void *uSchedule(void *uArg)
+{
+	uARG *A=(uARG *) uArg;
+
+	FILE	*fSD=NULL;
+	unsigned int cpu=0;
+	long int pid;
+
+	while(A->LOOP && A->PROC && A->L.Play.showSchedule)
+	{
+		for(cpu=0; cpu < A->P.CPU; cpu++)
+		{
+			memmove(&A->S.Pipe[cpu].Task[1].pid, &A->S.Pipe[cpu].Task[0].pid, 2 * sizeof(struct TASK_STRUCT));
+			bzero(&A->S.Pipe[cpu].Task[0], sizeof(struct TASK_STRUCT));
+		}
+		if((A->PROC=((fSD=fopen("/proc/sched_debug", "r")) != NULL)) == true)
+		{
+			char buffer[1024], fmt[48];
+			sprintf(fmt, SCHED_PID_FMT, SCHED_PID_FIELD);
+
+			while(!feof(fSD))
+			{
+				if(fgets(buffer, sizeof(buffer), fSD) != NULL)
+				{
+					if((sscanf(buffer, SCHED_CPU_FIELD, &cpu) > 0) && (cpu >= 0) && (cpu < A->P.CPU))
+					{
+						while(fgets(buffer, sizeof(buffer), fSD) != NULL)
+						{
+							if((buffer[0] == '\n') || (sscanf(buffer, fmt, &pid) > 0))
+							{
+								if(pid != 0)
+								{
+									FILE *fCOMM=NULL;
+									sprintf(buffer, "/proc/%ld/comm", pid);
+
+									if((fCOMM=fopen(buffer, "r")) != NULL)
+									{
+										fscanf(fCOMM, TASK_COMM_FMT, A->S.Pipe[cpu].Task[0].comm);
+										fclose(fCOMM);
+									}
+									A->S.Pipe[cpu].Task[0].pid=pid;
+								}
+								break;
+							}
+						}
+					}
+				}
+			}
+			fclose(fSD);
+		}
+		usleep(IDLE_BASE_USEC * A->S.IdleTime);
+	}
+	return(NULL);
+}
+
+
 // Drawing Button functions.
 void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 {
@@ -2245,6 +2301,7 @@ int	OpenWidgets(uARG *A)
 								{ID:ID_FREQ , RSC:{Text:RSC_FREQ} },
 								{ID:ID_CYCLE, RSC:{Text:RSC_CYCLE}},
 								{ID:ID_RATIO, RSC:{Text:RSC_RATIO}},
+								{ID:ID_SCHED, RSC:{Text:RSC_SCHED}},
 								{ID:ID_NULL , RSC:{Text:NULL}}
 							};
 						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
@@ -2867,6 +2924,15 @@ void	BuildLayout(uARG *A, int G)
 					One_Char_Width(G) * ((A->P.Boost[9] + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					&str[4], 2);
+			if(A->L.Play.showSchedule)
+			{
+				sprintf(str, "%7dus", (IDLE_BASE_USEC * A->S.IdleTime) );
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
+				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+						A->W[G].width - Twice_Char_Width(G) - (9 * One_Char_Width(G)),
+						A->W[G].height - Quarter_Char_Height(G),
+						str, strlen(str) );
+			}
 		}
 			break;
 		case CSTATES:
@@ -3276,7 +3342,6 @@ void	DrawLayout(uARG *A, int G)
 								str, strlen(str) );
 					}
 
-					XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 					if(A->L.Play.cycleValues) {
 						sprintf(str,	CORE_DELTA,
 								A->P.Topology[cpu].CPU->Delta.C0.UCC / (IDLE_BASE_USEC * A->P.IdleTime),
@@ -3284,23 +3349,57 @@ void	DrawLayout(uARG *A, int G)
 								A->P.Topology[cpu].CPU->Delta.C3 / (IDLE_BASE_USEC * A->P.IdleTime),
 								A->P.Topology[cpu].CPU->Delta.C6 / (IDLE_BASE_USEC * A->P.IdleTime),
 								A->P.Topology[cpu].CPU->Delta.TSC / (IDLE_BASE_USEC * A->P.IdleTime));
+						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 								One_Char_Width(G) * 13,
 								One_Char_Height(G) * (cpu + 1 + 1),
 								str, strlen(str) );
 					}
-					else if(!A->L.Play.ratioValues) {
-						sprintf(str,	CORE_CYCLES,
+					else {
+						if(A->L.Play.showSchedule) {
+							if(A->S.Pipe[cpu].Task[2].pid != 0)
+							{
+							sprintf(str, CORE_TASK, A->S.Pipe[cpu].Task[2].comm);
+							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH2].RGB);
+							XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+									One_Char_Width(G) * 13,
+									One_Char_Height(G) * (cpu + 1 + 1),
+									str, strlen(str) );
+							}
+							if(A->S.Pipe[cpu].Task[1].pid != 0)
+							{
+							sprintf(str, CORE_TASK, A->S.Pipe[cpu].Task[1].comm);
+							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH1].RGB);
+							XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+									One_Char_Width(G) * 20,
+									One_Char_Height(G) * (cpu + 1 + 1),
+									str, strlen(str) );
+							}
+							if(A->S.Pipe[cpu].Task[0].pid != 0)
+							{
+							sprintf(str, CORE_TASK, A->S.Pipe[cpu].Task[0].comm);
+							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
+							XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+									One_Char_Width(G) * 28,
+									One_Char_Height(G) * (cpu + 1 + 1),
+									str, strlen(str) );
+							}
+						}
+						else if(!A->L.Play.ratioValues) {
+							sprintf(str,	CORE_CYCLES,
 								A->P.Topology[cpu].CPU->Cycles.C0[1].UCC,
 								A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
-						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-								One_Char_Width(G) * 13,
-								One_Char_Height(G) * (cpu + 1 + 1),
-								str, strlen(str) );
+							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
+							XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+									One_Char_Width(G) * 13,
+									One_Char_Height(G) * (cpu + 1 + 1),
+									str, strlen(str) );
+						}
 					}
 
 					if(A->L.Play.ratioValues) {
 						sprintf(str, CORE_RATIO, A->P.Topology[cpu].CPU->RelativeRatio);
+						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 								Twice_Char_Width(G) * CORES_TEXT_WIDTH,
 								One_Char_Height(G) * (cpu + 1 + 1),
@@ -3617,8 +3716,10 @@ static void *uDraw(void *uArg)
 	pthread_detach(A->TID_Draw);
 
 	int G=0;
-	for(G=MAIN; G < WIDGETS; G++) {
-		if(!A->PAUSE[G]) {
+	for(G=MAIN; G < WIDGETS; G++)
+	{
+		if(!A->PAUSE[G])
+		{
 			MapLayout(A, G);
 			DrawLayout(A, G);
 			FlushLayout(A, G);
@@ -3636,9 +3737,11 @@ void	Play(uARG *A, int G, char ID)
 {
 	switch(ID) {
 		case ID_NORTH:
-			if(A->L.Page[G].Pageable) {
+			if(A->L.Page[G].Pageable)
+			{
 				bool CallFlush=false;
-				if(GetVScrolling(G) > 0) {
+				if(GetVScrolling(G) > 0)
+				{
 					SetVScrolling(G, GetVScrolling(G) - SCROLLED_ROWS_PER_ONCE);
 					CallFlush=true;
 				}
@@ -3647,9 +3750,11 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_SOUTH:
-			if(A->L.Page[G].Pageable) {
+			if(A->L.Page[G].Pageable)
+			{
 				bool CallFlush=false;
-				if(GetVScrolling(G) < (GetVListing(G) - GetVViewport(G))) {
+				if(GetVScrolling(G) < (GetVListing(G) - GetVViewport(G)))
+				{
 					SetVScrolling(G, GetVScrolling(G) + SCROLLED_ROWS_PER_ONCE);
 					CallFlush=true;
 				}
@@ -3658,9 +3763,11 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_EAST:
-			if(A->L.Page[G].Pageable) {
+			if(A->L.Page[G].Pageable)
+			{
 				bool CallFlush=false;
-				if(GetHScrolling(G) < (GetHListing(G) - GetHViewport(G))) {
+				if(GetHScrolling(G) < (GetHListing(G) - GetHViewport(G)))
+				{
 					SetHScrolling(G, GetHScrolling(G) + SCROLLED_COLS_PER_ONCE);
 					CallFlush=true;
 				}
@@ -3669,9 +3776,11 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_WEST:
-			if(A->L.Page[G].Pageable) {
+			if(A->L.Page[G].Pageable)
+			{
 				bool CallFlush=false;
-				if(GetHScrolling(G) > 0) {
+				if(GetHScrolling(G) > 0)
+				{
 					SetHScrolling(G, GetHScrolling(G) - SCROLLED_COLS_PER_ONCE);
 					CallFlush=true;
 				}
@@ -3680,13 +3789,16 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_PGUP:
-			if(A->L.Page[G].Pageable) {
+			if(A->L.Page[G].Pageable)
+			{
 				bool CallFlush=false;
-				if(GetVScrolling(G) > SCROLLED_ROWS_PER_PAGE) {
+				if(GetVScrolling(G) > SCROLLED_ROWS_PER_PAGE)
+				{
 					SetVScrolling(G, GetVScrolling(G) - SCROLLED_ROWS_PER_PAGE);
 					CallFlush=true;
 				}
-				else if(GetVScrolling(G) > 0) {
+				else if(GetVScrolling(G) > 0)
+				{
 					SetVScrolling(G, 0);
 					CallFlush=true;
 				}
@@ -3695,13 +3807,16 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_PGDW:
-			if(A->L.Page[G].Pageable) {
+			if(A->L.Page[G].Pageable)
+			{
 				bool CallFlush=false;
-				if(GetVScrolling(G) < (GetVListing(G) - GetVViewport(G) - SCROLLED_ROWS_PER_PAGE)) {
+				if(GetVScrolling(G) < (GetVListing(G) - GetVViewport(G) - SCROLLED_ROWS_PER_PAGE))
+				{
 					SetVScrolling(G, GetVScrolling(G) + SCROLLED_ROWS_PER_PAGE);
 					CallFlush=true;
 				}
-				else if(GetVScrolling(G) < (GetVListing(G) - GetVViewport(G))) {
+				else if(GetVScrolling(G) < (GetVListing(G) - GetVViewport(G)))
+				{
 					SetVScrolling(G, GetVListing(G) - GetVViewport(G));
 					CallFlush=true;
 				}
@@ -3710,9 +3825,11 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_PGHOME:
-			if(A->L.Page[G].Pageable) {
+			if(A->L.Page[G].Pageable)
+			{
 				bool CallFlush=false;
-				if(GetHScrolling(G) > 0) {
+				if(GetHScrolling(G) > 0)
+				{
 					SetHScrolling(G, 0);
 					CallFlush=true;
 				}
@@ -3721,9 +3838,11 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_PGEND:
-			if(A->L.Page[G].Pageable) {
+			if(A->L.Page[G].Pageable)
+			{
 				bool CallFlush=false;
-				if(GetHScrolling(G) < (GetHListing(G) - GetHViewport(G))) {
+				if(GetHScrolling(G) < (GetHListing(G) - GetHViewport(G)))
+				{
 					SetHScrolling(G, GetHListing(G) - GetHViewport(G));
 					CallFlush=true;
 				}
@@ -3732,13 +3851,16 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_CTRLHOME:
-			if(A->L.Page[G].Pageable) {
+			if(A->L.Page[G].Pageable)
+			{
 				bool CallFlush=false;
-				if(GetHScrolling(G) > 0) {
+				if(GetHScrolling(G) > 0)
+				{
 					SetHScrolling(G, 0);
 					CallFlush=true;
 				}
-				if(GetVScrolling(G) > 0) {
+				if(GetVScrolling(G) > 0)
+				{
 					SetVScrolling(G, 0);
 					CallFlush=true;
 				}
@@ -3747,13 +3869,16 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_CTRLEND:
-			if(A->L.Page[G].Pageable) {
+			if(A->L.Page[G].Pageable)
+			{
 				bool CallFlush=false;
-				if(GetHScrolling(G) < (GetHListing(G) - GetHViewport(G))) {
+				if(GetHScrolling(G) < (GetHListing(G) - GetHViewport(G)))
+				{
 					SetHScrolling(G, GetHListing(G) - GetHViewport(G));
 					CallFlush=true;
 				}
-				if(GetVScrolling(G) < (GetVListing(G) - GetVViewport(G))) {
+				if(GetVScrolling(G) < (GetVListing(G) - GetVViewport(G)))
+				{
 					SetVScrolling(G, GetVListing(G) - GetVViewport(G));
 					CallFlush=true;
 				}
@@ -3761,23 +3886,27 @@ void	Play(uARG *A, int G, char ID)
 					FlushLayout(A, G);
 			}
 			break;
-		case ID_PAUSE: {
-			A->PAUSE[G]=!A->PAUSE[G];
-			XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT * A->PAUSE[G]]);
+		case ID_PAUSE:
+			{
+				A->PAUSE[G]=!A->PAUSE[G];
+				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT * A->PAUSE[G]]);
 			}
 			break;
-		case ID_STOP: {
-			A->PAUSE[G]=true;
-			XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
+		case ID_STOP:
+			{
+				A->PAUSE[G]=true;
+				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 			}
 			break;
-		case ID_RESUME: {
-			A->PAUSE[G]=false;
-			XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
+		case ID_RESUME:
+			{
+				A->PAUSE[G]=false;
+				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
 		case ID_INCLOOP:
-			if(A->P.IdleTime < IDLE_COEF_MAX) {
+			if(A->P.IdleTime < IDLE_COEF_MAX)
+			{
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
 				A->P.IdleTime++;
@@ -3788,7 +3917,8 @@ void	Play(uARG *A, int G, char ID)
 			}
 			break;
 		case ID_DECLOOP:
-			if(A->P.IdleTime > IDLE_COEF_MIN) {
+			if(A->P.IdleTime > IDLE_COEF_MIN)
+			{
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
 				A->P.IdleTime--;
@@ -3809,6 +3939,69 @@ void	Play(uARG *A, int G, char ID)
 			break;
 		case ID_RATIO:
 			A->L.Play.ratioValues=!A->L.Play.ratioValues;
+			break;
+		case ID_SCHED:
+			if(A->PROC)
+			{
+				if(A->L.Play.showSchedule == false)
+				{
+					A->S.Pipe=calloc(A->P.CPU, sizeof(struct PIPE_STRUCT));
+					if(!pthread_create(&A->TID_Schedule, NULL, uSchedule, A))
+					{
+						RESOURCE Rsc;
+						Rsc.Text=RSC_INCSCHED;
+						CreateButton(	A, TEXT, ID_INCSCHED, CORES,
+								A->W[CORES].width - Twice_Char_Width(CORES),
+								A->W[CORES].height - Footer_Height(CORES) + 2,
+								One_Half_Char_Width(CORES),
+								One_Char_Height(CORES),
+								CallBackButton,
+								&Rsc);
+
+						Rsc.Text=RSC_DECSCHED;
+						CreateButton(	A, TEXT, ID_DECSCHED, CORES,
+								A->W[CORES].width - Twice_Char_Width(CORES) - (9 * One_Char_Width(CORES)) - One_Half_Char_Width(CORES),
+								A->W[CORES].height - Footer_Height(CORES) + 2,
+								One_Half_Char_Width(CORES),
+								One_Char_Height(CORES),
+								CallBackButton,
+								&Rsc);
+
+						A->L.Play.showSchedule=true;
+						fDraw(CORES, true, false);
+					}
+					else
+					{
+						free(A->S.Pipe);
+						A->S.Pipe=NULL;
+					}
+				}
+				else
+				{
+					A->L.Play.showSchedule=false;
+					pthread_join(A->TID_Schedule, NULL);
+					free(A->S.Pipe);
+					A->S.Pipe=NULL;
+
+					DestroyButton(A, CORES, ID_INCSCHED);
+					DestroyButton(A, CORES, ID_DECSCHED);
+					fDraw(CORES, true, false);
+				}
+			}
+			break;
+		case ID_INCSCHED:
+			if(A->S.IdleTime < IDLE_COEF_MAX)
+			{
+				A->S.IdleTime++;
+				fDraw(CORES, true, true);
+			}
+			break;
+		case ID_DECSCHED:
+			if(A->S.IdleTime > IDLE_COEF_MIN)
+			{
+				A->S.IdleTime--;
+				fDraw(G, true, true);
+			}
 			break;
 		case ID_STATE:
 			A->L.Play.cStatePercent=!A->L.Play.cStatePercent;
@@ -3887,7 +4080,7 @@ char	*FQN_Settings(const char *fName)
 	return(NULL);
 }
 
-bool	StoreSettings(uARG *A)
+bool	SaveSettings(uARG *A)
 {
 	char storePath[1024]={0};
 
@@ -4034,7 +4227,7 @@ void	CallBackButton(uARG *A, WBUTTON *wButton)
 
 void	CallBackSave(uARG *A, WBUTTON *wButton)
 {
-	if(StoreSettings(A))
+	if(SaveSettings(A))
 		Output(A, "Settings successfully saved.\n");
 	else
 		Output(A, "Failed to save settings.\n");
@@ -4148,6 +4341,11 @@ static void *uLoop(uARG *A)
 					case XK_R:
 						if(E.xkey.state & ControlMask)
 							Play(A, G, ID_RATIO);
+						break;
+					case XK_t:
+					case XK_T:
+						if(E.xkey.state & ControlMask)
+							Play(A, G, ID_SCHED);
 						break;
 					case XK_w:
 					case XK_W:
@@ -4605,6 +4803,9 @@ int main(int argc, char *argv[])
 				ClockSrc:SRC_TSC,
 				IdleTime:IDLE_COEF_DEF,
 			},
+			S: {
+				IdleTime:IDLE_SCHED_DEF,
+			},
 			Splash: {window:0, gc:0, x:0, y:0, w:splash_width + (splash_width >> 2), h:splash_height << 1},
 			W: {
 				// MAIN
@@ -4873,11 +5074,13 @@ int main(int argc, char *argv[])
 					freqHertz:true,
 					cycleValues:false,
 					ratioValues:true,
+					showSchedule:false,
 					cStatePercent:false,
 					alwaysOnTop: false,
 					wallboard:false,
 					flashCursor:true,
 					hideSplash:false,
+					bootSchedule:false,
 				},
 				WB: {
 					Scroll:0,
@@ -4908,6 +5111,7 @@ int main(int argc, char *argv[])
 			},
 			LOOP: true,
 			PAUSE: {false},
+			PROC: true,
 			configFile:calloc(1024, sizeof(char)),
 			Options:
 			{
@@ -4927,6 +5131,7 @@ int main(int argc, char *argv[])
 				{"-z", "%u", &A.L.Play.freqHertz,     "CPU frequency (0/1)",                               XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
 				{"-l", "%u", &A.L.Play.cycleValues,   "Cycle Values (0/1)",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
 				{"-r", "%u", &A.L.Play.ratioValues,   "Ratio Values (0/1)",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
+				{"-t", "%u", &A.L.Play.bootSchedule,  "Task scheduling (0/1)",                             XDB_CLASS_CORES"."XDB_KEY_PLAY_SCHEDULE    },
 				{"-p", "%u", &A.L.Play.cStatePercent, "C-State percentage (0/1)",                          XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
 				{"-t", "%u", &A.L.Play.alwaysOnTop,   "Always On Top (0/1)",                               NULL                                       },
 				{"-w", "%u", &A.L.Play.wallboard,     "Scroll wallboard (0/1)",                            XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
@@ -5053,7 +5258,11 @@ int main(int argc, char *argv[])
 						A.PAUSE[G]=true;
 				}
 				pthread_t TID_Cycle=0;
-				if((A.P.ArchID != -1) && !pthread_create(&TID_Cycle, NULL, A.P.Arch[A.P.ArchID].uCycle, &A)) {
+				if((A.P.ArchID != -1) && !pthread_create(&TID_Cycle, NULL, A.P.Arch[A.P.ArchID].uCycle, &A))
+				{
+					if(A.L.Play.bootSchedule)
+						Play(&A, CORES, ID_SCHED);
+
 					Output(&A, BootLog);
 					Output(&A, "Welcome to X-Freq\nEnter help to list commands.\n");
 

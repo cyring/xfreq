@@ -1,12 +1,12 @@
 /*
- * XFreq.h #0.24 SR0 by CyrIng
+ * XFreq.h #0.25 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
 #define _MAJOR   "0"
-#define _MINOR   "24"
+#define _MINOR   "25"
 #define _NIGHTLY "0"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
@@ -674,6 +674,7 @@ typedef	struct {
 } CPU_STRUCT;
 
 #define	IDLE_BASE_USEC	50000
+#define	IDLE_SCHED_DEF	10
 #define	IDLE_COEF_DEF	20
 #define	IDLE_COEF_MAX	80
 #define	IDLE_COEF_MIN	2
@@ -722,6 +723,23 @@ typedef struct
 		useconds_t			IdleTime;
 } PROCESSOR;
 
+#define	SCHED_PID_FMT	"  .%-30s: %%ld\n"
+#define	SCHED_PID_FIELD	"curr->pid"
+#define	SCHED_CPU_FIELD	"cpu#%d\n"
+#define	TASK_COMM_LEN	16
+#define	TASK_COMM_FMT	"%15s"
+typedef	struct
+{
+	struct PIPE_STRUCT
+	{
+		struct TASK_STRUCT
+		{
+			long int	pid;
+			char		comm[TASK_COMM_LEN];
+		} Task[3];
+	} *Pipe;
+	useconds_t			IdleTime;
+} SCHEDULE;
 
 enum {
 	BACKGROUND_MAIN,
@@ -820,14 +838,17 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 #define	ID_FREQ		'z'
 #define	ID_CYCLE	'Y'
 #define	ID_RATIO	'R'
+#define	ID_SCHED	'T'
 #define	ID_STATE	'P'
 #define	ID_TSC		't'
 #define	ID_BIOS		'b'
 #define	ID_SPEC		'a'
 #define	ID_ROM		'r'
 #define	ID_USER		'u'
-#define	ID_INCLOOP	'+'
-#define	ID_DECLOOP	'-'
+#define	ID_INCLOOP	'<'
+#define	ID_DECLOOP	'>'
+#define	ID_INCSCHED	'+'
+#define	ID_DECSCHED	'-'
 #define	ID_WALLBOARD	'B'
 
 #define	RSC_PAUSE	"Pause"
@@ -836,12 +857,15 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 #define	RSC_CYCLE	"Cycle"
 #define	RSC_STATE	"States"
 #define	RSC_RATIO	"Ratio"
+#define	RSC_SCHED	"Task"
 #define	RSC_TSC		"TSC"
 #define	RSC_BIOS	"BIOS"
 #define	RSC_SPEC	"SPEC"
 #define	RSC_ROM		"ROM"
 #define	RSC_INCLOOP	"<<"
 #define	RSC_DECLOOP	">>"
+#define	RSC_INCSCHED	"+"
+#define	RSC_DECSCHED	"-"
 #define	RSC_WALLBOARD	"Brand"
 
 #define	ICON_LABELS	{{Label:'M'}, {Label:'C'}, {Label:'S'}, {Label:'T'}, {Label:'I'}, {Label:'D'}}
@@ -977,6 +1001,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	MENU_FORMAT	"[F1]     Help             [F2]     Core\n"               \
 			"[F3]     C-States         [F4]     Temps \n"             \
 			"[F5]     System Info      [F6]     Dump\n"               \
+			"\n"                                                      \
 			"                                 [Up]\n"                 \
 			"  Page Scrolling          [Left]      [Right]\n"         \
 			"                                [Down]\n"                \
@@ -986,10 +1011,10 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"KPad [+] Faster Loop      KPad [-] Slower Loop\n\n"      \
 			"With the [Control] key, activate the followings :\n"     \
 			"[Home]   Page Begin       [End]    Page End\n"           \
-			"[L][l]   Refresh page     \n"                            \
+			"[L][l]   Refresh page     [Q][q]   Quit\n"               \
 			"[Y][y]   Cycles           [W][w]   Wallboard\n"          \
 			"[Z][z]   Frequency Hz     [P][p]   C-States %\n"         \
-			"[R][r]   Ratio values     [Q][q]   Quit\n\n"             \
+			"[R][r]   Ratio values     [T][t]   Task schedule\n\n"    \
 			"Commands :\n"                                            \
 			"[Backspace] Remove the rightmost character\n"            \
 			"[Erase] Suppress the full Command line\n"                \
@@ -1002,6 +1027,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CORE_FREQ	"%4.0fMHz"
 #define	CORE_CYCLES	"%016llu:%016llu"
 #define	CORE_DELTA	"%04llu:%04llu %04llu %04llu / %04llu"
+#define	CORE_TASK	"%s"
 #define	CORE_RATIO	"%-3.1f"
 #define	CSTATES_PERCENT	"%6.2f%% %6.2f%% %6.2f%% %6.2f%%"
 #define	OVERCLOCK	"%s [%4.0f MHz]"
@@ -1167,11 +1193,13 @@ typedef struct
 				freqHertz,
 				cycleValues,
 				ratioValues,
+				showSchedule,
 				cStatePercent,
 				alwaysOnTop,
 				wallboard,
 				flashCursor,
-				hideSplash;
+				hideSplash,
+				bootSchedule;
 	} Play;
 	struct {;
 		int		Scroll,
@@ -1229,10 +1257,11 @@ typedef struct
 #define	XDB_KEY_PLAY_FREQ	"PlayFrequency"
 #define	XDB_KEY_PLAY_CYCLES	"PlayCycles"
 #define	XDB_KEY_PLAY_RATIOS	"PlayRatios"
+#define	XDB_KEY_PLAY_SCHEDULE	"PlaySchedule"
 #define	XDB_KEY_PLAY_CSTATES	"PlayCStates"
 #define	XDB_KEY_PLAY_WALLBOARD	"PlayBrand"
 
-#define	OPTIONS_COUNT	20
+#define	OPTIONS_COUNT	21
 typedef struct
 {
 	char		*argument;
@@ -1245,6 +1274,7 @@ typedef struct
 typedef struct
 {
 	PROCESSOR	P;
+	SCHEDULE	S;
 	struct IMCINFO	*M;
 	Display		*display;
 	Screen		*screen;
@@ -1259,11 +1289,13 @@ typedef struct
 	bool		MDI;
 	LAYOUT		L;
 	sigset_t	Signal;
-	pthread_t	TID_SigHandler;
+	pthread_t	TID_SigHandler,
+			TID_Schedule;
 	bool		LOOP,
 			PAUSE[WIDGETS],
 			MSR,
-			BIOS;
+			BIOS,
+			PROC;
 	char		*configFile;
 	OPTIONS		Options[OPTIONS_COUNT];
 } uARG;

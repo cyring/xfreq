@@ -28,7 +28,7 @@
  * + GPU sensors.
  *     compile with the NVIDIA (first), the AMD & Intel frameworks (seconds) ?
  *
- * + implement the procstat API to trace high cpu load processes.
+ * + implement the procstat API to trace high cpu load processes: in progress with kernel source sched.h
  * + scripting, editor, push alarms : write user defined bit values in MSR.
  *
  *
@@ -43,7 +43,7 @@
  * + some button-switchs & sliders to enable/disable/set the PKG/Core features in the System Info Widget.
  * + full transparency & opacity.
  * + integrate XCB, wayland ?
- * + handle skins :
+ * + handle skins : Done. Colors only.
  * + provide a processor usage history.
  * + gradiant coloring.
  * + screenshot key.
@@ -75,6 +75,11 @@
  *
  *
  * [HISTORY]
+ *
+ * R 0.25 : 04/28/2014
+ *        - Display the Task Scheduling in the Core Widget.
+ *            start XFreq with the '-t' argument or click the [Task] button,
+ *            then adjust the polling loop with buttons [+] and [-]
  *
  * R 0.24 : 04/25/2014
  *        - Added 2 arguments:
