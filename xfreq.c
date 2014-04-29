@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.25 SR0 by CyrIng
+ * XFreq.c #0.25 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -1409,8 +1409,8 @@ static void *uSchedule(void *uArg)
 	{
 		for(cpu=0; cpu < A->P.CPU; cpu++)
 		{
-			memmove(&A->S.Pipe[cpu].Task[1].pid, &A->S.Pipe[cpu].Task[0].pid, 2 * sizeof(struct TASK_STRUCT));
-			bzero(&A->S.Pipe[cpu].Task[0], sizeof(struct TASK_STRUCT));
+			memmove(&A->S.Pipe[cpu].Task[1].pid, &A->S.Pipe[cpu].Task[0].pid, (TASK_PIPE_DEPTH - 1) * sizeof(struct TASK_STRUCT));
+			memset(&A->S.Pipe[cpu].Task[0], 0, sizeof(struct TASK_STRUCT));
 		}
 		if((A->PROC=((fSD=fopen("/proc/sched_debug", "r")) != NULL)) == true)
 		{
@@ -1447,6 +1447,9 @@ static void *uSchedule(void *uArg)
 			}
 			fclose(fSD);
 		}
+		else
+			Output(A, "Warning: cannot open file '/proc/sched_debug'.\n");
+
 		usleep(IDLE_BASE_USEC * A->S.IdleTime);
 	}
 	return(NULL);
@@ -1457,7 +1460,8 @@ static void *uSchedule(void *uArg)
 void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 {
 	switch(wButton->ID) {
-		case ID_SAVE: {
+		case ID_SAVE:
+		{
 			XPoint xpoints[]={
 					{	x:+wButton->x	, y:+wButton->y		},
 					{	x:+wButton->w	, y:0			},
@@ -1485,7 +1489,8 @@ void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 					xsegments, sizeof(xsegments)/sizeof(XSegment));
 		}
 			break;
-		case ID_QUIT: {
+		case ID_QUIT:
+		{
 			XFillRectangle(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
 					wButton->x + (wButton->w >> 1) - 1, wButton->y, 3, (wButton->h >> 1));
 			XDrawArc(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
@@ -1496,7 +1501,8 @@ void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 					34 << 8, 66 << 8);
 		}
 			break;
-		case ID_MIN: {
+		case ID_MIN:
+		{
 			int inner=(MIN(wButton->w, wButton->h) >> 1) + 2;
 			XDrawRectangle(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
 					wButton->x, wButton->y, wButton->w, wButton->h );
@@ -1504,13 +1510,32 @@ void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 					wButton->x + 2, wButton->y + 2, wButton->w - inner, wButton->h - inner);
 		}
 			break;
+		case ID_CHART:
+		{
+			short int h=wButton->h / 5;
+			XSegment sChart[]=
+			{
+				{x1:wButton->x + 2,	y1:wButton->y + (h * 1),	x2:wButton->x + (3 * wButton->w / 4),	y2:wButton->y + (h * 1)},
+				{x1:wButton->x + 2,	y1:wButton->y + (h * 2),	x2:wButton->x + (1 * wButton->w / 2),	y2:wButton->y + (h * 2)},
+				{x1:wButton->x + 2,	y1:wButton->y + (h * 3),	x2:wButton->x + wButton->w - 2,		y2:wButton->y + (h * 3)},
+				{x1:wButton->x + 2,	y1:wButton->y + (h * 4),	x2:wButton->x + (2 * wButton->w / 5),	y2:wButton->y + (h * 4)}
+			};
+			int	nChart=sizeof(sChart)/sizeof(XSegment);
+
+			XDrawRectangle(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
+					wButton->x, wButton->y, wButton->w, wButton->h );
+			XDrawSegments(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc, sChart, nChart);
+		}
+			break;
 	}
 }
 
 void	DrawScrollingButton(uARG *A, WBUTTON *wButton)
 {
-	switch(wButton->ID) {
-		case ID_NORTH: {
+	switch(wButton->ID)
+	{
+		case ID_NORTH:
+		{
 			unsigned int inner=1;
 			XPoint Arrow[3];
 			unsigned int valign=wButton->h - (inner << 1);
@@ -1521,7 +1546,8 @@ void	DrawScrollingButton(uARG *A, WBUTTON *wButton)
 			XFillPolygon(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc, Arrow, 3, Nonconvex, CoordModePrevious);
 		}
 			break;
-		case ID_SOUTH: {
+		case ID_SOUTH:
+		{
 			unsigned int inner=1;
 			XPoint Arrow[3];
 			unsigned int valign=wButton->h - (inner << 1);
@@ -1532,7 +1558,8 @@ void	DrawScrollingButton(uARG *A, WBUTTON *wButton)
 			XFillPolygon(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc, Arrow, 3, Nonconvex, CoordModePrevious);
 		}
 			break;
-		case ID_EAST: {
+		case ID_EAST:
+		{
 			unsigned int inner=1;
 			XPoint Arrow[3];
 			unsigned int halign=wButton->w - (inner << 1);
@@ -1543,7 +1570,8 @@ void	DrawScrollingButton(uARG *A, WBUTTON *wButton)
 			XFillPolygon(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc, Arrow, 3, Nonconvex, CoordModePrevious);
 		}
 			break;
-		case ID_WEST: {
+		case ID_WEST:
+		{
 			unsigned int inner=1;
 			XPoint Arrow[3];
 			unsigned int halign=wButton->w - (inner << 1);
@@ -1559,7 +1587,8 @@ void	DrawScrollingButton(uARG *A, WBUTTON *wButton)
 
 void	DrawTextButton(uARG *A, WBUTTON *wButton)
 {
-	if(wButton->Resource.Text != NULL) {
+	if(wButton->Resource.Text != NULL)
+	{
 		size_t length=strlen(wButton->Resource.Text);
 		unsigned int inner=(wButton->w - (length * One_Char_Width(wButton->Target))) >> 1;
 
@@ -1581,13 +1610,14 @@ void	DrawIconButton(uARG *A, WBUTTON *wButton)
 void	CallBackSave(uARG *A, WBUTTON *wButton) ;
 void	CallBackQuit(uARG *A, WBUTTON *wButton) ;
 void	CallBackButton(uARG *A, WBUTTON *wButton) ;
+void	CallBackSwitchChart(uARG *A, WBUTTON *wButton) ;
 void	CallBackMinimizeWidget(uARG *A, WBUTTON *wButton) ;
 void	CallBackRestoreWidget(uARG *A, WBUTTON *wButton) ;
 
 // Create a button with callback, drawing & collision functions.
 void	CreateButton(uARG *A, WBTYPE Type, char ID, int Target, int x, int y, unsigned int w, unsigned h, void *CallBack, RESOURCE *Resource)
 {
-	WBUTTON *NewButton=malloc(sizeof(WBUTTON));
+	WBUTTON *NewButton=calloc(1, sizeof(WBUTTON));
 
 	NewButton->Type=Type;
 	NewButton->ID=ID;
@@ -1608,7 +1638,8 @@ void	CreateButton(uARG *A, WBTYPE Type, char ID, int Target, int x, int y, unsig
 		case SCROLLING:
 			NewButton->DrawFunc=DrawScrollingButton;
 			break;
-		case TEXT: {
+		case TEXT:
+		{
 			if(Resource->Text != NULL) {
 				NewButton->Resource.Text=malloc(strlen(Resource->Text) + 1);
 				strcpy(NewButton->Resource.Text, Resource->Text);
@@ -1621,7 +1652,8 @@ void	CreateButton(uARG *A, WBTYPE Type, char ID, int Target, int x, int y, unsig
 			}
 		}
 			break;
-		case ICON: {
+		case ICON:
+		{
 			G=MAIN;
 			NewButton->Resource.Label=Resource->Label;
 			NewButton->DrawFunc=DrawIconButton;
@@ -1642,11 +1674,13 @@ void	DestroyButton(uARG *A, int G, char ID)
 {
 	WBUTTON *wButton=A->W[G].wButton[HEAD], *cButton=A->W[G].wButton[HEAD];
 	while(cButton != NULL)
-		if(cButton->ID == ID) {
+		if(cButton->ID == ID)
+		{
 			if(cButton == A->W[G].wButton[TAIL])
 				A->W[G].wButton[TAIL]=wButton;
 			wButton->Chain=cButton->Chain;
-			switch(cButton->Type) {
+			switch(cButton->Type)
+			{
 				case TEXT:
 					if(cButton->Resource.Text != NULL)
 						free(cButton->Resource.Text);
@@ -1670,7 +1704,8 @@ void	DestroyAllButtons(uARG *A, int G)
 	WBUTTON *wButton=A->W[G].wButton[HEAD], *cButton=NULL;
 	while(wButton != NULL) {
 		cButton=wButton->Chain;
-		switch(wButton->Type) {
+		switch(wButton->Type)
+		{
 			case TEXT:
 				if(wButton->Resource.Text != NULL)
 					free(wButton->Resource.Text);
@@ -1688,12 +1723,14 @@ void	WidgetButtonPress(uARG *A, int G, XEvent *E)
 {
 	int x=0, y=0;
 	switch(E->type) {
-		case ButtonPress: {
+		case ButtonPress:
+		{
 			x=E->xbutton.x;
 			y=E->xbutton.y;
 		}
 			break;
-		case MotionNotify: {
+		case MotionNotify:
+		{
 			x=E->xmotion.x;
 			y=E->xmotion.y;
 		}
@@ -1702,7 +1739,8 @@ void	WidgetButtonPress(uARG *A, int G, XEvent *E)
 	int T=G, xOffset=0, yOffset=0;
 	if(_IS_MDI_) {
 		for(T=LAST_WIDGET; T >= FIRST_WIDGET; T--)
-			if( E->xbutton.subwindow == A->W[T].window) {
+			if( E->xbutton.subwindow == A->W[T].window)
+			{
 				xOffset=A->W[T].x;
 				yOffset=A->W[T].y;
 				break;
@@ -1714,8 +1752,8 @@ void	WidgetButtonPress(uARG *A, int G, XEvent *E)
 		if((x > wButton->x + xOffset)
 		&& (y > wButton->y + yOffset)
 		&& (x < wButton->x + xOffset + wButton->w)
-		&& (y < wButton->y + yOffset + wButton->h)) {
-			// Execute its callback.
+		&& (y < wButton->y + yOffset + wButton->h))
+		{	// Execute its callback.
 			wButton->CallBack(A, wButton);
 			break;
 		}
@@ -1866,9 +1904,10 @@ void	MoveWidget(uARG *A, XEvent *E)
 
 void	IconifyWidget(uARG *A, int G, XEvent *E)
 {
-	switch(E->type) {
-		case UnmapNotify: {
-			// When a Widget is iconified, minimized or unmapped, create an associated button in the MAIN window.
+	switch(E->type)
+	{
+		case UnmapNotify:
+		{	// When a Widget is iconified, minimized or unmapped, create an associated button in the MAIN window.
 			RESOURCE Resource[WIDGETS]=ICON_LABELS;
 
 			int vSpacing=Header_Height(MAIN) + (G * One_Half_Char_Height(MAIN));
@@ -1882,8 +1921,8 @@ void	IconifyWidget(uARG *A, int G, XEvent *E)
 					&Resource[G]);
 		}
 			break;
-		case MapNotify: {
-			// Remove the button when the Widget is restored on screen.
+		case MapNotify:
+		{	// Remove the button when the Widget is restored on screen.
 			DestroyButton(A, MAIN, (ID_NULL + G));
 		}
 			break;
@@ -1917,14 +1956,15 @@ static void *uSplash(void *uArg)
 	XEvent	E={0};
 	while(A->LOOP) {
 		XNextEvent(A->display, &E);
-		switch(E.type) {
+		switch(E.type)
+		{
 			case ClientMessage:
 				if(E.xclient.send_event)
 					A->LOOP=false;
 				break;
 			case Expose:
 				if(!E.xexpose.count)
-					{
+				{
 					XSetForeground(A->display, A->Splash.gc, _FOREGROUND_SPLASH);
 					XCopyPlane(	A->display,
 							A->Splash.bitmap,
@@ -1937,7 +1977,7 @@ static void *uSplash(void *uArg)
 							(A->Splash.w - splash_width) >> 1,
 							(A->Splash.h - splash_height) >> 1,
 							1);
-					}
+				}
 				break;
 		}
 	}
@@ -2081,7 +2121,7 @@ void	CloseWidgets(uARG *A)
 
 	int G=0;
 	for(G=LAST_WIDGET; G >= MAIN ; G--)
-		{
+	{
 		XFreePixmap(A->display, A->W[G].pixmap.B);
 		XFreePixmap(A->display, A->W[G].pixmap.F);
 		if(A->L.Page[G].Pageable)
@@ -2090,7 +2130,7 @@ void	CloseWidgets(uARG *A)
 		XDestroyWindow(A->display, A->W[G].window);
 		free(A->L.Axes[G].Segment);
 		DestroyAllButtons(A, G);
-		}
+	}
 	free(A->L.WB.String);
 	free(A->L.Usage.C0);
 	free(A->L.Usage.C3);
@@ -2140,13 +2180,14 @@ int	OpenWidgets(uARG *A)
 			SetWidgetName(A, G, str);
 
 			if((A->W[G].gc=XCreateGC(A->display, A->W[G].window, 0, NULL)))
-				{
+			{
 				XSetFont(A->display, A->W[G].gc, A->xfont->fid);
 
 				switch(G)
 				{
 					// Compute Widgets scaling.
-					case MAIN: {
+					case MAIN:
+					{
 						SetHViewport(G, MAIN_TEXT_WIDTH  - 3);
 						SetVViewport(G, MAIN_TEXT_HEIGHT - 2);
 						SetHFrame(G, GetHViewport(G) << MAIN_FRAME_VIEW_HSHIFT);
@@ -2180,7 +2221,8 @@ int	OpenWidgets(uARG *A)
 						A->W[G].height+=Footer_Height(G);
 
 						// First run if MAIN is not defined as MDI then create buttons.
-						if(!_IS_MDI_) {
+						if(!_IS_MDI_)
+						{
 							unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
 
 							CreateButton(	A, DECORATION, ID_SAVE, G,
@@ -2244,7 +2286,8 @@ int	OpenWidgets(uARG *A)
 						}
 					}
 						break;
-					case CORES: {
+					case CORES:
+					{
 						SetHViewport(G, CORES_TEXT_WIDTH);
 						SetVViewport(G, CORES_TEXT_HEIGHT);
 						SetHFrame(G, GetHViewport(G));
@@ -2271,7 +2314,8 @@ int	OpenWidgets(uARG *A)
 						A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
 						int	i=0,
 							j=A->W[G].extents.overall.width / CORES_TEXT_WIDTH;
-						for(i=0; i <= CORES_TEXT_WIDTH; i++) {
+						for(i=0; i <= CORES_TEXT_WIDTH; i++)
+						{
 							A->L.Axes[G].Segment[i].x1=(j * i) + (One_Char_Width(G) * 3);
 							A->L.Axes[G].Segment[i].y1=3 + One_Char_Height(G);
 							A->L.Axes[G].Segment[i].x2=A->L.Axes[G].Segment[i].x1;
@@ -2285,6 +2329,14 @@ int	OpenWidgets(uARG *A)
 						A->W[G].height+=Footer_Height(G);
 
 						unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
+
+						CreateButton(	A, DECORATION, ID_CHART, G,
+								A->W[G].width - (One_Char_Width(G) * 5) - 2,
+								2,
+								square - 2,
+								square - 2,
+								CallBackButton,
+								NULL);
 
 						CreateButton(	A, DECORATION, ID_MIN, G,
 								A->W[G].width - Twice_Char_Width(G) - 2,
@@ -2307,15 +2359,16 @@ int	OpenWidgets(uARG *A)
 						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
 						for(i=0; Loader[i].ID != ID_NULL; i++, spacing+=One_Char_Width(G) * (2 + strlen(Loader[i-1].RSC.Text)))
 							CreateButton(	A, TEXT, Loader[i].ID, G,
-										spacing,
-										A->W[G].height - Footer_Height(G) + 2,
-										One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
-										One_Char_Height(G),
-										CallBackButton,
-										&Loader[i].RSC);
+									spacing,
+									A->W[G].height - Footer_Height(G) + 2,
+									One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
+									One_Char_Height(G),
+									CallBackButton,
+									&Loader[i].RSC);
 					}
 						break;
-					case CSTATES: {
+					case CSTATES:
+					{
 						SetHViewport(G, CSTATES_TEXT_WIDTH);
 						SetVViewport(G, CSTATES_TEXT_HEIGHT);
 						SetHFrame(G, GetHViewport(G));
@@ -2341,7 +2394,8 @@ int	OpenWidgets(uARG *A)
 						// A->L.Axes[G].N=CSTATES_TEXT_HEIGHT + 1; /* Without a footer */
 						A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
 						int i=0;
-						for(i=0; i < CSTATES_TEXT_HEIGHT; i++) {
+						for(i=0; i < CSTATES_TEXT_HEIGHT; i++)
+						{
 							A->L.Axes[G].Segment[i].x1=0;
 							A->L.Axes[G].Segment[i].y1=(i + 1) * One_Char_Height(G);
 							A->L.Axes[G].Segment[i].x2=A->W[G].width;
@@ -2389,7 +2443,8 @@ int	OpenWidgets(uARG *A)
 									&Loader[i].RSC);
 					}
 						break;
-					case TEMPS: {
+					case TEMPS:
+					{
 						SetHViewport(G, TEMPS_TEXT_WIDTH);
 						SetVViewport(G, TEMPS_TEXT_HEIGHT);
 						SetHFrame(G, GetHViewport(G));
@@ -2414,7 +2469,8 @@ int	OpenWidgets(uARG *A)
 						// A->L.Axes[G].N=TEMPS_TEXT_WIDTH + 1; /* Without a footer (plus 1 to malloc size) */
 						A->L.Axes[G].Segment=malloc(A->L.Axes[G].N * sizeof(XSegment));
 						int i=0;
-						for(i=0; i < TEMPS_TEXT_WIDTH; i++) {
+						for(i=0; i < TEMPS_TEXT_WIDTH; i++)
+						{
 							A->L.Axes[G].Segment[i].x1=Twice_Char_Width(G) + (i * One_Char_Width(G));
 							A->L.Axes[G].Segment[i].y1=(TEMPS_TEXT_HEIGHT + 1) * One_Char_Height(G);
 							A->L.Axes[G].Segment[i].x2=A->L.Axes[G].Segment[i].x1 + One_Char_Width(G);
@@ -2456,15 +2512,16 @@ int	OpenWidgets(uARG *A)
 						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
 						for(i=0; Loader[i].ID != ID_NULL; i++, spacing+=One_Char_Width(G) * (2 + strlen(Loader[i-1].RSC.Text)))
 							CreateButton(	A, TEXT, Loader[i].ID, G,
-										spacing,
-										A->W[G].height - Footer_Height(G) + 2,
-										One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
-										One_Char_Height(G),
-										CallBackButton,
-										&Loader[i].RSC);
+									spacing,
+									A->W[G].height - Footer_Height(G) + 2,
+									One_Char_Width(G) * (1 + strlen(Loader[i].RSC.Text)),
+									One_Char_Height(G),
+									CallBackButton,
+									&Loader[i].RSC);
 					}
 						break;
-					case SYSINFO: {
+					case SYSINFO:
+					{
 						SetHViewport(G, SYSINFO_TEXT_WIDTH  - 3);
 						SetVViewport(G, SYSINFO_TEXT_HEIGHT - 2);
 						SetHFrame(G, GetHViewport(G) << SYSINFO_FRAME_VIEW_HSHIFT);
@@ -2574,7 +2631,8 @@ int	OpenWidgets(uARG *A)
 						A->L.WB.Length=strlen(str) + A->L.WB.Scroll;
 					}
 						break;
-					case DUMP: {
+					case DUMP:
+					{
 						SetHViewport(G, DUMP_TEXT_WIDTH  - 3);
 						SetVViewport(G, DUMP_TEXT_HEIGHT - 2);
 						SetHFrame(G, GetHViewport(G) << DUMP_FRAME_VIEW_HSHIFT);
@@ -2813,7 +2871,8 @@ void	BuildLayout(uARG *A, int G)
 					strlen(A->L.Page[G].Title) );
 
 			// If the MDI mode is enabled then draw a separator line.
-			if(_IS_MDI_) {
+			if(_IS_MDI_)
+			{
 				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_MDI_SEP].RGB);
 				XDrawLine(A->display, A->W[G].pixmap.B, A->W[G].gc,
 					A->L.Axes[G].Segment[1].x1,
@@ -2821,8 +2880,10 @@ void	BuildLayout(uARG *A, int G)
 					A->L.Axes[G].Segment[1].x2,
 					A->L.Axes[G].Segment[1].y2 + Footer_Height(G) + 1);
 			}
-			if(A->L.Output) {
-				if(A->L.Page[G].Pageable) {
+			if(A->L.Output)
+			{
+				if(A->L.Page[G].Pageable)
+				{
 					// Clear the scrolling area.
 					XSetForeground(A->display, A->W[G].gc, A->W[G].background);
 					XFillRectangle(A->display, A->L.Page[G].Pixmap, A->W[G].gc,
@@ -2846,8 +2907,8 @@ void	BuildLayout(uARG *A, int G)
 						SetVScrolling(G, GetVListing(G) - GetVViewport(G));
 					SetHScrolling(G, 0);
 				}
-				else {
-					// Draw the Output log in a fixed height area.
+				else
+				{	// Draw the Output log in a fixed height area.
 					XRectangle R[]=	{ {
 							x:0,
 							y:Header_Height(G),
@@ -2875,7 +2936,8 @@ void	BuildLayout(uARG *A, int G)
 			// Draw the Core identifiers, the header, and the footer on the chart.
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			int cpu=0;
-			for(cpu=0; cpu < A->P.CPU; cpu++) {
+			for(cpu=0; cpu < A->P.CPU; cpu++)
+			{
 				sprintf(str, CORE_NUM, cpu);
 				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 						Half_Char_Width(G),
@@ -2977,14 +3039,17 @@ void	BuildLayout(uARG *A, int G)
 
 			// Draw the Core identifiers.
 			int cpu=0;
-			for(cpu=0; cpu < A->P.CPU; cpu++) {
+			for(cpu=0; cpu < A->P.CPU; cpu++)
+			{
 				XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 				sprintf(str, CORE_NUM, cpu);
 				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 						Twice_Char_Width(G) + ((cpu * CSTATES_TEXT_SPACING) * One_Half_Char_Width(G)),
 						One_Char_Height(G),
 						str, strlen(str) );
-				if(A->P.Topology[cpu].CPU == NULL) {
+
+				if(A->P.Topology[cpu].CPU == NULL)	// Is the Core disabled ?
+				{
 					XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 					XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 							One_Half_Char_Width(G) + ((cpu * CSTATES_TEXT_SPACING) * One_Half_Char_Width(G)),
@@ -3015,7 +3080,8 @@ void	BuildLayout(uARG *A, int G)
 			// Draw the Core identifiers.
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			int cpu=0;
-			for(cpu=0; cpu < A->P.CPU; cpu++) {
+			for(cpu=0; cpu < A->P.CPU; cpu++)
+			{
 				sprintf(str, CORE_NUM, cpu);
 				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 						(One_Char_Width(G) * 5)
@@ -3048,7 +3114,8 @@ void	BuildLayout(uARG *A, int G)
 					A->W[G].height - Quarter_Char_Height(G),
 					str, strlen(str) );
 
-			if(A->L.Page[G].Pageable) {
+			if(A->L.Page[G].Pageable)
+			{
 				char 		*items=calloc(8192, 1);
 				const char	powered[2]={'N', 'Y'},
 						*enabled[2]={"OFF", "ON"},
@@ -3142,7 +3209,8 @@ void	BuildLayout(uARG *A, int G)
 				sprintf(str, TOPOLOGY_SECTION, A->P.OnLine);
 				strcat(items, str);
 				int cpu=0;
-				for(cpu=0; cpu < A->P.CPU; cpu++) {
+				for(cpu=0; cpu < A->P.CPU; cpu++)
+				{
 					if(A->P.Topology[cpu].CPU != NULL)
 						sprintf(str, TOPOLOGY_FORMAT,
 							cpu,
@@ -3161,7 +3229,8 @@ void	BuildLayout(uARG *A, int G)
 						A->P.Features.Perf_Monitoring_Leaf.AX.MonCtrs, A->P.Features.Perf_Monitoring_Leaf.AX.MonWidth,
 						A->P.Features.Perf_Monitoring_Leaf.DX.FixCtrs, A->P.Features.Perf_Monitoring_Leaf.DX.FixWidth);
 				strcat(items, str);
-				for(cpu=0; cpu < A->P.CPU; cpu++) {
+				for(cpu=0; cpu < A->P.CPU; cpu++)
+				{
 					if(A->P.Topology[cpu].CPU != NULL)
 						sprintf(str, PERF_FORMAT,
 							cpu,
@@ -3182,9 +3251,11 @@ void	BuildLayout(uARG *A, int G)
 				strcat(items, RAM_SECTION);
 				strcat(items, CHA_FORMAT);
 
-				if(A->M != NULL) {
+				if(A->M != NULL)	// Is the IMC found ?
+				{
 					unsigned cha=0;
-					for(cha=0; cha < A->M->ChannelCount; cha++) {
+					for(cha=0; cha < A->M->ChannelCount; cha++)
+					{
 						sprintf(str, CAS_FORMAT,
 							cha,
 							A->M->Channel[cha].Timing.tCL,
@@ -3220,7 +3291,8 @@ void	BuildLayout(uARG *A, int G)
 							One_Char_Height(G));
 				free(items);
 			}
-			else {
+			else
+			{
 				sprintf(str, OVERCLOCK, A->P.Features.BrandString, A->P.Boost[1] * A->P.ClockSpeed);
 				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 				XDrawString(A->display, A->W[G].pixmap.B, A->W[G].gc,
@@ -3297,7 +3369,7 @@ void	DrawLayout(uARG *A, int G)
 			break;
 		case CORES:
 		{
-			char str[16]={0};
+			char str[TASK_PIPE_DEPTH * TASK_COMM_LEN]={0};
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++)
 				if(A->P.Topology[cpu].CPU != NULL)
@@ -3326,14 +3398,22 @@ void	DrawLayout(uARG *A, int G)
 
 					// Draw the Core frequency.
 					XSetForeground(A->display, A->W[G].gc, Bar[i].Bg);
-					XFillRectangle(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-							One_Char_Width(G) * 3,
-							3 + ( One_Char_Height(G) * (cpu + 1) ),
-							(A->W[G].extents.overall.width * A->P.Topology[cpu].CPU->RelativeRatio) / CORES_TEXT_WIDTH,
-							One_Char_Height(G) - 3);
+					if(A->L.Play.fillGraphics)
+						XFillRectangle(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+								One_Char_Width(G) * 3,
+								3 + ( One_Char_Height(G) * (cpu + 1) ),
+								(A->W[G].extents.overall.width * A->P.Topology[cpu].CPU->RelativeRatio) / CORES_TEXT_WIDTH,
+								One_Char_Height(G) - 3);
+					else
+						XDrawRectangle(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+								One_Char_Width(G) * 3,
+								3 + ( One_Char_Height(G) * (cpu + 1) ),
+								(A->W[G].extents.overall.width * A->P.Topology[cpu].CPU->RelativeRatio) / CORES_TEXT_WIDTH,
+								One_Char_Height(G) - 3);
 
 					// For each Core, display its frequency, C-STATE & ratio.
-					if(A->L.Play.freqHertz && (A->P.Topology[cpu].CPU->RelativeRatio >= 5.0f) ) {
+					if(A->L.Play.freqHertz && (A->P.Topology[cpu].CPU->RelativeRatio >= 5.0f) )
+					{
 						XSetForeground(A->display, A->W[G].gc, Bar[i].Fg);
 						sprintf(str, CORE_FREQ, A->P.Topology[cpu].CPU->RelativeFreq);
 						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
@@ -3342,7 +3422,8 @@ void	DrawLayout(uARG *A, int G)
 								str, strlen(str) );
 					}
 
-					if(A->L.Play.cycleValues) {
+					if(A->L.Play.cycleValues)
+					{
 						sprintf(str,	CORE_DELTA,
 								A->P.Topology[cpu].CPU->Delta.C0.UCC / (IDLE_BASE_USEC * A->P.IdleTime),
 								A->P.Topology[cpu].CPU->Delta.C0.URC / (IDLE_BASE_USEC * A->P.IdleTime),
@@ -3355,37 +3436,41 @@ void	DrawLayout(uARG *A, int G)
 								One_Char_Height(G) * (cpu + 1 + 1),
 								str, strlen(str) );
 					}
-					else {
-						if(A->L.Play.showSchedule) {
-							if(A->S.Pipe[cpu].Task[2].pid != 0)
+					else
+					{
+						if(A->L.Play.showSchedule)
+						{
+							int i=0, L=TASK_PIPE_DEPTH * (TASK_COMM_LEN - 1);
+							memset(str, 0x20, (TASK_PIPE_DEPTH * TASK_COMM_LEN) - 1);
+
+							for(i=0; i < TASK_PIPE_DEPTH ; i++)
 							{
-							sprintf(str, CORE_TASK, A->S.Pipe[cpu].Task[2].comm);
-							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH2].RGB);
+								size_t l=strlen(A->S.Pipe[cpu].Task[i].comm);
+								if(l > 0)
+								{
+									L=L-l;
+									memcpy(&str[L], A->S.Pipe[cpu].Task[i].comm, l);
+								}
+								L-=(l > 7) ? 1 : l;
+							}
+							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH3].RGB);
 							XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 									One_Char_Width(G) * 13,
 									One_Char_Height(G) * (cpu + 1 + 1),
-									str, strlen(str) );
-							}
-							if(A->S.Pipe[cpu].Task[1].pid != 0)
-							{
-							sprintf(str, CORE_TASK, A->S.Pipe[cpu].Task[1].comm);
-							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH1].RGB);
+									&str[16], 7 );
+							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH2].RGB);
 							XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 									One_Char_Width(G) * 20,
 									One_Char_Height(G) * (cpu + 1 + 1),
-									str, strlen(str) );
-							}
-							if(A->S.Pipe[cpu].Task[0].pid != 0)
-							{
-							sprintf(str, CORE_TASK, A->S.Pipe[cpu].Task[0].comm);
+									&str[23], 7 );
 							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 							XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-									One_Char_Width(G) * 28,
+									One_Char_Width(G) * 27,
 									One_Char_Height(G) * (cpu + 1 + 1),
-									str, strlen(str) );
-							}
+									&str[30], 15 );
 						}
-						else if(!A->L.Play.ratioValues) {
+						else if(!A->L.Play.ratioValues)
+						{
 							sprintf(str,	CORE_CYCLES,
 								A->P.Topology[cpu].CPU->Cycles.C0[1].UCC,
 								A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
@@ -3397,7 +3482,8 @@ void	DrawLayout(uARG *A, int G)
 						}
 					}
 
-					if(A->L.Play.ratioValues) {
+					if(A->L.Play.ratioValues)
+					{
 						sprintf(str, CORE_RATIO, A->P.Topology[cpu].CPU->RelativeRatio);
 						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
@@ -3405,7 +3491,9 @@ void	DrawLayout(uARG *A, int G)
 								One_Char_Height(G) * (cpu + 1 + 1),
 								str, strlen(str) );
 					}
-				} else {
+				}
+				else
+				{
 					XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							Twice_Char_Width(G) * CORES_TEXT_WIDTH,
@@ -3491,7 +3579,8 @@ void	DrawLayout(uARG *A, int G)
 			// Update & draw the temperature histogram.
 			int i=0;
 			XSegment *U=&A->L.Axes[G].Segment[i], *V=&A->L.Axes[G].Segment[i+1];
-			for(i=0; i < (TEMPS_TEXT_WIDTH - 1); i++, U=&A->L.Axes[G].Segment[i], V=&A->L.Axes[G].Segment[i+1]) {
+			for(i=0; i < (TEMPS_TEXT_WIDTH - 1); i++, U=&A->L.Axes[G].Segment[i], V=&A->L.Axes[G].Segment[i+1])
+			{
 				U->x1=V->x1 - One_Char_Width(G);
 				U->x2=V->x2 - One_Char_Width(G);
 				U->y1=V->y1;
@@ -3518,7 +3607,9 @@ void	DrawLayout(uARG *A, int G)
 							(One_Char_Width(G) * 5) + Quarter_Char_Width(G) + (cpu << 1) * Twice_Char_Width(G),
 							One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1),
 							str, strlen(str));
-				} else {
+				}
+				else	// Is the Core disabled ?
+				{
 					XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 					XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 							(One_Char_Width(G) * 5) + Quarter_Char_Width(G) + (cpu << 1) * Twice_Char_Width(G),
@@ -3635,15 +3726,16 @@ void	DrawLayout(uARG *A, int G)
 				strcat(items, str);
 
 				int H=0;
-				for(H=0; H < 15; H++) {
+				for(H=0; H < 15; H++)
+				{
 					strncat(items, &binStr[H << 2], 4);
 					strcat(items, " ");
 				};
 				strncat(items, &binStr[H << 2], 4);
 				strcat(items, "]\n");
 			}
-			if(A->L.Page[G].Pageable) {
-				// Clear the scrolling area.
+			if(A->L.Page[G].Pageable)
+			{	// Clear the scrolling area.
 				XSetForeground(A->display, A->W[G].gc, A->W[G].background);
 				XFillRectangle(A->display, A->L.Page[G].Pixmap, A->W[G].gc,
 						0,
@@ -3657,8 +3749,9 @@ void	DrawLayout(uARG *A, int G)
 							One_Char_Height(G),
 							items,
 							One_Char_Height(G));
-			} else {
-				// Draw the Registers in a fixed height area.
+			}
+			else
+			{	// Draw the Registers in a fixed height area.
 				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 				A->L.Page[G].Listing=XPrint(A->display, A->W[G].pixmap.F, A->W[G].gc,
 							One_Char_Width(G),
@@ -3735,7 +3828,8 @@ static void *uDraw(void *uArg)
 // Implementation of CallBack functions.
 void	Play(uARG *A, int G, char ID)
 {
-	switch(ID) {
+	switch(ID)
+	{
 		case ID_NORTH:
 			if(A->L.Page[G].Pageable)
 			{
@@ -3912,7 +4006,7 @@ void	Play(uARG *A, int G, char ID)
 				A->P.IdleTime++;
 				SelectBaseClock(A);
 				pthread_mutex_unlock(&uDraw_mutex);
-				fDraw(G, true, false);
+				fDraw(SYSINFO, true, false);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
@@ -3924,12 +4018,15 @@ void	Play(uARG *A, int G, char ID)
 				A->P.IdleTime--;
 				SelectBaseClock(A);
 				pthread_mutex_unlock(&uDraw_mutex);
-				fDraw(G, true, false);
+				fDraw(SYSINFO, true, false);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
 		case ID_RESET:
 			A->P.Cold=0;
+			break;
+		case ID_CHART:
+			A->L.Play.fillGraphics=!A->L.Play.fillGraphics;
 			break;
 		case ID_FREQ:
 			A->L.Play.freqHertz=!A->L.Play.freqHertz;
@@ -4000,7 +4097,7 @@ void	Play(uARG *A, int G, char ID)
 			if(A->S.IdleTime > IDLE_COEF_MIN)
 			{
 				A->S.IdleTime--;
-				fDraw(G, true, true);
+				fDraw(CORES, true, true);
 			}
 			break;
 		case ID_STATE:
@@ -4013,7 +4110,7 @@ void	Play(uARG *A, int G, char ID)
 				pthread_mutex_lock(&uDraw_mutex);
 				SelectBaseClock(A);
 				pthread_mutex_unlock(&uDraw_mutex);
-				fDraw(G, true, false);
+				fDraw(SYSINFO, true, false);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
@@ -4024,7 +4121,7 @@ void	Play(uARG *A, int G, char ID)
 				pthread_mutex_lock(&uDraw_mutex);
 				SelectBaseClock(A);
 				pthread_mutex_unlock(&uDraw_mutex);
-				fDraw(G, true, false);
+				fDraw(SYSINFO, true, false);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
@@ -4035,7 +4132,7 @@ void	Play(uARG *A, int G, char ID)
 				pthread_mutex_lock(&uDraw_mutex);
 				SelectBaseClock(A);
 				pthread_mutex_unlock(&uDraw_mutex);
-				fDraw(G, true, false);
+				fDraw(SYSINFO, true, false);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
@@ -4046,7 +4143,7 @@ void	Play(uARG *A, int G, char ID)
 				pthread_mutex_lock(&uDraw_mutex);
 				SelectBaseClock(A);
 				pthread_mutex_unlock(&uDraw_mutex);
-				fDraw(G, true, false);
+				fDraw(SYSINFO, true, false);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
@@ -4105,7 +4202,8 @@ bool	SaveSettings(uARG *A)
 		for(i=0; i < OPTIONS_COUNT; i++)
 			if(A->Options[i].xrmName != NULL)
 			{
-				switch(A->Options[i].format[1]) {
+				switch(A->Options[i].format[1])
+				{
 					case 'd': {
 						sprintf(strKey, "%s: %s", A->Options[i].xrmName, A->Options[i].format);
 						signed int *pINT=A->Options[i].pointer;
@@ -4148,13 +4246,15 @@ bool	SaveSettings(uARG *A)
 						XDB_CLASS_SYSINFO,
 						XDB_CLASS_DUMP};
 		int G=0;
-		for(G=MAIN; G < WIDGETS; G++) {
+		for(G=MAIN; G < WIDGETS; G++)
+		{
 			sprintf(strVal, "%s.%s.%s: %d", _IS_MDI_ ? "MDI":"", xrmClass[G], XDB_KEY_LEFT, A->W[G].x);
 			XrmPutLineResource(&xdb, strVal);
 			sprintf(strVal, "%s.%s.%s: %d", _IS_MDI_ ? "MDI":"", xrmClass[G], XDB_KEY_TOP, A->W[G].y);
 			XrmPutLineResource(&xdb, strVal);
 		}
-		for(i=0; i < COLOR_COUNT; i++) {
+		for(i=0; i < COLOR_COUNT; i++)
+		{
 			sprintf(strVal, "%s.%s: 0x%x", A->L.Colors[i].xrmClass, A->L.Colors[i].xrmKey, A->L.Colors[i].RGB);
 			XrmPutLineResource(&xdb, strVal);
 		}
@@ -4199,7 +4299,8 @@ void	Proc_Help(uARG *A)
 {
 	char stringNL[16]={0};
 	int C=0;
-	for(C=0; Command[C].Instruction != NULL; C++) {
+	for(C=0; Command[C].Instruction != NULL; C++)
+	{
 		sprintf(stringNL, "%s\n", Command[C].Instruction);
 		Output(A, stringNL);
 	}
@@ -4209,7 +4310,8 @@ void	Proc_Help(uARG *A)
 void	ExecCommand(uARG *A)
 {
 	int C=0;
-	while(Command[C].Instruction != NULL) {
+	while(Command[C].Instruction != NULL)
+	{
 		if(!strcmp(A->L.Input.KeyBuffer, Command[C].Instruction))
 			break;
 		C++;
@@ -4239,7 +4341,6 @@ void	CallBackQuit(uARG *A, WBUTTON *wButton)
 	Proc_Quit(A);
 	fDraw(MAIN, true, false);
 }
-
 void	CallBackMinimizeWidget(uARG *A, WBUTTON *wButton)
 {
 	MinimizeWidget(A, wButton->Target);
@@ -4264,7 +4365,8 @@ static void *uLoop(uARG *A)
 				break;
 
 		if(G < WIDGETS)
-		    switch(E.type) {
+		    switch(E.type)
+		    {
 			case Expose: {
 				if(!E.xexpose.count)
 					FlushLayout(A, G);
@@ -4276,36 +4378,42 @@ static void *uLoop(uARG *A)
 				XComposeStatus ComposeStatus={0};
 				char xkBuffer[256];
 				int  xkLength;
+
 				if((xkLength=XLookupString(&E.xkey,
 							xkBuffer,
 							256,
 							&KeySymPressed,
 							&ComposeStatus)) )
-				if(!(E.xkey.state & AllModMask)
-				&& (KeySymPressed >= XK_space)
-				&& (KeySymPressed <= XK_asciitilde)
-				&& ((A->L.Input.KeyLength + xkLength) < 255)) {
-					memcpy(&A->L.Input.KeyBuffer[A->L.Input.KeyLength], xkBuffer, xkLength);
-					A->L.Input.KeyLength+=xkLength;
-					fDraw(MAIN, false, true);
+					if(!(E.xkey.state & AllModMask)
+					&& (KeySymPressed >= XK_space)
+					&& (KeySymPressed <= XK_asciitilde)
+					&& ((A->L.Input.KeyLength + xkLength) < 255))
+					{
+						memcpy(&A->L.Input.KeyBuffer[A->L.Input.KeyLength], xkBuffer, xkLength);
+						A->L.Input.KeyLength+=xkLength;
+						fDraw(MAIN, false, true);
 					}
-				switch(KeySymPressed) {
+				switch(KeySymPressed)
+				{
 					case XK_Delete:
 					case XK_KP_Delete:
-						if(A->L.Input.KeyLength > 0) {
+						if(A->L.Input.KeyLength > 0)
+						{
 							A->L.Input.KeyLength=0;
 							fDraw(MAIN, false, true);
 						}
 						break;
 					case XK_BackSpace:
-						if(A->L.Input.KeyLength > 0) {
+						if(A->L.Input.KeyLength > 0)
+						{
 							A->L.Input.KeyLength--;
 							fDraw(MAIN, false, true);
 						}
 						break;
 					case XK_Return:
 					case XK_KP_Enter:
-						if(A->L.Input.KeyLength > 0) {
+						if(A->L.Input.KeyLength > 0)
+						{
 							A->L.Input.KeyBuffer[A->L.Input.KeyLength]='\0';
 							ExecCommand(A);
 							A->L.Input.KeyLength=0;
@@ -4320,7 +4428,8 @@ static void *uLoop(uARG *A)
 					case XK_l:
 					case XK_L:
 						// Fire the drawing thread.
-						if(E.xkey.state & ControlMask) {
+						if(E.xkey.state & ControlMask)
+						{
 							if(pthread_mutex_trylock(&uDraw_mutex) == 0)
 								pthread_create(&A->TID_Draw, NULL, uDraw, A);
 						}
@@ -4332,7 +4441,8 @@ static void *uLoop(uARG *A)
 						break;
 					case XK_q:
 					case XK_Q:
-						if(E.xkey.state & ControlMask) {
+						if(E.xkey.state & ControlMask)
+						{
 							Proc_Quit(A);
 							fDraw(MAIN, true, false);
 						}
@@ -4404,7 +4514,8 @@ static void *uLoop(uARG *A)
 					case XK_KP_Subtract:
 						Play(A, G, ID_INCLOOP);
 						break;
-					case XK_F1: {
+					case XK_F1:
+					{
 						Proc_Menu(A);
 						fDraw(MAIN, true, false);
 					}
@@ -4413,14 +4524,16 @@ static void *uLoop(uARG *A)
 					case XK_F3:
 					case XK_F4:
 					case XK_F5:
-					case XK_F6: {
+					case XK_F6:
+					{
 						// Convert the function key number into a Widget index.
 						int T=XLookupKeysym(&E.xkey, 0) - XK_F1;
 						// Get the Map state.
 						XWindowAttributes xwa={0};
 						XGetWindowAttributes(A->display, A->W[T].window, &xwa);
 						// Hide or unhide the Widget.
-						switch(xwa.map_state) {
+						switch(xwa.map_state)
+						{
 							case IsViewable:
 								MinimizeWidget(A, T);
 								break;
@@ -4434,16 +4547,19 @@ static void *uLoop(uARG *A)
 			}
 				break;
 			case ButtonPress:
-				switch(E.xbutton.button) {
+				switch(E.xbutton.button)
+				{
 					case Button1:
 						WidgetButtonPress(A, G, &E);
 						break;
 					case Button3:
 						MoveWidget(A, &E);
 						break;
-					case Button4: {
+					case Button4:
+					{
 						int T=G;
-						if(_IS_MDI_) {
+						if(_IS_MDI_)
+						{
 							for(T=LAST_WIDGET; T >= FIRST_WIDGET; T--)
 								if( E.xbutton.subwindow == A->W[T].window)
 									break;
@@ -4451,9 +4567,11 @@ static void *uLoop(uARG *A)
 						Play(A, T, ID_NORTH);
 						break;
 					}
-					case Button5: {
+					case Button5:
+					{
 						int T=G;
-						if(_IS_MDI_) {
+						if(_IS_MDI_)
+						{
 							for(T=LAST_WIDGET; T >= FIRST_WIDGET; T--)
 								if( E.xbutton.subwindow == A->W[T].window)
 									break;
@@ -4464,7 +4582,8 @@ static void *uLoop(uARG *A)
 				}
 				break;
 			case ButtonRelease:
-				switch(E.xbutton.button) {
+				switch(E.xbutton.button)
+				{
 					case Button3:
 						MoveWidget(A, &E);
 						break;
@@ -4476,7 +4595,8 @@ static void *uLoop(uARG *A)
 				if(E.xmotion.state & Button1Mask)
 					WidgetButtonPress(A, G, &E);
 				break;
-			case ConfigureNotify: {
+			case ConfigureNotify:
+			{
 				A->W[G].x=E.xconfigure.x;
 				A->W[G].y=E.xconfigure.y;
 				A->W[G].width=E.xconfigure.width;
@@ -4493,7 +4613,8 @@ static void *uLoop(uARG *A)
 			case DestroyNotify:
 				A->LOOP=false;
 				break;
-			case UnmapNotify: {
+			case UnmapNotify:
+			{
 				if(G != MAIN)
 					A->PAUSE[G]=true;
 
@@ -4501,7 +4622,8 @@ static void *uLoop(uARG *A)
 				fDraw(MAIN, true, false);
 			}
 				break;
-			case MapNotify: {
+			case MapNotify:
+			{
 				if(G != MAIN)
 					A->PAUSE[G]=false;
 
@@ -4510,7 +4632,8 @@ static void *uLoop(uARG *A)
 			}
 				break;
 			case VisibilityNotify:
-				switch (E.xvisibility.state) {
+				switch (E.xvisibility.state)
+				{
 					case VisibilityUnobscured:
 						break;
 					case VisibilityPartiallyObscured:
@@ -4549,27 +4672,31 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 		}
 	}
 	if(xdb != NULL)
-		{
-			for(i=0; i < OPTIONS_COUNT; i++)
-				if((A->Options[i].xrmName != NULL) && XrmGetResource(xdb, A->Options[i].xrmName, NULL, &xtype, &xvalue))
-					sscanf(xvalue.addr, A->Options[i].format, A->Options[i].pointer);
+	{
+		for(i=0; i < OPTIONS_COUNT; i++)
+			if((A->Options[i].xrmName != NULL) && XrmGetResource(xdb, A->Options[i].xrmName, NULL, &xtype, &xvalue))
+				sscanf(xvalue.addr, A->Options[i].format, A->Options[i].pointer);
 
-			for(i=0; i < COLOR_COUNT; i++) {
-				sprintf(xrmKey, "%s.%s", A->L.Colors[i].xrmClass, A->L.Colors[i].xrmKey);
-				if(XrmGetResource(xdb, xrmKey, NULL, &xtype, &xvalue))
-					sscanf(xvalue.addr, "%x", &A->L.Colors[i].RGB);
-			}
+		for(i=0; i < COLOR_COUNT; i++)
+		{
+			sprintf(xrmKey, "%s.%s", A->L.Colors[i].xrmClass, A->L.Colors[i].xrmKey);
+			if(XrmGetResource(xdb, xrmKey, NULL, &xtype, &xvalue))
+				sscanf(xvalue.addr, "%x", &A->L.Colors[i].RGB);
 		}
+	}
 	//  Parse the command line arguments which may override settings.
 	if( (argc - ((argc >> 1) << 1)) )
 	{
-		for(j=1; j < argc; j+=2) {
+		for(j=1; j < argc; j+=2)
+		{
 			for(i=0; i < OPTIONS_COUNT; i++)
-				if(!strcmp(argv[j], A->Options[i].argument)) {
+				if(!strcmp(argv[j], A->Options[i].argument))
+				{
 					sscanf(argv[j+1], A->Options[i].format, A->Options[i].pointer);
 					break;
 				}
-			if(i == OPTIONS_COUNT) {
+			if(i == OPTIONS_COUNT)
+			{
 				noerr=false;
 				break;
 			}
@@ -4711,19 +4838,24 @@ static void *uEmergency(void *uArg)
 			case SIGQUIT:
 			case SIGUSR1:
 			case SIGTERM:
+			{
+				perror("\nEmergency shutdown");
 				A->LOOP=false;
+			}
 				break;
-			case SIGCONT: {
-/*				int G=0;
+			case SIGCONT:
+			{
+				int G=0;
 				for(G=FIRST_WIDGET; G <= LAST_WIDGET; G++)
-					Play(A, G, ID_RESUME);*/
+					Play(A, G, ID_RESUME);
 			}
 				break;
 			case SIGUSR2:
-			case SIGTSTP: {
-/*				int G=0;
+//			case SIGTSTP:
+			{
+				int G=0;
 				for(G=FIRST_WIDGET; G <= LAST_WIDGET; G++)
-					Play(A, G, ID_STOP);*/
+					Play(A, G, ID_STOP);
 			}
 		}
 	return(NULL);
@@ -5071,6 +5203,7 @@ int main(int argc, char *argv[])
 					},
 				},
 				Play: {
+					fillGraphics:true,
 					freqHertz:true,
 					cycleValues:false,
 					ratioValues:true,
@@ -5128,6 +5261,7 @@ int main(int argc, char *argv[])
 				{"-S", "%u", &A.P.ClockSrc,           "Clock source TSC(0) BIOS(1) SPEC(2) ROM(3) USER(4)",XDB_CLASS_SYSINFO"."XDB_KEY_CLOCK_SOURCE   },
 				{"-M", "%x", &A.P.BClockROMaddr,      "ROM memory address of the Base Clock (Hex. value)", XDB_CLASS_SYSINFO"."XDB_KEY_ROM_ADDRESS    },
 				{"-s", "%u", &A.P.IdleTime,           "Idle time ratio where N x 50000 (usec)",            NULL                                       },
+				{"-g", "%u", &A.L.Play.fillGraphics,  "Fill the graphics (0/1)",                           XDB_CLASS_CORES"."XDB_KEY_PLAY_GRAPHICS    },
 				{"-z", "%u", &A.L.Play.freqHertz,     "CPU frequency (0/1)",                               XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
 				{"-l", "%u", &A.L.Play.cycleValues,   "Cycle Values (0/1)",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
 				{"-r", "%u", &A.L.Play.ratioValues,   "Ratio Values (0/1)",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
@@ -5160,13 +5294,13 @@ int main(int argc, char *argv[])
 			sigaddset(&A.Signal, SIGUSR2);
 			sigaddset(&A.Signal, SIGTERM);
 			sigaddset(&A.Signal, SIGCONT);
-			sigaddset(&A.Signal, SIGTSTP);	// [CTRL] + [Z]
+//			sigaddset(&A.Signal, SIGTSTP);	// [CTRL] + [Z]
 
 			if(!pthread_sigmask(SIG_BLOCK, &A.Signal, NULL)
 			&& !pthread_create(&A.TID_SigHandler, NULL, uEmergency, &A))
 				SIGNAL=true;
 			else
-				strcat(BootLog, "Remark: can not start the signal handler.\n");
+				strcat(BootLog, "Remark: cannot start the signal handler.\n");
 
 			if(!A.L.Play.hideSplash)
 				StartSplash(&A);
@@ -5194,17 +5328,17 @@ int main(int argc, char *argv[])
 
 			if(!(A.P.CPU=A.P.Features.ThreadCount))
 			{
-				strcat(BootLog, "Warning: can not read the maximum number of Cores from CPUID.\n");
+				strcat(BootLog, "Warning: cannot read the maximum number of Cores from CPUID.\n");
 
 				if(A.P.Features.Std.DX.HTT)
 				{
 					if(!(A.BIOS=(A.P.CPU=Get_ThreadCount()) != 0))
-						strcat(BootLog, "Warning: can not read the maximum number of Threads from BIOS DMI\nCheck if 'dmi' kernel module is loaded.\n");
+						strcat(BootLog, "Warning: cannot read the maximum number of Threads from BIOS DMI\nCheck if 'dmi' kernel module is loaded.\n");
 				}
 				else
 				{
 					if(!(A.BIOS=(A.P.CPU=Get_CoreCount()) != 0))
-						strcat(BootLog, "Warning: can not read the maximum number of Cores BIOS DMI\nCheck if 'dmi' kernel module is loaded\n");
+						strcat(BootLog, "Warning: cannot read the maximum number of Cores BIOS DMI\nCheck if 'dmi' kernel module is loaded\n");
 				}
 			}
 			if(!A.P.CPU)
@@ -5234,12 +5368,12 @@ int main(int argc, char *argv[])
 
 			// Open once the MSR gate.
 			if(!(A.MSR=A.P.Arch[A.P.ArchID].Init_MSR(&A)))
-				strcat(BootLog, "Warning: can not read the MSR registers\nCheck if the 'msr' kernel module is loaded.\n");
+				strcat(BootLog, "Warning: cannot read the MSR registers\nCheck if the 'msr' kernel module is loaded.\n");
 
 			// Read the Integrated Memory Controler information.
 			A.M=IMC_Read_Info();
 			if(!A.M->ChannelCount)
-				strcat(BootLog, "Warning: can not read the IMC controler.\n");
+				strcat(BootLog, "Warning: cannot read the IMC controler.\n");
 
 			SelectBaseClock(&A);
 
@@ -5249,7 +5383,8 @@ int main(int argc, char *argv[])
 			if(OpenWidgets(&A))
 			{
 				int G=0;
-				for(G=MAIN; G < WIDGETS; G++) {
+				for(G=MAIN; G < WIDGETS; G++)
+				{
 					BuildLayout(&A, G);
 					MapLayout(&A, G);
 					if(!(A.L.UnMapBitmask & (1 << G)))
@@ -5269,12 +5404,18 @@ int main(int argc, char *argv[])
 					uLoop(&A);
 					pthread_join(TID_Cycle, NULL);
 				}
-				else rc=2;
-
+				else
+				{
+					perror(NULL);
+					rc=2;
+				}
 				CloseWidgets(&A);
 			}
-			else rc=2;
-
+			else
+			{
+				perror(NULL);
+				rc=2;
+			}
 			// Release the ressources.
 			if(SIGNAL)
 				if(!pthread_kill(A.TID_SigHandler, SIGUSR1))
@@ -5288,12 +5429,18 @@ int main(int argc, char *argv[])
 
 			pthread_mutex_destroy(&uDraw_mutex);
 		}
-		else	rc=2;
-
+		else
+		{
+			perror(NULL);
+			rc=2;
+		}
 		CloseDisplay(&A);
 	}
-	else	rc=1;
-
+	else
+	{
+		perror(NULL);
+		rc=1;
+	}
 	free(A.fontName);
 	free(A.configFile);
 

@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.25 SR0 by CyrIng
+ * XFreq.h #0.25 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,7 +7,7 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "25"
-#define _NIGHTLY "0"
+#define _NIGHTLY "1"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 
@@ -674,7 +674,7 @@ typedef	struct {
 } CPU_STRUCT;
 
 #define	IDLE_BASE_USEC	50000
-#define	IDLE_SCHED_DEF	10
+#define	IDLE_SCHED_DEF	15
 #define	IDLE_COEF_DEF	20
 #define	IDLE_COEF_MAX	80
 #define	IDLE_COEF_MIN	2
@@ -728,6 +728,8 @@ typedef struct
 #define	SCHED_CPU_FIELD	"cpu#%d\n"
 #define	TASK_COMM_LEN	16
 #define	TASK_COMM_FMT	"%15s"
+#define	TASK_PIPE_DEPTH	3
+
 typedef	struct
 {
 	struct PIPE_STRUCT
@@ -736,7 +738,7 @@ typedef	struct
 		{
 			long int	pid;
 			char		comm[TASK_COMM_LEN];
-		} Task[3];
+		} Task[TASK_PIPE_DEPTH];
 	} *Pipe;
 	useconds_t			IdleTime;
 } SCHEDULE;
@@ -798,8 +800,8 @@ enum {
 #define	_COLOR_CURSOR		0xfd0000
 #define	_COLOR_DYNAMIC		0xdddddd
 #define	_COLOR_GRAPH1		0x6666f0
-#define	_COLOR_GRAPH2		0x6666b0
-#define	_COLOR_GRAPH3		0x666690
+#define	_COLOR_GRAPH2		0x50508a
+#define	_COLOR_GRAPH3		0x515172
 #define	_COLOR_INIT_VALUE	0x6666b0
 #define	_COLOR_LOW_VALUE	0x00aa66
 #define	_COLOR_MED_VALUE	0xe49400
@@ -835,6 +837,7 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 #define	ID_STOP		'&'
 #define	ID_RESUME	'!'
 #define	ID_RESET	'Z'
+#define	ID_CHART	'c'
 #define	ID_FREQ		'z'
 #define	ID_CYCLE	'Y'
 #define	ID_RATIO	'R'
@@ -1189,7 +1192,7 @@ typedef struct
 		char		*Title;
 	} Page[WIDGETS];
 	struct {
-		bool
+		bool		fillGraphics,
 				freqHertz,
 				cycleValues,
 				ratioValues,
@@ -1254,6 +1257,7 @@ typedef struct
 #define	XDB_KEY_FOREGROUND	"Foreground"
 #define	XDB_KEY_CLOCK_SOURCE	"ClockSource"
 #define	XDB_KEY_ROM_ADDRESS	"ClockRomAddr"
+#define	XDB_KEY_PLAY_GRAPHICS	"FillGraphics"
 #define	XDB_KEY_PLAY_FREQ	"PlayFrequency"
 #define	XDB_KEY_PLAY_CYCLES	"PlayCycles"
 #define	XDB_KEY_PLAY_RATIOS	"PlayRatios"
@@ -1261,7 +1265,7 @@ typedef struct
 #define	XDB_KEY_PLAY_CSTATES	"PlayCStates"
 #define	XDB_KEY_PLAY_WALLBOARD	"PlayBrand"
 
-#define	OPTIONS_COUNT	21
+#define	OPTIONS_COUNT	22
 typedef struct
 {
 	char		*argument;

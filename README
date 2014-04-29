@@ -76,6 +76,11 @@
  *
  * [HISTORY]
  *
+ * R 0.25 : 04/29/2014 SR-1
+ *        - In the Core Widget, a button allows to switch graphic mode between filled or not.
+ *        - Prints some perror().
+ *        - Outputs a warning if file '/proc/sched_debug' cannot be opened.
+ *
  * R 0.25 : 04/28/2014
  *        - Display the Task Scheduling in the Core Widget.
  *            start XFreq with the '-t' argument or click the [Task] button,
