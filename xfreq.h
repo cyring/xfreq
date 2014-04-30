@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.25 SR1 by CyrIng
+ * XFreq.h #0.25 SR2 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,7 +7,7 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "25"
-#define _NIGHTLY "1"
+#define _NIGHTLY "2"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 
@@ -799,7 +799,7 @@ enum {
 #define	_COLOR_PROMPT		0xffff00
 #define	_COLOR_CURSOR		0xfd0000
 #define	_COLOR_DYNAMIC		0xdddddd
-#define	_COLOR_GRAPH1		0x6666f0
+#define	_COLOR_GRAPH1		0xadadff
 #define	_COLOR_GRAPH2		0x50508a
 #define	_COLOR_GRAPH3		0x515172
 #define	_COLOR_INIT_VALUE	0x6666b0

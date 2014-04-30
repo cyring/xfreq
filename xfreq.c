@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.25 SR1 by CyrIng
+ * XFreq.c #0.25 SR2 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -1403,7 +1403,6 @@ static void *uSchedule(void *uArg)
 
 	FILE	*fSD=NULL;
 	unsigned int cpu=0;
-	long int pid;
 
 	while(A->LOOP && A->PROC && A->L.Play.showSchedule)
 	{
@@ -1425,6 +1424,7 @@ static void *uSchedule(void *uArg)
 					{
 						while(fgets(buffer, sizeof(buffer), fSD) != NULL)
 						{
+							long int pid=0;
 							if((buffer[0] == '\n') || (sscanf(buffer, fmt, &pid) > 0))
 							{
 								if(pid != 0)
@@ -1454,6 +1454,18 @@ static void *uSchedule(void *uArg)
 	}
 	return(NULL);
 }
+
+// The functions definition of the Widget drawing.
+// Must be executed in the following sequence:
+
+// step 1
+void	BuildLayout(uARG *A, int G) ;
+// step 2
+void	MapLayout(uARG *A, int G) ;
+// step 3
+void	DrawLayout(uARG *A, int G) ;
+// step 4
+void	FlushLayout(uARG *A, int G) ;
 
 
 // Drawing Button functions.
@@ -1753,7 +1765,17 @@ void	WidgetButtonPress(uARG *A, int G, XEvent *E)
 		&& (y > wButton->y + yOffset)
 		&& (x < wButton->x + xOffset + wButton->w)
 		&& (y < wButton->y + yOffset + wButton->h))
-		{	// Execute its callback.
+		{
+			// Flash the buttons.
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PULSE].RGB);
+			wButton->DrawFunc(A, wButton);
+			fDraw(G, false, false);
+			usleep(50000);
+			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+			wButton->DrawFunc(A, wButton);
+			fDraw(G, false, false);
+
+			// Execute its callback.
 			wButton->CallBack(A, wButton);
 			break;
 		}
@@ -3369,7 +3391,7 @@ void	DrawLayout(uARG *A, int G)
 			break;
 		case CORES:
 		{
-			char str[TASK_PIPE_DEPTH * TASK_COMM_LEN]={0};
+			char str[TASK_COMM_LEN]={0};
 			int cpu=0;
 			for(cpu=0; cpu < A->P.CPU; cpu++)
 				if(A->P.Topology[cpu].CPU != NULL)
@@ -3414,8 +3436,11 @@ void	DrawLayout(uARG *A, int G)
 					// For each Core, display its frequency, C-STATE & ratio.
 					if(A->L.Play.freqHertz && (A->P.Topology[cpu].CPU->RelativeRatio >= 5.0f) )
 					{
-						XSetForeground(A->display, A->W[G].gc, Bar[i].Fg);
 						sprintf(str, CORE_FREQ, A->P.Topology[cpu].CPU->RelativeFreq);
+						if(A->L.Play.fillGraphics)
+							XSetForeground(A->display, A->W[G].gc, Bar[i].Fg);
+						else
+							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 								One_Char_Width(G) * 5,
 								One_Char_Height(G) * (cpu + 1 + 1),
@@ -3440,34 +3465,52 @@ void	DrawLayout(uARG *A, int G)
 					{
 						if(A->L.Play.showSchedule)
 						{
-							int i=0, L=TASK_PIPE_DEPTH * (TASK_COMM_LEN - 1);
-							memset(str, 0x20, (TASK_PIPE_DEPTH * TASK_COMM_LEN) - 1);
-
-							for(i=0; i < TASK_PIPE_DEPTH ; i++)
+							if(!A->L.Play.ratioValues)
 							{
-								size_t l=strlen(A->S.Pipe[cpu].Task[i].comm);
-								if(l > 0)
+								if(A->S.Pipe[cpu].Task[0].pid > 0)
 								{
-									L=L-l;
-									memcpy(&str[L], A->S.Pipe[cpu].Task[i].comm, l);
+									sprintf(str, "%ld", A->S.Pipe[cpu].Task[0].pid);
+									int l=strlen(str);
+
+									XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH1].RGB);
+									XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+											A->W[G].width - (One_Char_Width(G) * l),
+											One_Char_Height(G) * (cpu + 1 + 1),
+											str, l );
 								}
-								L-=(l > 7) ? 1 : l;
 							}
-							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH3].RGB);
-							XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-									One_Char_Width(G) * 13,
-									One_Char_Height(G) * (cpu + 1 + 1),
-									&str[16], 7 );
-							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH2].RGB);
-							XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-									One_Char_Width(G) * 20,
-									One_Char_Height(G) * (cpu + 1 + 1),
-									&str[23], 7 );
-							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
-							XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-									One_Char_Width(G) * 27,
-									One_Char_Height(G) * (cpu + 1 + 1),
-									&str[30], 15 );
+							XRectangle R[]=
+							{ {
+								x:One_Char_Width(G) * 13,
+								y:Header_Height(G),
+								width:One_Char_Width(G) * ((CORES_TEXT_WIDTH - 7) << 1),
+								height:One_Char_Height(G) * CORES_TEXT_HEIGHT
+							} };
+							XSetClipRectangles(A->display, A->W[G].gc, 0, 0, R, 1, Unsorted);
+
+							const unsigned long Fg[TASK_PIPE_DEPTH]=
+							{
+								A->L.Colors[COLOR_GRAPH1].RGB,
+								A->L.Colors[COLOR_GRAPH2].RGB,
+								A->L.Colors[COLOR_GRAPH3].RGB
+							};
+							int i=0, l=strlen(A->S.Pipe[cpu].Task[i].comm),
+								L=(CORES_TEXT_WIDTH << 1) - 1 - ((l > 0) ? l : (TASK_COMM_LEN - 1));
+							do
+							{
+								if((A->S.Pipe[cpu].Task[i].pid > 0) || (l > 0))
+								{
+									XSetForeground(A->display, A->W[G].gc, Fg[i]);
+									XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+											One_Char_Width(G) * L,
+											One_Char_Height(G) * (cpu + 1 + 1),
+											A->S.Pipe[cpu].Task[i].comm, l );
+								}
+								i++; l=strlen(A->S.Pipe[cpu].Task[i].comm); L-=((l > 0) ? (l + 1) : (TASK_COMM_LEN - 1));
+							}
+							while(i < TASK_PIPE_DEPTH) ;
+
+							XSetClipMask(A->display, A->W[G].gc, None);
 						}
 						else if(!A->L.Play.ratioValues)
 						{
@@ -5248,7 +5291,7 @@ int main(int argc, char *argv[])
 			configFile:calloc(1024, sizeof(char)),
 			Options:
 			{
-				{"-C", "%s", A.configFile,            "Configuration path and file name",                  NULL                                       },
+				{"-C", "%s", A.configFile,            "Path and file configuration name (must be first)",  NULL                                       },
 				{"-D", "%d", &A.MDI,                  "Enable MDI Window (0/1)",                           NULL                                       },
 				{"-U", "%x", &A.L.UnMapBitmask,       "Bitmap of unmap Widgets (Hex. value)",              NULL                                       },
 				{"-F", "%s", A.fontName,              "Font name",                                         XDB_CLASS_MAIN"."XDB_KEY_FONT              },

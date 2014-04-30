@@ -76,6 +76,15 @@
  *
  * [HISTORY]
  *
+ * R 0.25 : 04/30/2014 SR-2
+ *        - When pressed, flash buttons with the COLOR_PULSE during a usleep of 50000.
+ *            could be enhanced with a dedicated pixmap loop running its own thread.
+ *        - Changed the default RGB value of _COLOR_GRAPH1 to 0xadadff , _COLOR_GRAPH2 to 0x50508a and _COLOR_GRAPH3 to 0x515172
+ *        - With the none filled graphic mode activated:
+ *            added the PID number instead of the ratio value if the [Ratio] button is pressed;
+ *            modified the disposal and the scalling of the task command names;
+ *            fix the text foreground color inside the Core usage rectangles.
+ *
  * R 0.25 : 04/29/2014 SR-1
  *        - In the Core Widget, a button allows to switch graphic mode between filled or not.
  *        - Prints some perror().
