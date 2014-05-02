@@ -1,12 +1,124 @@
 /*
- * XFreq.c by CyrIng
+ * XFreq by CyrIng
  *
- * A Widget to display the frequency & the temperature of each core in the Intel i7 processor.
+ *
+ * [PURPOSE]
+ *
+ * XFreq provides some Widgets to display the frequency (incl. turbo), the temperature, C-States and other features of the Intel Core i7, i5 processors.
+ * It also works with Core 2 architectures.
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * http://blog.cyring.fr
  *
  * Licenses: GPL2
+ *
+ *
+ *
+ * [BUILD]
+ *
+ * 1- download the source code into a working directory
+ *
+ * xfreq.c
+ *
+ * xfreq.h
+ *
+ * Makefile
+ *
+ *
+ * 2- in a terminal, run the compilation of the source code
+ *
+ * make
+ *
+ *
+ * 3- the following output will be displayed
+ *
+ * +-------------------------------------------------------------------------------------+
+ * | Compiling : Done.                                                                   |
+ * | Linking   : Done.                                                                   |
+ * | Ready     : ./bin/xfreq                                                             |
+ * | --- Prerequisites ---                                                               |
+ * | 1- Super User privileges                                                            |
+ * | 2- Insert or modprobe the Kernel modules : dmi_sysfs (optional) and msr (mandatory) |
+ * | 3- Allow root access to the X Server (with the xhost + command for instance)        |
+ * +-------------------------------------------------------------------------------------+
+ *
+ *
+ * 4- depending of your packages distribution, the libraries required to compile the source code are the following
+ *
+ * XLIB developer (libX11)
+ *
+ * POSIX threads (pthreads)
+ *
+ *
+ *
+ * [RUN]
+ *
+ * 1- the following kernel modules and file systems are prerequisites to run XFreq
+ *
+ * +---------------------------+-----------+--------------------------------------+
+ * | msr.ko                    | mandatory | model specific registers (1)         |
+ * +---------------------------+-----------+--------------------------------------+
+ * | dmi-sysfs.ko              | optional  | DMI tables (2)                       |
+ * +---------------------------+-----------+--------------------------------------+
+ * | /proc/sched_debug         | optional  | reference: kernel/sched/debug.c      |
+ * +---------------------------+-----------+--------------------------------------+
+ * | /proc/<pid>/*             | optional  | reference: linux/fs/proc/base.c      |
+ * +---------------------------+-----------+--------------------------------------+
+ * | iopl                      | optional  | change I/O privilege level           |
+ * +---------------------------+-----------+--------------------------------------+
+ *
+ *
+ * 2- if already logged into an X session as a regular user, you have to disable the X ACL using one of this two solutions.
+ *
+ * xhost +
+ *
+ * ./bin/xfreq -a N
+ *
+ *
+ * 3- then as root(with the X ACL already disabled), launch XFreq
+ *
+ * ./bin/xfreq
+ *
+ *
+ * Note:
+ *   some DE, such as KDE, provides their all-in-one launcher which simplify the previous steps (2 & 3)
+ *   try
+ *       kdesu ./bin/xfreq
+ *
+ *
+ *
+ * [TESTBED]
+ *
+ * +-------------------+---------------------------+--------+-------+---------\
+ * | Intel Processors  | System [Desktop/Laptop]   | Status |  Date | Release | Issue
+ * +-------------------+---------------------------+--------+-------+---------/
+ * | Core i7-920       | Asus Rampage II Gene [D]  |   OK   |Nightly| Nightly | The ddd debugger has caught a SIGQUIT signal.
+ * +-------------------+---------------------------+--------+-------+---------+
+ * | Core 2 Duo T5500  | Acer Aspire 5633 [L]      |   OK   | 04/30 | 0.25-2  | random exit without dumping a core.
+ * +-------------------+---------------------------+--------+-------+---------+
+ * + Core 2 Quad Q8200 | Unknown [L]               |   OK   | 05/02 + 0.25-2  | Troubles with Gnome 3. See below.
+ * +-------------------+---------------------------+--------+-------+---------+
+ *
+ *
+ *
+ * [ISSUE]
+ *
+ * + The live CD is too big (more than 500 MB).
+ *     So I packed other benchmark tools inside ;-)
+ *
+ * + The temperature thresholds MSR does not return any value.
+ *     Need to investigate ACPI.
+ *
+ * + Program freeze after a long run. Probably due to a semaphore lock overload.
+ *
+ * + Fast-Strings reported as not available in CPUID but enabled in MSR.
+ *
+ * + Virtual memory leak : investigation in progress with Valgrind
+ *
+ * + Gnome 3 reports "XIO:  fatal IO error 11 (Resource temporarily unavailable) on X server ":0" when selecting the Quit button.
+ *
+ * + Title name is missing in the Gnome 3 task bar.
+ *
  *
  *
  * [TODO]
@@ -59,22 +171,15 @@
  * + release candidate.
  *
  *
- *   Issues
- * ----------
- * + The live CD is too big (up to 500 MB).
- *     So I packed other benchmark tools inside ;-)
- *
- * + The temperature thresholds MSR does not return any value.
- *     Need to investigate ACPI.
- *
- * + Program freeze after a long run. Probably due to a semaphore lock overload.
- *
- * + Fast-Strings reported as not available in CPUID but enabled in MSR.
- *
- * + Virtual memory leak : investigation in progress with Valgrind
- *
  *
  * [HISTORY]
+ *
+ * R 0.25 : 05/01/2014 SR-3
+ *        - Written more details into the README file.
+ *        - Fix few errors mentioned by Valgrind -;)
+ *        - Fix some command line arguments:
+ *            '-t' was a duplicate and has been replaced by '-o' to keep Widgets always on top;
+ *            '-t' to boot the task scheduling monitor is now correctly saved into the settings file.
  *
  * R 0.25 : 04/30/2014 SR-2
  *        - When pressed, flash buttons with the COLOR_PULSE during a usleep of 50000.
@@ -353,4 +458,19 @@
  *        - leave Event Loop, uLoop() as the main thread.
  * R 0.08 : Widget ready as a beta release.
  * R 0.01 to 0.07 : initial source code.
+ *
+ *
+ *
+ * [DOCUMENTATION]
+ *
+ * +-----+--------------------------------------------------------------------------------------------+
+ * | (1) | Intel 64 and IA-32 Software Developer Manual Vol 3A 3B 3C                                  |
+ * +-----+--------------------------------------------------------------------------------------------+
+ * | (2) | DMTF: System Management BIOS (SMBIOS) Reference Specification                              |
+ * +-----+--------------------------------------------------------------------------------------------+
+ * | (3) | Intel Turbo Boost Technology in Intel CoreTM Microarchitecture (Nehalem) Based Processors  |
+ * +-----+--------------------------------------------------------------------------------------------+
+ * | (4) | Micron Technology: Technical Note DDR3 Power-Up, Initialization, and Reset                 |
+ * +-----+--------------------------------------------------------------------------------------------+
+ *
  */

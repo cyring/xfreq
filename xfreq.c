@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.25 SR2 by CyrIng
+ * XFreq.c #0.25 SR3 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -1408,7 +1408,7 @@ static void *uSchedule(void *uArg)
 	{
 		for(cpu=0; cpu < A->P.CPU; cpu++)
 		{
-			memmove(&A->S.Pipe[cpu].Task[1].pid, &A->S.Pipe[cpu].Task[0].pid, (TASK_PIPE_DEPTH - 1) * sizeof(struct TASK_STRUCT));
+			memmove(&A->S.Pipe[cpu].Task[1], &A->S.Pipe[cpu].Task[0], (TASK_PIPE_DEPTH - 1) * sizeof(struct TASK_STRUCT));
 			memset(&A->S.Pipe[cpu].Task[0], 0, sizeof(struct TASK_STRUCT));
 		}
 		if((A->PROC=((fSD=fopen("/proc/sched_debug", "r")) != NULL)) == true)
@@ -1416,31 +1416,27 @@ static void *uSchedule(void *uArg)
 			char buffer[1024], fmt[48];
 			sprintf(fmt, SCHED_PID_FMT, SCHED_PID_FIELD);
 
-			while(!feof(fSD))
+			while(fgets(buffer, sizeof(buffer), fSD) != NULL)
 			{
-				if(fgets(buffer, sizeof(buffer), fSD) != NULL)
+				if((sscanf(buffer, SCHED_CPU_FIELD, &cpu) > 0) && (cpu >= 0) && (cpu < A->P.CPU))
 				{
-					if((sscanf(buffer, SCHED_CPU_FIELD, &cpu) > 0) && (cpu >= 0) && (cpu < A->P.CPU))
+					while(fgets(buffer, sizeof(buffer), fSD) != NULL)
 					{
-						while(fgets(buffer, sizeof(buffer), fSD) != NULL)
+						long int pid=0;
+						if((buffer[0] == '\n') || (sscanf(buffer, fmt, &pid) > 0))
 						{
-							long int pid=0;
-							if((buffer[0] == '\n') || (sscanf(buffer, fmt, &pid) > 0))
+							if(pid != 0)
 							{
-								if(pid != 0)
+								FILE *fCOMM=NULL;
+								sprintf(buffer, "/proc/%ld/comm", pid);
+								if((fCOMM=fopen(buffer, "r")) != NULL)
 								{
-									FILE *fCOMM=NULL;
-									sprintf(buffer, "/proc/%ld/comm", pid);
-
-									if((fCOMM=fopen(buffer, "r")) != NULL)
-									{
-										fscanf(fCOMM, TASK_COMM_FMT, A->S.Pipe[cpu].Task[0].comm);
-										fclose(fCOMM);
-									}
-									A->S.Pipe[cpu].Task[0].pid=pid;
+									fscanf(fCOMM, TASK_COMM_FMT, A->S.Pipe[cpu].Task[0].comm);
+									fclose(fCOMM);
 								}
-								break;
+								A->S.Pipe[cpu].Task[0].pid=pid;
 							}
+							break;
 						}
 					}
 				}
@@ -1770,7 +1766,7 @@ void	WidgetButtonPress(uARG *A, int G, XEvent *E)
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PULSE].RGB);
 			wButton->DrawFunc(A, wButton);
 			fDraw(G, false, false);
-			usleep(50000);
+			usleep(WBUTTON_PULSE_US);
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			wButton->DrawFunc(A, wButton);
 			fDraw(G, false, false);
@@ -3494,11 +3490,14 @@ void	DrawLayout(uARG *A, int G)
 								A->L.Colors[COLOR_GRAPH2].RGB,
 								A->L.Colors[COLOR_GRAPH3].RGB
 							};
-							int i=0, l=strlen(A->S.Pipe[cpu].Task[i].comm),
-								L=(CORES_TEXT_WIDTH << 1) - 1 - ((l > 0) ? l : (TASK_COMM_LEN - 1));
+
+							int i=0, L=(CORES_TEXT_WIDTH << 1);
 							do
 							{
-								if((A->S.Pipe[cpu].Task[i].pid > 0) || (l > 0))
+								int l=strlen(A->S.Pipe[cpu].Task[i].comm);
+								L-=((l > 0) ? (l + 1) : (TASK_COMM_LEN - 1));
+
+								if((A->S.Pipe[cpu].Task[i].pid > 0) && (l > 0))
 								{
 									XSetForeground(A->display, A->W[G].gc, Fg[i]);
 									XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
@@ -3506,7 +3505,7 @@ void	DrawLayout(uARG *A, int G)
 											One_Char_Height(G) * (cpu + 1 + 1),
 											A->S.Pipe[cpu].Task[i].comm, l );
 								}
-								i++; l=strlen(A->S.Pipe[cpu].Task[i].comm); L-=((l > 0) ? (l + 1) : (TASK_COMM_LEN - 1));
+								i++;
 							}
 							while(i < TASK_PIPE_DEPTH) ;
 
@@ -4107,7 +4106,7 @@ void	Play(uARG *A, int G, char ID)
 								CallBackButton,
 								&Rsc);
 
-						A->L.Play.showSchedule=true;
+						A->L.Play.bootSchedMon=A->L.Play.showSchedule=true;
 						fDraw(CORES, true, false);
 					}
 					else
@@ -4118,7 +4117,7 @@ void	Play(uARG *A, int G, char ID)
 				}
 				else
 				{
-					A->L.Play.showSchedule=false;
+					A->L.Play.bootSchedMon=A->L.Play.showSchedule=false;
 					pthread_join(A->TID_Schedule, NULL);
 					free(A->S.Pipe);
 					A->S.Pipe=NULL;
@@ -4470,11 +4469,13 @@ static void *uLoop(uARG *A)
 						break;
 					case XK_l:
 					case XK_L:
-						// Fire the drawing thread.
+						// Draw Widget once.
 						if(E.xkey.state & ControlMask)
 						{
-							if(pthread_mutex_trylock(&uDraw_mutex) == 0)
-								pthread_create(&A->TID_Draw, NULL, uDraw, A);
+							MapLayout(A, G);
+							DrawLayout(A, G);
+							FlushLayout(A, G);
+							UpdateWidgetName(A, G);
 						}
 						break;
 					case XK_p:
@@ -4882,7 +4883,9 @@ static void *uEmergency(void *uArg)
 			case SIGUSR1:
 			case SIGTERM:
 			{
-				perror("\nEmergency shutdown");
+				char str[sizeof(SIG_EMERGENCY_FMT)];
+				sprintf(str, SIG_EMERGENCY_FMT, caught);
+				perror(str);
 				A->LOOP=false;
 			}
 				break;
@@ -5256,7 +5259,7 @@ int main(int argc, char *argv[])
 					wallboard:false,
 					flashCursor:true,
 					hideSplash:false,
-					bootSchedule:false,
+					bootSchedMon:false,
 				},
 				WB: {
 					Scroll:0,
@@ -5308,9 +5311,9 @@ int main(int argc, char *argv[])
 				{"-z", "%u", &A.L.Play.freqHertz,     "CPU frequency (0/1)",                               XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
 				{"-l", "%u", &A.L.Play.cycleValues,   "Cycle Values (0/1)",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
 				{"-r", "%u", &A.L.Play.ratioValues,   "Ratio Values (0/1)",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
-				{"-t", "%u", &A.L.Play.bootSchedule,  "Task scheduling (0/1)",                             XDB_CLASS_CORES"."XDB_KEY_PLAY_SCHEDULE    },
+				{"-t", "%u", &A.L.Play.bootSchedMon,  "Task scheduling monitoring (0/1)",                  XDB_CLASS_CORES"."XDB_KEY_PLAY_SCHEDULE    },
 				{"-p", "%u", &A.L.Play.cStatePercent, "C-State percentage (0/1)",                          XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
-				{"-t", "%u", &A.L.Play.alwaysOnTop,   "Always On Top (0/1)",                               NULL                                       },
+				{"-o", "%u", &A.L.Play.alwaysOnTop,   "Always On Top (0/1) {not implemented yet}",         NULL                                       },
 				{"-w", "%u", &A.L.Play.wallboard,     "Scroll wallboard (0/1)",                            XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
 				{"-i", "%u", &A.L.Play.hideSplash,    "Hide the splash screen (0/1)",                      NULL                                       },
 			},
@@ -5438,7 +5441,7 @@ int main(int argc, char *argv[])
 				pthread_t TID_Cycle=0;
 				if((A.P.ArchID != -1) && !pthread_create(&TID_Cycle, NULL, A.P.Arch[A.P.ArchID].uCycle, &A))
 				{
-					if(A.L.Play.bootSchedule)
+					if(A.L.Play.bootSchedMon)
 						Play(&A, CORES, ID_SCHED);
 
 					Output(&A, BootLog);
@@ -5463,6 +5466,12 @@ int main(int argc, char *argv[])
 			if(SIGNAL)
 				if(!pthread_kill(A.TID_SigHandler, SIGUSR1))
 					pthread_join(A.TID_SigHandler, NULL);
+
+			if(A.L.Play.showSchedule)
+			{
+				pthread_join(A.TID_Schedule, NULL);
+				free(A.S.Pipe);
+			}
 
 			IMC_Free_Info(A.M);
 

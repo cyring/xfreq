@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.25 SR2 by CyrIng
+ * XFreq.h #0.25 SR3 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,7 +7,7 @@
 
 #define _MAJOR   "0"
 #define _MINOR   "25"
-#define _NIGHTLY "2"
+#define _NIGHTLY "3"
 #define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 
@@ -725,7 +725,7 @@ typedef struct
 
 #define	SCHED_PID_FMT	"  .%-30s: %%ld\n"
 #define	SCHED_PID_FIELD	"curr->pid"
-#define	SCHED_CPU_FIELD	"cpu#%d\n"
+#define	SCHED_CPU_FIELD	"cpu#%d"
 #define	TASK_COMM_LEN	16
 #define	TASK_COMM_FMT	"%15s"
 #define	TASK_PIPE_DEPTH	3
@@ -737,7 +737,7 @@ typedef	struct
 		struct TASK_STRUCT
 		{
 			long int	pid;
-			char		comm[TASK_COMM_LEN];
+			char		comm[TASK_COMM_LEN + 1];
 		} Task[TASK_PIPE_DEPTH];
 	} *Pipe;
 	useconds_t			IdleTime;
@@ -899,6 +899,8 @@ struct WButton
 typedef	struct	WButton	WBUTTON;
 
 enum	{HEAD, TAIL, CHAINS};
+
+#define	WBUTTON_PULSE_US	75000
 
 typedef struct
 {
@@ -1135,6 +1137,8 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	TITLE_TEMPS_FMT		"Core#%d @ %dC"
 #define	TITLE_SYSINFO_FMT	"Clock @ %5.2f MHz"
 
+#define	SIG_EMERGENCY_FMT	"\nEmergency shutdown(%02d)"
+
 #define	SCROLLED_ROWS_PER_ONCE	1
 #define	SCROLLED_ROWS_PER_PAGE	(MAIN_TEXT_HEIGHT >> 1)
 #define	SCROLLED_COLS_PER_ONCE	1
@@ -1202,7 +1206,7 @@ typedef struct
 				wallboard,
 				flashCursor,
 				hideSplash,
-				bootSchedule;
+				bootSchedMon;
 	} Play;
 	struct {;
 		int		Scroll,
