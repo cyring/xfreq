@@ -89,14 +89,14 @@
  *
  * [TESTBED]
  *
- * +-------------------+---------------------------+--------+-------+---------\
+ * +-------------------+---------------------------+--------+-------+---------+
  * | Intel Processors  | System [Desktop/Laptop]   | Status |  Date | Release | Issue
- * +-------------------+---------------------------+--------+-------+---------/
+ * +-------------------+---------------------------+--------+-------+---------+
  * | Core i7-920       | Asus Rampage II Gene [D]  |   OK   |Nightly| Nightly | The ddd debugger has caught a SIGQUIT signal.
  * +-------------------+---------------------------+--------+-------+---------+
  * | Core 2 Duo T5500  | Acer Aspire 5633 [L]      |   OK   | 04/30 | 0.25-2  | random exit without dumping a core.
  * +-------------------+---------------------------+--------+-------+---------+
- * + Core 2 Quad Q8200 | Unknown [L]               |   OK   | 05/02 + 0.25-2  | Troubles with Gnome 3. See below.
+ * + Core 2 Quad Q8200 | Unknown [L]               |   OK   | 05/02 + 0.25-2  |
  * +-------------------+---------------------------+--------+-------+---------+
  *
  *
@@ -114,10 +114,6 @@
  * + Fast-Strings reported as not available in CPUID but enabled in MSR.
  *
  * + Virtual memory leak : investigation in progress with Valgrind
- *
- * + Gnome 3 reports "XIO:  fatal IO error 11 (Resource temporarily unavailable) on X server ":0" when selecting the Quit button.
- *
- * + Title name is missing in the Gnome 3 task bar.
  *
  *
  *
@@ -140,7 +136,6 @@
  * + GPU sensors.
  *     compile with the NVIDIA (first), the AMD & Intel frameworks (seconds) ?
  *
- * + implement the procstat API to trace high cpu load processes: in progress with kernel source sched.h
  * + scripting, editor, push alarms : write user defined bit values in MSR.
  *
  *
@@ -173,6 +168,16 @@
  *
  *
  * [HISTORY]
+ *
+ * R 0.25 : 05/07/2014 SR-4
+ *        - The feature 'Always on top' is implemented by invoking the Window Manager.
+ *        - Widgets can be skipped from the WM taskbar using the argument '-N'
+ *        - The Window Manager decorations can be removed using the argument '-n'
+ *        - Added an icon to all windows, including the Splash one.
+ *        - Fix the missing application class and title name required by the Gnome 3 task bar.
+ *        - Fix "XIO:  fatal IO error 11 ..."
+ *        - After moving a paused Widget the Cursor is restored to its previous shape.
+ *        - The MAIN Widget is the only window which buffers the input keys.
  *
  * R 0.25 : 05/01/2014 SR-3
  *        - Written more details into the README file.

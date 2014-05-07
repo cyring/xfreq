@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.25 SR3 by CyrIng
+ * XFreq.c #0.25 SR4 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -1451,18 +1451,6 @@ static void *uSchedule(void *uArg)
 	return(NULL);
 }
 
-// The functions definition of the Widget drawing.
-// Must be executed in the following sequence:
-
-// step 1
-void	BuildLayout(uARG *A, int G) ;
-// step 2
-void	MapLayout(uARG *A, int G) ;
-// step 3
-void	DrawLayout(uARG *A, int G) ;
-// step 4
-void	FlushLayout(uARG *A, int G) ;
-
 
 // Drawing Button functions.
 void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
@@ -1614,15 +1602,7 @@ void	DrawIconButton(uARG *A, WBUTTON *wButton)
 	XDrawString(A->display, A->W[MAIN].pixmap.B, A->W[MAIN].gc, wButton->x+inner, wButton->y+(A->W[MAIN].extents.ascent), str, 1);
 }
 
-// CallBack functions definition.
-void	CallBackSave(uARG *A, WBUTTON *wButton) ;
-void	CallBackQuit(uARG *A, WBUTTON *wButton) ;
-void	CallBackButton(uARG *A, WBUTTON *wButton) ;
-void	CallBackSwitchChart(uARG *A, WBUTTON *wButton) ;
-void	CallBackMinimizeWidget(uARG *A, WBUTTON *wButton) ;
-void	CallBackRestoreWidget(uARG *A, WBUTTON *wButton) ;
-
-// Create a button with callback, drawing & collision functions.
+// Create a button, supplying the callback, the drawing & the collision functions.
 void	CreateButton(uARG *A, WBTYPE Type, char ID, int Target, int x, int y, unsigned int w, unsigned h, void *CallBack, RESOURCE *Resource)
 {
 	WBUTTON *NewButton=calloc(1, sizeof(WBUTTON));
@@ -1765,11 +1745,11 @@ void	WidgetButtonPress(uARG *A, int G, XEvent *E)
 			// Flash the buttons.
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PULSE].RGB);
 			wButton->DrawFunc(A, wButton);
-			fDraw(G, false, false);
+			fDraw(G, false, true);
 			usleep(WBUTTON_PULSE_US);
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			wButton->DrawFunc(A, wButton);
-			fDraw(G, false, false);
+			fDraw(G, false, true);
 
 			// Execute its callback.
 			wButton->CallBack(A, wButton);
@@ -1777,12 +1757,30 @@ void	WidgetButtonPress(uARG *A, int G, XEvent *E)
 		}
 }
 
-// Draw the TextCursor shape,
+// Draw the TextCursor shape.
 void	DrawCursor(uARG *A, int G, XPoint *Origin)
 {
 	A->L.TextCursor[0].x=Origin->x;
 	A->L.TextCursor[0].y=Origin->y;
 	XFillPolygon(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.TextCursor, 3, Nonconvex, CoordModePrevious);
+}
+
+// Draw the shape for a window icon.
+void	DrawIconWindow(Display *display, Drawable drawable, GC gc, XRectangle *rect, unsigned long bg, unsigned long fg)
+{
+	XSetForeground(display, gc, bg);
+	XFillRectangle(display, drawable, gc, 0, 0, rect->width, rect->height);
+	XSetForeground(display, gc, fg);
+
+	const short int h=rect->height / 5;
+	XSegment shape[]=
+	{
+		{x1:rect->x + 2,	y1:rect->y + (h * 1),	x2:rect->x + (3 * rect->width / 4),	y2:rect->y + (h * 1)},
+		{x1:rect->x + 2,	y1:rect->y + (h * 2),	x2:rect->x + (1 * rect->width / 2),	y2:rect->y + (h * 2)},
+		{x1:rect->x + 2,	y1:rect->y + (h * 3),	x2:rect->x + rect->width - 4,		y2:rect->y + (h * 3)},
+		{x1:rect->x + 2,	y1:rect->y + (h * 4),	x2:rect->x + (2 * rect->width / 5),	y2:rect->y + (h * 4)}
+	};
+	XDrawSegments(display, drawable, gc, shape, sizeof(shape)/sizeof(XSegment));
 }
 
 // All-in-One function to print a string filled with some New Line terminated texts.
@@ -1885,7 +1883,10 @@ void	MoveWidget(uARG *A, XEvent *E)
 			break;
 		case ButtonRelease:
 			if(A->T.Locked) {
-				XDefineCursor(A->display, A->W[A->T.S].window, A->MouseCursor[MC_DEFAULT]);
+				if(A->PAUSE[A->T.S])
+					XDefineCursor(A->display, A->W[A->T.S].window, A->MouseCursor[MC_WAIT]);
+				else
+					XDefineCursor(A->display, A->W[A->T.S].window, A->MouseCursor[MC_DEFAULT]);
 				A->T.S=0;
 				A->T.Locked=false;
 			}
@@ -2017,23 +2018,34 @@ void	StartSplash(uARG *A)
 						_BACKGROUND_SPLASH)) != 0
 	&& (A->Splash.gc=XCreateGC(A->display, A->Splash.window, 0, NULL)) != 0)
 	{
+		XClassHint *clHints=NULL;
+		if((clHints=XAllocClassHint()) != NULL)
+		{
+			clHints->res_name="Splash";
+			clHints->res_class=_APPNAME;
+			XSetClassHint(A->display, A->Splash.window, clHints);
+			XFree(clHints);
+		}
+		XStoreName(A->display, A->Splash.window, _APPNAME);
+		XSetIconName(A->display, A->Splash.window, _APPNAME);
+
 		A->Splash.bitmap=XCreateBitmapFromData(A->display, A->Splash.window, (const char *) splash_bits, splash_width, splash_height);
 
-		XSizeHints *hints=NULL;
-		if((hints=XAllocSizeHints()) != NULL)
+		XSizeHints *szHints=NULL;
+		if((szHints=XAllocSizeHints()) != NULL)
 		{
-			hints->x=A->Splash.x;
-			hints->y=A->Splash.y;
-			hints->min_width= hints->max_width= A->Splash.w;
-			hints->min_height=hints->max_height=A->Splash.h;
-			hints->flags=USPosition|USSize|PMinSize|PMaxSize;
-			XSetWMNormalHints(A->display, A->Splash.window, hints);
-			XFree(hints);
+			szHints->x=A->Splash.x;
+			szHints->y=A->Splash.y;
+			szHints->min_width= szHints->max_width= A->Splash.w;
+			szHints->min_height=szHints->max_height=A->Splash.h;
+			szHints->flags=USPosition|USSize|PMinSize|PMaxSize;
+			XSetWMNormalHints(A->display, A->Splash.window, szHints);
+			XFree(szHints);
 		}
 		else
 			XMoveWindow(A->display, A->Splash.window, A->Splash.x, A->Splash.y);
 
-		Atom property=XInternAtom(A->display, "_MOTIF_WM_HINTS", true);
+		Atom property=XInternAtom(A->display, "_MOTIF_WM_HINTS", True);
 		if(property != None)
 		{
 			struct {
@@ -2046,6 +2058,34 @@ void	StartSplash(uARG *A)
 					data={flags:2, functions:0, decorations:0, inputMode:0, status:0};
 
 			XChangeProperty(A->display, A->Splash.window, property, property, 32, PropModeReplace, (unsigned char *) &data, 5);
+		}
+
+		XRectangle iconRect={x:0, y:0, width:48, height:48};
+		XIconSize *xics=NULL;
+		int xicn=0;
+		if(XGetIconSizes(A->display, XRootWindow(A->display, DefaultScreen(A->display)), &xics, &xicn) != 0)
+		{
+			if(xicn > 0)
+			{
+				iconRect.width=xics[0].max_width;
+				iconRect.height=xics[0].max_height;
+			}
+			XFree(xics);
+		}
+		if((A->Splash.icon=XCreatePixmap(A->display, A->Splash.window, iconRect.width, iconRect.height, DefaultDepthOfScreen(A->screen))))
+		{
+			DrawIconWindow(A->display, A->Splash.icon, A->Splash.gc, &iconRect, _BACKGROUND_SPLASH, _FOREGROUND_SPLASH);
+
+			XWMHints *wmhints=XAllocWMHints();
+			if(wmhints != NULL)
+			{
+				wmhints->initial_state = NormalState;
+				wmhints->input = True;
+				wmhints->icon_pixmap = A->Splash.icon;
+				wmhints->flags = StateHint | IconPixmapHint | InputHint;
+				XSetWMHints(A->display, A->Splash.window, wmhints);
+				XFree(wmhints);
+			}
 		}
 		XSelectInput(A->display, A->Splash.window, ExposureMask);
 		XMapWindow(A->display, A->Splash.window);
@@ -2063,6 +2103,7 @@ void	StopSplash(uARG *A)
 	pthread_join(A->TID_Draw, NULL);
 
 	XUnmapWindow(A->display, A->Splash.window);
+	XFreePixmap(A->display, A->Splash.icon);
 	XFreePixmap(A->display, A->Splash.bitmap);
 	XFreeGC(A->display, A->Splash.gc);
 	XDestroyWindow(A->display, A->Splash.window);
@@ -2094,7 +2135,8 @@ int	OpenDisplay(uARG *A)
 	int noerr=true;
 	if((A->display=XOpenDisplay(NULL)) && (A->screen=DefaultScreenOfDisplay(A->display)) )
 	{
-		switch(A->xACL) {
+		switch(A->xACL)
+		{
 			case 'Y':
 			case 'y':
 				XEnableAccessControl(A->display);
@@ -2111,7 +2153,8 @@ int	OpenDisplay(uARG *A)
 
 		if((A->xfont=XLoadQueryFont(A->display, A->fontName)) == NULL)
 			noerr=false;
-		else {
+		else
+		{
 			// Adjust margins using the font size.
 			if(_IS_MDI_) {
 				A->L.Margin.H=(A->xfont->max_bounds.rbearing - A->xfont->min_bounds.lbearing) << 1;
@@ -2121,7 +2164,8 @@ int	OpenDisplay(uARG *A)
 				A->L.Margin.V=(A->xfont->ascent + A->xfont->descent) + (A->xfont->ascent + A->xfont->descent);
 			}
 		}
-		if(noerr) {
+		if(noerr)
+		{
 			A->MouseCursor[MC_DEFAULT]=XCreateFontCursor(A->display, XC_left_ptr);
 			A->MouseCursor[MC_MOVE]=XCreateFontCursor(A->display, XC_fleur);
 			A->MouseCursor[MC_WAIT]=XCreateFontCursor(A->display, XC_watch);
@@ -2142,6 +2186,7 @@ void	CloseWidgets(uARG *A)
 	{
 		XFreePixmap(A->display, A->W[G].pixmap.B);
 		XFreePixmap(A->display, A->W[G].pixmap.F);
+		XFreePixmap(A->display, A->W[G].pixmap.I);
 		if(A->L.Page[G].Pageable)
 			XFreePixmap(A->display, A->L.Page[G].Pixmap);
 		XFreeGC(A->display, A->W[G].gc);
@@ -2165,6 +2210,19 @@ int	OpenWidgets(uARG *A)
 	A->L.Usage.C0=calloc(A->P.CPU, sizeof(XRectangle));
 	A->L.Usage.C3=calloc(A->P.CPU, sizeof(XRectangle));
 	A->L.Usage.C6=calloc(A->P.CPU, sizeof(XRectangle));
+
+	XRectangle iconRect={x:0, y:0, width:48, height:48};
+	XIconSize *xics=NULL;
+	int xicn=0;
+	if(XGetIconSizes(A->display, XRootWindow(A->display, DefaultScreen(A->display)), &xics, &xicn) != 0)
+	{
+		if(xicn > 0)
+		{
+			iconRect.width=xics[0].max_width;
+			iconRect.height=xics[0].max_height;
+		}
+		XFree(xics);
+	}
 
 	XSetWindowAttributes swa={
 	/* Pixmap: background, None, or ParentRelative	*/	background_pixmap:None,
@@ -2195,6 +2253,15 @@ int	OpenWidgets(uARG *A)
 						CopyFromParent, InputOutput, CopyFromParent, CWBorderPixel|CWOverrideRedirect|CWCursor, &swa)) )
 		{
 			sprintf(str, TITLE_MAIN_FMT, _MAJOR, _MINOR, _NIGHTLY);
+
+			XClassHint *hints=NULL;
+			if((hints=XAllocClassHint()) != NULL)
+			{
+				hints->res_name=str;
+				hints->res_class=_APPNAME;
+				XSetClassHint(A->display, A->W[G].window, hints);
+				XFree(hints);
+			}
 			SetWidgetName(A, G, str);
 
 			if((A->W[G].gc=XCreateGC(A->display, A->W[G].window, 0, NULL)))
@@ -2818,14 +2885,45 @@ int	OpenWidgets(uARG *A)
 				CallBackButton,
 				NULL);
 	}
+	A->atom[0]=XInternAtom(A->display, "WM_DELETE_WINDOW", False);
+	A->atom[1]=XInternAtom(A->display, "_MOTIF_WM_HINTS", True);
+	A->atom[2]=XInternAtom(A->display, "_NET_WM_STATE", False);
+	A->atom[3]=XInternAtom(A->display, "_NET_WM_STATE_ABOVE", False);
+	A->atom[4]=XInternAtom(A->display, "_NET_WM_STATE_SKIP_TASKBAR", False);
+
+	struct {
+		unsigned long   flags,
+				functions,
+				decorations;
+		long		inputMode;
+		unsigned long	status;
+		}
+		wmProp={flags:(1L << 1), functions:0, decorations:0, inputMode:0, status:0};
+
 	for(G=MAIN; noerr && (G < WIDGETS); G++)
 		if((A->W[G].pixmap.B=XCreatePixmap(	A->display, A->W[G].window,
 							A->W[G].width, A->W[G].height,
 							DefaultDepthOfScreen(A->screen) ))
 		&& (A->W[G].pixmap.F=XCreatePixmap(	A->display, A->W[G].window,
 							A->W[G].width, A->W[G].height,
-							DefaultDepthOfScreen(A->screen) )))
+							DefaultDepthOfScreen(A->screen) ))
+		&& (A->W[G].pixmap.I=XCreatePixmap(	A->display, A->W[G].window,
+							iconRect.width, iconRect.height,
+							DefaultDepthOfScreen(A->screen))))
 		{
+			DrawIconWindow(A->display, A->W[G].pixmap.I, A->W[G].gc, &iconRect, A->W[G].background, A->W[G].foreground);
+
+			XWMHints *wmHints=XAllocWMHints();
+			if(wmHints != NULL)
+			{
+				wmHints->initial_state = NormalState;
+				wmHints->input = True;
+				wmHints->icon_pixmap = A->W[G].pixmap.I;
+				wmHints->flags = StateHint | IconPixmapHint | InputHint;
+				XSetWMHints(A->display, A->W[G].window, wmHints);
+				XFree(wmHints);
+			}
+
 			if(A->L.Page[G].Pageable)
 			{
 				A->L.Page[G].width	= (GetHViewport(G) * One_Char_Width(G))
@@ -2852,6 +2950,16 @@ int	OpenWidgets(uARG *A)
 					EventProfile=EventProfile | CLICK_EVENTS | MOVE_EVENTS;
 			}
 			else	EventProfile=EventProfile | CLICK_EVENTS | MOVE_EVENTS;
+
+			XSetWMProtocols(A->display, A->W[G].window, &A->atom[0], 1);
+
+			if(A->L.Play.noDecorations && (A->atom[1] != None))
+				XChangeProperty(A->display, A->W[G].window, A->atom[1], A->atom[1], 32, PropModeReplace, (unsigned char *) &wmProp, 5);
+
+			if(A->L.Play.alwaysOnTop)
+				XChangeProperty(A->display, A->W[G].window, A->atom[2], XA_ATOM, 32, PropModeReplace, (unsigned char *) &A->atom[3], 1);
+			if(A->L.Play.skipTaskbar)
+				XChangeProperty(A->display, A->W[G].window, A->atom[2], XA_ATOM, 32, PropModeAppend, (unsigned char *) &A->atom[4], 1);
 
 			XSelectInput(A->display, A->W[G].window, EventProfile);
 		}
@@ -3813,33 +3921,42 @@ void	UpdateWidgetName(uARG *A, int G)
 	char str[32]={0};
 	switch(G) {
 		case MAIN:
-			if(_IS_MDI_) {
+			if(_IS_MDI_)
+			{
 				sprintf(str, TITLE_MDI_FMT,
 						A->P.Topology[A->P.Top].CPU->RelativeFreq,
 						A->P.Topology[A->P.Hot].CPU->TjMax.Target - A->P.Topology[A->P.Hot].CPU->ThermStat.DTS);
 				SetWidgetName(A, G, str);
 			}
 			break;
-		case CORES: {
+		case CORES:
+			if(!_IS_MDI_)
+			{
 				sprintf(str, TITLE_CORES_FMT, A->P.Top, A->P.Topology[A->P.Top].CPU->RelativeFreq);
 				SetWidgetName(A, G, str);
-		}
+			}
 			break;
-		case CSTATES: {
+		case CSTATES:
+			if(!_IS_MDI_)
+			{
 				sprintf(str, TITLE_CSTATES_FMT, 100 * A->P.Avg.C0, 100 * (A->P.Avg.C3 + A->P.Avg.C6));
 				SetWidgetName(A, G, str);
-		}
+			}
 			break;
-		case TEMPS: {
+		case TEMPS:
+			if(!_IS_MDI_)
+			{
 				sprintf(str, TITLE_TEMPS_FMT,
 						A->P.Top, A->P.Topology[A->P.Hot].CPU->TjMax.Target - A->P.Topology[A->P.Hot].CPU->ThermStat.DTS);
 				SetWidgetName(A, G, str);
-		}
+			}
 			break;
-		case SYSINFO: {
+		case SYSINFO:
+			if(!_IS_MDI_)
+			{
 				sprintf(str, TITLE_SYSINFO_FMT, A->P.ClockSpeed);
 				SetWidgetName(A, G, str);
-		}
+			}
 			break;
 	}
 }
@@ -3854,11 +3971,8 @@ static void *uDraw(void *uArg)
 	for(G=MAIN; G < WIDGETS; G++)
 	{
 		if(!A->PAUSE[G])
-		{
-			MapLayout(A, G);
-			DrawLayout(A, G);
-			FlushLayout(A, G);
-		}
+			fDraw(G, false, true);
+
 		if(!(A->L.UnMapBitmask & (1 << G)))
 			UpdateWidgetName(A, G);
 	}
@@ -4047,8 +4161,8 @@ void	Play(uARG *A, int G, char ID)
 				pthread_mutex_lock(&uDraw_mutex);
 				A->P.IdleTime++;
 				SelectBaseClock(A);
-				pthread_mutex_unlock(&uDraw_mutex);
 				fDraw(SYSINFO, true, false);
+				pthread_mutex_unlock(&uDraw_mutex);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
@@ -4059,8 +4173,8 @@ void	Play(uARG *A, int G, char ID)
 				pthread_mutex_lock(&uDraw_mutex);
 				A->P.IdleTime--;
 				SelectBaseClock(A);
-				pthread_mutex_unlock(&uDraw_mutex);
 				fDraw(SYSINFO, true, false);
+				pthread_mutex_unlock(&uDraw_mutex);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
@@ -4151,8 +4265,8 @@ void	Play(uARG *A, int G, char ID)
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
 				SelectBaseClock(A);
-				pthread_mutex_unlock(&uDraw_mutex);
 				fDraw(SYSINFO, true, false);
+				pthread_mutex_unlock(&uDraw_mutex);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
@@ -4162,8 +4276,8 @@ void	Play(uARG *A, int G, char ID)
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
 				SelectBaseClock(A);
-				pthread_mutex_unlock(&uDraw_mutex);
 				fDraw(SYSINFO, true, false);
+				pthread_mutex_unlock(&uDraw_mutex);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
@@ -4173,8 +4287,8 @@ void	Play(uARG *A, int G, char ID)
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
 				SelectBaseClock(A);
-				pthread_mutex_unlock(&uDraw_mutex);
 				fDraw(SYSINFO, true, false);
+				pthread_mutex_unlock(&uDraw_mutex);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
@@ -4184,8 +4298,8 @@ void	Play(uARG *A, int G, char ID)
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
 				SelectBaseClock(A);
-				pthread_mutex_unlock(&uDraw_mutex);
 				fDraw(SYSINFO, true, false);
+				pthread_mutex_unlock(&uDraw_mutex);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
@@ -4414,8 +4528,15 @@ static void *uLoop(uARG *A)
 					FlushLayout(A, G);
 			}
 				break;
-			case KeyPress:
+			case ClientMessage:
+				if(E.xclient.data.l[0] == A->atom[0])
 				{
+					Proc_Quit(A);
+					fDraw(MAIN, true, false);
+				}
+				break;
+			case KeyPress:
+			{
 				KeySym	KeySymPressed;
 				XComposeStatus ComposeStatus={0};
 				char xkBuffer[256];
@@ -4429,7 +4550,8 @@ static void *uLoop(uARG *A)
 					if(!(E.xkey.state & AllModMask)
 					&& (KeySymPressed >= XK_space)
 					&& (KeySymPressed <= XK_asciitilde)
-					&& ((A->L.Input.KeyLength + xkLength) < 255))
+					&& ((A->L.Input.KeyLength + xkLength) < 255)
+					&& G == MAIN)
 					{
 						memcpy(&A->L.Input.KeyBuffer[A->L.Input.KeyLength], xkBuffer, xkLength);
 						A->L.Input.KeyLength+=xkLength;
@@ -4469,14 +4591,9 @@ static void *uLoop(uARG *A)
 						break;
 					case XK_l:
 					case XK_L:
-						// Draw Widget once.
+						// Draw the Widget once.
 						if(E.xkey.state & ControlMask)
-						{
-							MapLayout(A, G);
-							DrawLayout(A, G);
-							FlushLayout(A, G);
-							UpdateWidgetName(A, G);
-						}
+							fDraw(G, false, true);
 						break;
 					case XK_p:
 					case XK_P:
@@ -4675,7 +4792,7 @@ static void *uLoop(uARG *A)
 				fDraw(MAIN, true, false);
 			}
 				break;
-			case VisibilityNotify:
+/*			case VisibilityNotify:
 				switch (E.xvisibility.state)
 				{
 					case VisibilityUnobscured:
@@ -4686,8 +4803,8 @@ static void *uLoop(uARG *A)
 							XRaiseWindow(A->display, A->W[G].window);
 						break;
 				}
-				break;
-		}
+				break;	*/
+		    }
 	}
 	return(NULL);
 }
@@ -5254,12 +5371,13 @@ int main(int argc, char *argv[])
 					cycleValues:false,
 					ratioValues:true,
 					showSchedule:false,
+					bootSchedMon:false,
 					cStatePercent:false,
-					alwaysOnTop: false,
 					wallboard:false,
 					flashCursor:true,
+					alwaysOnTop: false,
+					noDecorations: false,
 					hideSplash:false,
-					bootSchedMon:false,
 				},
 				WB: {
 					Scroll:0,
@@ -5294,28 +5412,30 @@ int main(int argc, char *argv[])
 			configFile:calloc(1024, sizeof(char)),
 			Options:
 			{
-				{"-C", "%s", A.configFile,            "Path and file configuration name (must be first)",  NULL                                       },
-				{"-D", "%d", &A.MDI,                  "Enable MDI Window (0/1)",                           NULL                                       },
-				{"-U", "%x", &A.L.UnMapBitmask,       "Bitmap of unmap Widgets (Hex. value)",              NULL                                       },
-				{"-F", "%s", A.fontName,              "Font name",                                         XDB_CLASS_MAIN"."XDB_KEY_FONT              },
-				{"-a", "%c", &A.xACL,                 "Enable or disable X ACL (Y/N)",                     NULL                                       },
-				{"-x", "%d", &A.L.Start.H,            "Initial left position (pixel value)",               NULL                                       },
-				{"-y", "%d", &A.L.Start.V,            "Initial top position (pixel value)",                NULL                                       },
-				{"-b", "%x", &A.L.globalBackground,   "Background color (Hex. value)",                     NULL                                       },
-				{"-f", "%x", &A.L.globalForeground,   "Foreground color (Hex. value)",                     NULL                                       },
-				{"-c", "%d", &A.P.ArchID,             "Pick up an architecture# (-A to dump list)",        NULL                                       },
-				{"-S", "%u", &A.P.ClockSrc,           "Clock source TSC(0) BIOS(1) SPEC(2) ROM(3) USER(4)",XDB_CLASS_SYSINFO"."XDB_KEY_CLOCK_SOURCE   },
-				{"-M", "%x", &A.P.BClockROMaddr,      "ROM memory address of the Base Clock (Hex. value)", XDB_CLASS_SYSINFO"."XDB_KEY_ROM_ADDRESS    },
-				{"-s", "%u", &A.P.IdleTime,           "Idle time ratio where N x 50000 (usec)",            NULL                                       },
-				{"-g", "%u", &A.L.Play.fillGraphics,  "Fill the graphics (0/1)",                           XDB_CLASS_CORES"."XDB_KEY_PLAY_GRAPHICS    },
-				{"-z", "%u", &A.L.Play.freqHertz,     "CPU frequency (0/1)",                               XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
-				{"-l", "%u", &A.L.Play.cycleValues,   "Cycle Values (0/1)",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
-				{"-r", "%u", &A.L.Play.ratioValues,   "Ratio Values (0/1)",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
-				{"-t", "%u", &A.L.Play.bootSchedMon,  "Task scheduling monitoring (0/1)",                  XDB_CLASS_CORES"."XDB_KEY_PLAY_SCHEDULE    },
-				{"-p", "%u", &A.L.Play.cStatePercent, "C-State percentage (0/1)",                          XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
-				{"-o", "%u", &A.L.Play.alwaysOnTop,   "Always On Top (0/1) {not implemented yet}",         NULL                                       },
-				{"-w", "%u", &A.L.Play.wallboard,     "Scroll wallboard (0/1)",                            XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
-				{"-i", "%u", &A.L.Play.hideSplash,    "Hide the splash screen (0/1)",                      NULL                                       },
+				{"-C", "%s", A.configFile,            "Path & file configuration name (String) {must be first}",    NULL                                       },
+				{"-D", "%d", &A.MDI,                  "Run as a MDI Window (Bool) [0/1]",                           NULL                                       },
+				{"-U", "%x", &A.L.UnMapBitmask,       "Bitmap of unmap Widgets (Hex) [0x]",                         NULL                                       },
+				{"-F", "%s", A.fontName,              "Font name (String) {default to 'Fixed'}",                    XDB_CLASS_MAIN"."XDB_KEY_FONT              },
+				{"-a", "%c", &A.xACL,                 "Enable or disable X ACL (Char) [Y/N]",                       NULL                                       },
+				{"-x", "%d", &A.L.Start.H,            "Initial left position (Int) [pixel]",                        NULL                                       },
+				{"-y", "%d", &A.L.Start.V,            "Initial top position (Int) [pixel]",                         NULL                                       },
+				{"-b", "%x", &A.L.globalBackground,   "Background color (Hex) {RGB}",                               NULL                                       },
+				{"-f", "%x", &A.L.globalForeground,   "Foreground color (Hex) {RGB}",                               NULL                                       },
+				{"-c", "%d", &A.P.ArchID,             "Pick up an architecture# (Char) {'-A' to list arch. array}", NULL                                       },
+				{"-S", "%u", &A.P.ClockSrc,           "Clock source (Int) {TSC(0) BIOS(1) SPEC(2) ROM(3) USER(4)}", XDB_CLASS_SYSINFO"."XDB_KEY_CLOCK_SOURCE   },
+				{"-M", "%x", &A.P.BClockROMaddr,      "ROM address of the Base Clock (Hex) [0x]",                   XDB_CLASS_SYSINFO"."XDB_KEY_ROM_ADDRESS    },
+				{"-s", "%u", &A.P.IdleTime,           "Idle time multiplier (Int) {where N x 50000 usec}",          NULL                                       },
+				{"-g", "%u", &A.L.Play.fillGraphics,  "Fill the graphics (Bool) [0/1]",                             XDB_CLASS_CORES"."XDB_KEY_PLAY_GRAPHICS    },
+				{"-z", "%u", &A.L.Play.freqHertz,     "Show the Core frequency (Bool) [0/1]",                       XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
+				{"-l", "%u", &A.L.Play.cycleValues,   "Show the Core Cycles (Bool) [0/1]",                          XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
+				{"-r", "%u", &A.L.Play.ratioValues,   "Show the Core Ratio (Bool) [0/1]",                           XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
+				{"-t", "%u", &A.L.Play.bootSchedMon,  "Task scheduling monitoring (Bool) [0/1]",                    XDB_CLASS_CORES"."XDB_KEY_PLAY_SCHEDULE    },
+				{"-p", "%u", &A.L.Play.cStatePercent, "Show the Core C-State percentage (Bool) [0/1]",              XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
+				{"-w", "%u", &A.L.Play.wallboard,     "Scroll the Brand wallboard (Bool) [0/1]",                    XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
+				{"-o", "%u", &A.L.Play.alwaysOnTop,   "Keep always on top (Bool) [0/1]",                            NULL                                       },
+				{"-n", "%u", &A.L.Play.noDecorations, "Remove the WM decorations (Bool) [0/1]",                     NULL                                       },
+				{"-N", "%u", &A.L.Play.skipTaskbar,   "Skip from the WM taskbar (Bool) [0/1]",                      NULL                                       },
+				{"-i", "%u", &A.L.Play.hideSplash,    "Hide the splash screen (Bool) [0/1]",                        NULL                                       },
 			},
 		};
 	{
@@ -5490,7 +5610,6 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-		perror(NULL);
 		rc=1;
 	}
 	free(A.fontName);

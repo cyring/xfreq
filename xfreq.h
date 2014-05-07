@@ -1,14 +1,15 @@
 /*
- * XFreq.h #0.25 SR3 by CyrIng
+ * XFreq.h #0.25 SR4 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
+#define	_APPNAME "XFreq"
 #define _MAJOR   "0"
 #define _MINOR   "25"
-#define _NIGHTLY "3"
-#define AutoDate "X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
+#define _NIGHTLY "4"
+#define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 
 #define MAX(M, m)	((M) > (m) ? (M) : (m))
@@ -856,7 +857,7 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 
 #define	RSC_PAUSE	"Pause"
 #define	RSC_RESET	"Reset"
-#define	RSC_FREQ	"Freq."
+#define	RSC_FREQ	"Freq"
 #define	RSC_CYCLE	"Cycle"
 #define	RSC_STATE	"States"
 #define	RSC_RATIO	"Ratio"
@@ -907,7 +908,8 @@ typedef struct
 	Window		window;
 	struct {
 		Pixmap	B,
-			F;
+			F,
+			I;
 	} pixmap;
 	GC		gc;
 	int		x,
@@ -933,7 +935,8 @@ typedef struct
 {
 	Window		window;
 	GC		gc;
-	Pixmap		bitmap;
+	Pixmap		bitmap,
+			icon;
 	int		x, y,
 			w, h;
 } XSPLASH;
@@ -979,7 +982,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	MAIN_TEXT_WIDTH		49
 #define	MAIN_TEXT_HEIGHT	14
 
-#define	MAIN_SECTION		"X-Freq "_MAJOR"."_MINOR"-"_NIGHTLY" CyrIng"
+#define	MAIN_SECTION		_APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" CyrIng"
 
 #define	CORES_TEXT_WIDTH	MAX(A->P.Boost[9], 22)
 #define	CORES_TEXT_HEIGHT	(A->P.CPU)
@@ -1130,14 +1133,14 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	REG_HEXVAL	"%016llX"
 #define	REG_FORMAT	"%02d %05X %s%%%zdc["
 
-#define	TITLE_MDI_FMT		"X-Freq %.0fMHz %dC"
-#define	TITLE_MAIN_FMT		"X-Freq %s.%s-%s"
+#define	TITLE_MDI_FMT		_APPNAME" %.0fMHz %dC"
+#define	TITLE_MAIN_FMT		_APPNAME" %s.%s-%s"
 #define	TITLE_CORES_FMT		"Core#%d @ %.0f MHz"
 #define	TITLE_CSTATES_FMT	"C-States [%.2f%%] [%.2f%%]"
 #define	TITLE_TEMPS_FMT		"Core#%d @ %dC"
 #define	TITLE_SYSINFO_FMT	"Clock @ %5.2f MHz"
 
-#define	SIG_EMERGENCY_FMT	"\nEmergency shutdown(%02d)"
+#define	SIG_EMERGENCY_FMT	"\nShutdown(%02d)"
 
 #define	SCROLLED_ROWS_PER_ONCE	1
 #define	SCROLLED_ROWS_PER_PAGE	(MAIN_TEXT_HEIGHT >> 1)
@@ -1201,12 +1204,14 @@ typedef struct
 				cycleValues,
 				ratioValues,
 				showSchedule,
+				bootSchedMon,
 				cStatePercent,
-				alwaysOnTop,
 				wallboard,
 				flashCursor,
-				hideSplash,
-				bootSchedMon;
+				alwaysOnTop,
+				noDecorations,
+				skipTaskbar,
+				hideSplash;
 	} Play;
 	struct {;
 		int		Scroll,
@@ -1239,13 +1244,6 @@ typedef struct
 
 #define	_IS_MDI_	(A->MDI != false)
 
-// Misc drawing macro.
-#define	fDraw(N, DoBuild, DoDraw) {		\
-	if(DoBuild)  BuildLayout(A, N);		\
-	MapLayout(A, N);			\
-	if(DoDraw)   DrawLayout(A, N);		\
-	FlushLayout(A, N);			\
-}
 
 #define	XDB_SETTINGS_FILE	".xfreq"
 #define	XDB_CLASS_MAIN		"Main"
@@ -1269,7 +1267,7 @@ typedef struct
 #define	XDB_KEY_PLAY_CSTATES	"PlayCStates"
 #define	XDB_KEY_PLAY_WALLBOARD	"PlayBrand"
 
-#define	OPTIONS_COUNT	22
+#define	OPTIONS_COUNT	24
 typedef struct
 {
 	char		*argument;
@@ -1290,6 +1288,7 @@ typedef struct
 	char		*fontName;
 	XFontStruct	*xfont;
 	char		xACL;
+	Atom		atom[5];
 	Cursor		MouseCursor[MC_COUNT];
 	XSPLASH		Splash;
 	XWINDOW		W[WIDGETS];
@@ -1320,6 +1319,36 @@ typedef	struct
 	char	*Instruction;
 	void	(*Procedure)();
 } COMMAND;
+
+
+// Definition of the Buttons management functions (CallBack).
+void	CallBackSave(uARG *A, WBUTTON *wButton) ;
+void	CallBackQuit(uARG *A, WBUTTON *wButton) ;
+void	CallBackButton(uARG *A, WBUTTON *wButton) ;
+void	CallBackSwitchChart(uARG *A, WBUTTON *wButton) ;
+void	CallBackMinimizeWidget(uARG *A, WBUTTON *wButton) ;
+void	CallBackRestoreWidget(uARG *A, WBUTTON *wButton) ;
+
+// Definition of the Widgets drawing functions.
+// The triple buffering is as the following sequence:
+// step 1 : draw the static graphics into the background pixmap.
+void	BuildLayout(uARG *A, int G) ;
+// step 2 : copy the background into the foreground pixmap.
+void	MapLayout(uARG *A, int G) ;
+// step 3 : add the animated graphics into the foreground pixmap.
+void	DrawLayout(uARG *A, int G) ;
+// step 4 : copy the foreground into the display window (taking care of the scrolling pixmap).
+void	FlushLayout(uARG *A, int G) ;
+// loop to step 2 to avoid the execution of the building process.
+
+// All-in-One macro.
+#define	fDraw(N, DoBuild, DoDraw) {		\
+	if(DoBuild)  BuildLayout(A, N);		\
+	MapLayout(A, N);			\
+	if(DoDraw)   DrawLayout(A, N);		\
+	FlushLayout(A, N);			\
+}
+
 
 /* --- Splash bitmap --- */
 
