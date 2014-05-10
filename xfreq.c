@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.25 SR4 by CyrIng
+ * XFreq.c #0.26 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -1414,11 +1414,11 @@ static void *uSchedule(void *uArg)
 		if((A->PROC=((fSD=fopen("/proc/sched_debug", "r")) != NULL)) == true)
 		{
 			char buffer[1024], fmt[48];
-			sprintf(fmt, SCHED_PID_FMT, SCHED_PID_FIELD);
+			sprintf(fmt, SCHED_PID_FORMAT, SCHED_PID_FIELD);
 
 			while(fgets(buffer, sizeof(buffer), fSD) != NULL)
 			{
-				if((sscanf(buffer, SCHED_CPU_FIELD, &cpu) > 0) && (cpu >= 0) && (cpu < A->P.CPU))
+				if((sscanf(buffer, SCHED_CPU_SECTION, &cpu) > 0) && (cpu >= 0) && (cpu < A->P.CPU))
 				{
 					while(fgets(buffer, sizeof(buffer), fSD) != NULL)
 					{
@@ -1427,14 +1427,30 @@ static void *uSchedule(void *uArg)
 						{
 							if(pid != 0)
 							{
-								FILE *fCOMM=NULL;
-								sprintf(buffer, "/proc/%ld/comm", pid);
-								if((fCOMM=fopen(buffer, "r")) != NULL)
-								{
-									fscanf(fCOMM, TASK_COMM_FMT, A->S.Pipe[cpu].Task[0].comm);
-									fclose(fCOMM);
-								}
 								A->S.Pipe[cpu].Task[0].pid=pid;
+
+								while(fgets(buffer, sizeof(buffer), fSD) != NULL)
+									if(!strncmp(buffer, SCHED_TASK_SECTION, 15))
+									{
+										fgets(buffer, sizeof(buffer), fSD);	// skip "\n"
+										fgets(buffer, sizeof(buffer), fSD);	// skip "\n"
+
+										do
+										{
+											fgets(buffer, sizeof(buffer), fSD);
+
+											char state, comm[TASK_COMM_LEN]={0};
+											sscanf(	buffer, TASK_COMM_STATE""TASK_COMM_NAME" "TASK_COMM_PID,
+												&state, comm, &pid);
+											if(A->S.Pipe[cpu].Task[0].pid == pid)
+											{
+												strncpy(A->S.Pipe[cpu].Task[0].comm, comm, TASK_COMM_LEN - 1);
+												break;
+											}
+										} while((buffer[0] != '\n') && !feof(fSD)) ;
+
+										break;
+									}
 							}
 							break;
 						}

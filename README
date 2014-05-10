@@ -156,6 +156,7 @@
  * + screenshot key.
  * + resize footer separator w/ MDI.
  * + give a better disposal of the Widgets using % of screen size and absolute positions.
+ * + discrete temperature graphic: per CPU.
  *
  *
  *  Source code
@@ -168,6 +169,9 @@
  *
  *
  * [HISTORY]
+ *
+ * R 0.26 : 05/10/2014
+ *        - Simplify the Task Scheduler Monitoring thread to process only one file: "/proc/sched_debug"
  *
  * R 0.25 : 05/07/2014 SR-4
  *        - The feature 'Always on top' is implemented by invoking the Window Manager.

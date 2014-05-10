@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.25 SR4 by CyrIng
+ * XFreq.h #0.26 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,8 +7,8 @@
 
 #define	_APPNAME "XFreq"
 #define _MAJOR   "0"
-#define _MINOR   "25"
-#define _NIGHTLY "4"
+#define _MINOR   "26"
+#define _NIGHTLY "0"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 
@@ -724,12 +724,15 @@ typedef struct
 		useconds_t			IdleTime;
 } PROCESSOR;
 
-#define	SCHED_PID_FMT	"  .%-30s: %%ld\n"
-#define	SCHED_PID_FIELD	"curr->pid"
-#define	SCHED_CPU_FIELD	"cpu#%d"
-#define	TASK_COMM_LEN	16
-#define	TASK_COMM_FMT	"%15s"
-#define	TASK_PIPE_DEPTH	3
+#define	SCHED_CPU_SECTION	"cpu#%d"
+#define	SCHED_PID_FIELD		"curr->pid"
+#define	SCHED_PID_FORMAT	"  .%-30s: %%ld\n"
+#define	SCHED_TASK_SECTION	"runnable tasks:"
+#define	TASK_COMM_STATE		"%c"
+#define	TASK_COMM_NAME		"%15s"
+#define	TASK_COMM_PID		"%5ld"
+#define	TASK_COMM_LEN		16
+#define	TASK_PIPE_DEPTH		3
 
 typedef	struct
 {
