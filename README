@@ -170,6 +170,9 @@
  *
  * [HISTORY]
  *
+ * R 0.26 : 05/15/2014 SR-2
+ *        - Display tasks with the highest execution time.
+ *
  * R 0.26 : 05/10/2014
  *        - Simplify the Task Scheduler Monitoring thread to process only one file: "/proc/sched_debug"
  *

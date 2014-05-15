@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.26 SR0 by CyrIng
+ * XFreq.c #0.26 SR2 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -30,7 +30,7 @@
 static  char    Version[] = AutoDate;
 
 // The drawing thread.
-static pthread_mutex_t	uDraw_mutex;
+static pthread_mutex_t	uDraw_mutex, uSchedule_mutex;
 static void *uDraw(void *uArg);
 
 unsigned long long
@@ -1406,57 +1406,93 @@ static void *uSchedule(void *uArg)
 
 	while(A->LOOP && A->PROC && A->L.Play.showSchedule)
 	{
-		for(cpu=0; cpu < A->P.CPU; cpu++)
-		{
-			memmove(&A->S.Pipe[cpu].Task[1], &A->S.Pipe[cpu].Task[0], (TASK_PIPE_DEPTH - 1) * sizeof(struct TASK_STRUCT));
-			memset(&A->S.Pipe[cpu].Task[0], 0, sizeof(struct TASK_STRUCT));
-		}
 		if((A->PROC=((fSD=fopen("/proc/sched_debug", "r")) != NULL)) == true)
 		{
-			char buffer[1024], fmt[48];
-			sprintf(fmt, SCHED_PID_FORMAT, SCHED_PID_FIELD);
+			pthread_mutex_lock(&uSchedule_mutex);
+			memset(A->S.Pipe, 0, sizeof(struct PIPE_STRUCT) * A->P.CPU);
+
+			struct TASK_STRUCT task;
+			char buffer[1024], schedPidFmt[48];
+			sprintf(schedPidFmt, SCHED_PID_FORMAT, SCHED_PID_FIELD);
 
 			while(fgets(buffer, sizeof(buffer), fSD) != NULL)
 			{
 				if((sscanf(buffer, SCHED_CPU_SECTION, &cpu) > 0) && (cpu >= 0) && (cpu < A->P.CPU))
 				{
+/* TRACE BEGIN //
+					printf(	"CPU#%d\n", cpu);
+// TRACE END */
 					while(fgets(buffer, sizeof(buffer), fSD) != NULL)
 					{
-						long int pid=0;
-						if((buffer[0] == '\n') || (sscanf(buffer, fmt, &pid) > 0))
+						if((buffer[0] == '\n') || (sscanf(buffer, schedPidFmt, &task.pid) > 0))
 						{
-							if(pid != 0)
-							{
-								A->S.Pipe[cpu].Task[0].pid=pid;
+							A->S.Pipe[cpu].Task[0].pid=task.pid;
 
-								while(fgets(buffer, sizeof(buffer), fSD) != NULL)
-									if(!strncmp(buffer, SCHED_TASK_SECTION, 15))
+							while(fgets(buffer, sizeof(buffer), fSD) != NULL)
+								if(!strncmp(buffer, SCHED_TASK_SECTION, 15))
+								{
+									fgets(buffer, sizeof(buffer), fSD);	// skip "\n"
+									fgets(buffer, sizeof(buffer), fSD);	// skip "\n"
+									int depth=0;
+									do
 									{
-										fgets(buffer, sizeof(buffer), fSD);	// skip "\n"
-										fgets(buffer, sizeof(buffer), fSD);	// skip "\n"
+										fgets(buffer, sizeof(buffer), fSD);
 
-										do
-										{
-											fgets(buffer, sizeof(buffer), fSD);
+										sscanf(	buffer, TASK_STRUCT_FORMAT,
+											&task.state,
+											task.comm,
+											&task.pid,
+											&task.vruntime_nsec_high,
+											&task.vruntime_nsec_low,
+											&task.nvcsw,
+											&task.prio,
+											&task.vruntime_dup_nsec_high,
+											&task.vruntime_dup_nsec_low,
+											&task.sum_exec_runtime_high,
+											&task.sum_exec_runtime_low,
+											&task.sum_sleep_runtime_high,
+											&task.sum_sleep_runtime_low,
+											&task.node,
+											task.group_path);
 
-											char state, comm[TASK_COMM_LEN]={0};
-											sscanf(	buffer, TASK_COMM_STATE""TASK_COMM_NAME" "TASK_COMM_PID,
-												&state, comm, &pid);
-											if(A->S.Pipe[cpu].Task[0].pid == pid)
-											{
-												strncpy(A->S.Pipe[cpu].Task[0].comm, comm, TASK_COMM_LEN - 1);
-												break;
-											}
-										} while((buffer[0] != '\n') && !feof(fSD)) ;
+										depth=(depth < (TASK_PIPE_DEPTH - 1)) ? depth + 1 : 1;
 
-										break;
-									}
-							}
+										if(A->S.Pipe[cpu].Task[0].pid == task.pid)
+											memcpy(&A->S.Pipe[cpu].Task[0], &task, sizeof(struct TASK_STRUCT));
+									else
+										if( (task.sum_exec_runtime_high > A->S.Pipe[cpu].Task[depth].sum_exec_runtime_high)
+										|| ((task.sum_exec_runtime_high == A->S.Pipe[cpu].Task[depth].sum_exec_runtime_high)
+										&& ((task.sum_exec_runtime_low > A->S.Pipe[cpu].Task[depth].sum_exec_runtime_low))) )
+											memcpy(&A->S.Pipe[cpu].Task[depth], &task, sizeof(struct TASK_STRUCT));
+
+									} while((buffer[0] != '\n') && !feof(fSD)) ;
+/* TRACE BEGIN //
+									for(depth=0; depth < TASK_PIPE_DEPTH; depth++)
+										printf(	TASK_STRUCT_FORMAT"\n",
+											!A->S.Pipe[cpu].Task[depth].state ? 'S':A->S.Pipe[cpu].Task[depth].state,
+											A->S.Pipe[cpu].Task[depth].comm,
+											A->S.Pipe[cpu].Task[depth].pid,
+											A->S.Pipe[cpu].Task[depth].vruntime_nsec_high,
+											A->S.Pipe[cpu].Task[depth].vruntime_nsec_low,
+											A->S.Pipe[cpu].Task[depth].nvcsw,
+											A->S.Pipe[cpu].Task[depth].prio,
+											A->S.Pipe[cpu].Task[depth].vruntime_dup_nsec_high,
+											A->S.Pipe[cpu].Task[depth].vruntime_dup_nsec_low,
+											A->S.Pipe[cpu].Task[depth].sum_exec_runtime_high,
+											A->S.Pipe[cpu].Task[depth].sum_exec_runtime_low,
+											A->S.Pipe[cpu].Task[depth].sum_sleep_runtime_high,
+											A->S.Pipe[cpu].Task[depth].sum_sleep_runtime_low,
+											A->S.Pipe[cpu].Task[depth].node,
+											A->S.Pipe[cpu].Task[depth].group_path);
+// TRACE END */
+									break;
+								}
 							break;
 						}
 					}
 				}
 			}
+			pthread_mutex_unlock(&uSchedule_mutex);
 			fclose(fSD);
 		}
 		else
@@ -2901,21 +2937,14 @@ int	OpenWidgets(uARG *A)
 				CallBackButton,
 				NULL);
 	}
-	A->atom[0]=XInternAtom(A->display, "WM_DELETE_WINDOW", False);
-	A->atom[1]=XInternAtom(A->display, "_MOTIF_WM_HINTS", True);
-	A->atom[2]=XInternAtom(A->display, "_NET_WM_STATE", False);
-	A->atom[3]=XInternAtom(A->display, "_NET_WM_STATE_ABOVE", False);
-	A->atom[4]=XInternAtom(A->display, "_NET_WM_STATE_SKIP_TASKBAR", False);
-
-	struct {
-		unsigned long   flags,
-				functions,
-				decorations;
-		long		inputMode;
-		unsigned long	status;
-		}
-		wmProp={flags:(1L << 1), functions:0, decorations:0, inputMode:0, status:0};
-
+	if(noerr)
+	{
+		A->atom[0]=XInternAtom(A->display, "WM_DELETE_WINDOW", False);
+		A->atom[1]=XInternAtom(A->display, "_MOTIF_WM_HINTS", True);
+		A->atom[2]=XInternAtom(A->display, "_NET_WM_STATE", False);
+		A->atom[3]=XInternAtom(A->display, "_NET_WM_STATE_ABOVE", False);
+		A->atom[4]=XInternAtom(A->display, "_NET_WM_STATE_SKIP_TASKBAR", False);
+	}
 	for(G=MAIN; noerr && (G < WIDGETS); G++)
 		if((A->W[G].pixmap.B=XCreatePixmap(	A->display, A->W[G].window,
 							A->W[G].width, A->W[G].height,
@@ -2968,6 +2997,15 @@ int	OpenWidgets(uARG *A)
 			else	EventProfile=EventProfile | CLICK_EVENTS | MOVE_EVENTS;
 
 			XSetWMProtocols(A->display, A->W[G].window, &A->atom[0], 1);
+
+			struct {
+				unsigned long   flags,
+						functions,
+						decorations;
+				long		inputMode;
+				unsigned long	status;
+				}
+				wmProp={flags:(1L << 1), functions:0, decorations:0, inputMode:0, status:0};
 
 			if(A->L.Play.noDecorations && (A->atom[1] != None))
 				XChangeProperty(A->display, A->W[G].window, A->atom[1], A->atom[1], 32, PropModeReplace, (unsigned char *) &wmProp, 5);
@@ -3585,55 +3623,57 @@ void	DrawLayout(uARG *A, int G)
 					{
 						if(A->L.Play.showSchedule)
 						{
-							if(!A->L.Play.ratioValues)
+							if(pthread_mutex_trylock(&uSchedule_mutex) == 0)
 							{
-								if(A->S.Pipe[cpu].Task[0].pid > 0)
+								if(!A->L.Play.ratioValues)
 								{
-									sprintf(str, "%ld", A->S.Pipe[cpu].Task[0].pid);
-									int l=strlen(str);
+									if(A->S.Pipe[cpu].Task[0].pid > 0)
+									{
+										sprintf(str, "%ld", A->S.Pipe[cpu].Task[0].pid);
+										int l=strlen(str);
 
-									XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH1].RGB);
-									XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-											A->W[G].width - (One_Char_Width(G) * l),
-											One_Char_Height(G) * (cpu + 1 + 1),
-											str, l );
+										XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH1].RGB);
+										XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+												A->W[G].width - (One_Char_Width(G) * l),
+												One_Char_Height(G) * (cpu + 1 + 1),
+												str, l );
+									}
 								}
-							}
-							XRectangle R[]=
-							{ {
-								x:One_Char_Width(G) * 13,
-								y:Header_Height(G),
-								width:One_Char_Width(G) * ((CORES_TEXT_WIDTH - 7) << 1),
-								height:One_Char_Height(G) * CORES_TEXT_HEIGHT
-							} };
-							XSetClipRectangles(A->display, A->W[G].gc, 0, 0, R, 1, Unsorted);
+								XRectangle R[]=
+								{ {
+									x:One_Char_Width(G) * 13,
+									y:Header_Height(G),
+									width:One_Char_Width(G) * ((CORES_TEXT_WIDTH - 7) << 1),
+									height:One_Char_Height(G) * CORES_TEXT_HEIGHT
+								} };
+								XSetClipRectangles(A->display, A->W[G].gc, 0, 0, R, 1, Unsorted);
 
-							const unsigned long Fg[TASK_PIPE_DEPTH]=
-							{
-								A->L.Colors[COLOR_GRAPH1].RGB,
-								A->L.Colors[COLOR_GRAPH2].RGB,
-								A->L.Colors[COLOR_GRAPH3].RGB
-							};
-
-							int i=0, L=(CORES_TEXT_WIDTH << 1);
-							do
-							{
-								int l=strlen(A->S.Pipe[cpu].Task[i].comm);
-								L-=((l > 0) ? (l + 1) : (TASK_COMM_LEN - 1));
-
-								if((A->S.Pipe[cpu].Task[i].pid > 0) && (l > 0))
+								int depth=0, L=(CORES_TEXT_WIDTH << 1);
+								do
 								{
-									XSetForeground(A->display, A->W[G].gc, Fg[i]);
-									XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-											One_Char_Width(G) * L,
-											One_Char_Height(G) * (cpu + 1 + 1),
-											A->S.Pipe[cpu].Task[i].comm, l );
-								}
-								i++;
-							}
-							while(i < TASK_PIPE_DEPTH) ;
+									int l=strlen(A->S.Pipe[cpu].Task[depth].comm);
+									L-=((l > 0) ? (l + 2) : 0);
 
-							XSetClipMask(A->display, A->W[G].gc, None);
+									if((A->S.Pipe[cpu].Task[depth].pid > 0) && (l > 0))
+									{
+										XSetForeground(	A->display, A->W[G].gc,
+												(depth == 0) ? A->L.Colors[COLOR_PULSE].RGB
+												: (A->S.Pipe[cpu].Task[depth].state == 'R') ?
+													A->L.Colors[COLOR_GRAPH1].RGB
+													: A->L.Colors[COLOR_LABEL].RGB);
+										XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+												One_Char_Width(G) * L,
+												One_Char_Height(G) * (cpu + 1 + 1),
+												A->S.Pipe[cpu].Task[depth].comm, l );
+									}
+									depth++;
+								}
+								while(depth < TASK_PIPE_DEPTH) ;
+
+								XSetClipMask(A->display, A->W[G].gc, None);
+
+								pthread_mutex_unlock(&uSchedule_mutex);
+							}
 						}
 						else if(!A->L.Play.ratioValues)
 						{
@@ -3647,7 +3687,6 @@ void	DrawLayout(uARG *A, int G)
 									str, strlen(str) );
 						}
 					}
-
 					if(A->L.Play.ratioValues)
 					{
 						sprintf(str, CORE_RATIO, A->P.Topology[cpu].CPU->RelativeRatio);
@@ -3880,14 +3919,14 @@ void	DrawLayout(uARG *A, int G)
 			char *items=calloc(Rows, DUMP_TEXT_WIDTH);
 			for(row=0; row < Rows; row++)
 			{
-				char binStr[BIN64_STR]={0};
+				char binStr[DUMP_BIN64_STR]={0};
 				DumpRegister(A->P.Topology[0].CPU->FD, A->L.DumpTable[row].Addr, NULL, binStr);
 
-				char mask[PRE_TEXT]={0}, str[PRE_TEXT]={0};
+				char mask[DUMP_PRE_TEXT]={0}, str[DUMP_PRE_TEXT]={0};
 				sprintf(mask, REG_FORMAT, row,
 							A->L.DumpTable[row].Addr,
 							A->L.DumpTable[row].Name,
-							REG_ALIGN - strlen(A->L.DumpTable[row].Name));
+							DUMP_REG_ALIGN - strlen(A->L.DumpTable[row].Name));
 				sprintf(str, mask, 0x20);
 				strcat(items, str);
 
@@ -4175,9 +4214,11 @@ void	Play(uARG *A, int G, char ID)
 			{
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
-				A->P.IdleTime++;
-				SelectBaseClock(A);
-				fDraw(SYSINFO, true, false);
+				{
+					A->P.IdleTime++;
+					SelectBaseClock(A);
+					fDraw(SYSINFO, true, false);
+				}
 				pthread_mutex_unlock(&uDraw_mutex);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
@@ -4187,9 +4228,11 @@ void	Play(uARG *A, int G, char ID)
 			{
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
-				A->P.IdleTime--;
-				SelectBaseClock(A);
-				fDraw(SYSINFO, true, false);
+				{
+					A->P.IdleTime--;
+					SelectBaseClock(A);
+					fDraw(SYSINFO, true, false);
+				}
 				pthread_mutex_unlock(&uDraw_mutex);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
@@ -4215,7 +4258,8 @@ void	Play(uARG *A, int G, char ID)
 				if(A->L.Play.showSchedule == false)
 				{
 					A->S.Pipe=calloc(A->P.CPU, sizeof(struct PIPE_STRUCT));
-					if(!pthread_create(&A->TID_Schedule, NULL, uSchedule, A))
+					if(!pthread_mutex_init(&uSchedule_mutex, NULL)
+					&& !pthread_create(&A->TID_Schedule, NULL, uSchedule, A))
 					{
 						RESOURCE Rsc;
 						Rsc.Text=RSC_INCSCHED;
@@ -4243,14 +4287,20 @@ void	Play(uARG *A, int G, char ID)
 					{
 						free(A->S.Pipe);
 						A->S.Pipe=NULL;
+						pthread_mutex_destroy(&uSchedule_mutex);
 					}
 				}
 				else
 				{
 					A->L.Play.bootSchedMon=A->L.Play.showSchedule=false;
 					pthread_join(A->TID_Schedule, NULL);
-					free(A->S.Pipe);
-					A->S.Pipe=NULL;
+					pthread_mutex_lock(&uDraw_mutex);
+					{
+						free(A->S.Pipe);
+						A->S.Pipe=NULL;
+					}
+					pthread_mutex_unlock(&uDraw_mutex);
+					pthread_mutex_destroy(&uSchedule_mutex);
 
 					DestroyButton(A, CORES, ID_INCSCHED);
 					DestroyButton(A, CORES, ID_DECSCHED);
@@ -4280,8 +4330,10 @@ void	Play(uARG *A, int G, char ID)
 				A->P.ClockSrc=SRC_TSC;
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
-				SelectBaseClock(A);
-				fDraw(SYSINFO, true, false);
+				{
+					SelectBaseClock(A);
+					fDraw(SYSINFO, true, false);
+				}
 				pthread_mutex_unlock(&uDraw_mutex);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
@@ -4291,8 +4343,10 @@ void	Play(uARG *A, int G, char ID)
 				A->P.ClockSrc=SRC_BIOS;
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
-				SelectBaseClock(A);
-				fDraw(SYSINFO, true, false);
+				{
+					SelectBaseClock(A);
+					fDraw(SYSINFO, true, false);
+				}
 				pthread_mutex_unlock(&uDraw_mutex);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
@@ -4302,8 +4356,10 @@ void	Play(uARG *A, int G, char ID)
 				A->P.ClockSrc=SRC_SPEC;
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
-				SelectBaseClock(A);
-				fDraw(SYSINFO, true, false);
+				{
+					SelectBaseClock(A);
+					fDraw(SYSINFO, true, false);
+				}
 				pthread_mutex_unlock(&uDraw_mutex);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
@@ -4313,8 +4369,10 @@ void	Play(uARG *A, int G, char ID)
 				A->P.ClockSrc=SRC_ROM;
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 				pthread_mutex_lock(&uDraw_mutex);
-				SelectBaseClock(A);
-				fDraw(SYSINFO, true, false);
+				{
+					SelectBaseClock(A);
+					fDraw(SYSINFO, true, false);
+				}
 				pthread_mutex_unlock(&uDraw_mutex);
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
@@ -5607,6 +5665,7 @@ int main(int argc, char *argv[])
 			{
 				pthread_join(A.TID_Schedule, NULL);
 				free(A.S.Pipe);
+				pthread_mutex_destroy(&uSchedule_mutex);
 			}
 
 			IMC_Free_Info(A.M);

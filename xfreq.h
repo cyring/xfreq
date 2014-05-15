@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.26 SR0 by CyrIng
+ * XFreq.h #0.26 SR2 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -8,7 +8,7 @@
 #define	_APPNAME "XFreq"
 #define _MAJOR   "0"
 #define _MINOR   "26"
-#define _NIGHTLY "0"
+#define _NIGHTLY "2"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 
@@ -675,7 +675,7 @@ typedef	struct {
 } CPU_STRUCT;
 
 #define	IDLE_BASE_USEC	50000
-#define	IDLE_SCHED_DEF	15
+#define	IDLE_SCHED_DEF	19
 #define	IDLE_COEF_DEF	20
 #define	IDLE_COEF_MAX	80
 #define	IDLE_COEF_MIN	2
@@ -724,15 +724,32 @@ typedef struct
 		useconds_t			IdleTime;
 } PROCESSOR;
 
+
+/*
+Borrow from:
+   /include/linux/sched.h
+   /kernel/sched/debug.c
+   /include/linux/limits.h
+   /asm-generic/int-ll64.h
+*/
+
 #define	SCHED_CPU_SECTION	"cpu#%d"
 #define	SCHED_PID_FIELD		"curr->pid"
 #define	SCHED_PID_FORMAT	"  .%-30s: %%ld\n"
 #define	SCHED_TASK_SECTION	"runnable tasks:"
-#define	TASK_COMM_STATE		"%c"
-#define	TASK_COMM_NAME		"%15s"
-#define	TASK_COMM_PID		"%5ld"
+
+#define	TASK_STATE_FMT		"%c"
+#define	TASK_COMM_FMT		"%15s"
+#define	TASK_PID_FMT		"%5ld"
+#define	TASK_TIME_FMT		"%9Ld.%06ld"
+#define	TASK_CTXSWITCH_FMT	"%9Ld"
+#define	TASK_PRIORITY_FMT	"%5d"
+#define	TASK_NODE_FMT		"%d"
+#define	TASK_GROUP_FMT		"%s"
+
+#define	TASK_STRUCT_FORMAT	TASK_STATE_FMT""TASK_COMM_FMT" "TASK_PID_FMT" "TASK_TIME_FMT" "TASK_CTXSWITCH_FMT" "TASK_PRIORITY_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_NODE_FMT" "TASK_GROUP_FMT
 #define	TASK_COMM_LEN		16
-#define	TASK_PIPE_DEPTH		3
+#define	TASK_PIPE_DEPTH		6
 
 typedef	struct
 {
@@ -740,8 +757,21 @@ typedef	struct
 	{
 		struct TASK_STRUCT
 		{
-			long int	pid;
-			char		comm[TASK_COMM_LEN + 1];
+			char			state;
+			char			comm[TASK_COMM_LEN + 1];
+			long int		pid;
+			long long		vruntime_nsec_high;
+			long			vruntime_nsec_low;
+			long long		nvcsw;				/* sum of [non]voluntary context switch counts */
+			int			prio;
+			long long		vruntime_dup_nsec_high;		/* a duplicate of vruntime_nsec ? */
+			long			vruntime_dup_nsec_low;
+			long long		sum_exec_runtime_high;
+			long			sum_exec_runtime_low;
+			long long		sum_sleep_runtime_high;
+			long			sum_sleep_runtime_low;
+			int			node;
+			char			group_path[256];		/* #define PATH_MAX 4096 # chars in a path name including nul */
 		} Task[TASK_PIPE_DEPTH];
 	} *Pipe;
 	useconds_t			IdleTime;
@@ -1000,13 +1030,13 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	SYSINFO_TEXT_WIDTH	80
 #define	SYSINFO_TEXT_HEIGHT	20
 
-#define	REG_ALIGN		24
+#define	DUMP_REG_ALIGN		24
 // BIN64: 16 x 4 digits + '\0'
-#define BIN64_STR		(16 * 4) + 1
+#define DUMP_BIN64_STR		(16 * 4) + 1
 // PRE_TEXT: ##' 'Addr[5]' 'Name&Padding[24]'['
-#define PRE_TEXT		2 + 1 + 5 + 1 + REG_ALIGN + 1
+#define DUMP_PRE_TEXT		2 + 1 + 5 + 1 + DUMP_REG_ALIGN + 1
 // WIDTH: PRE_TEXT + BIN64 w/ 15 interspaces + ']' + ScrollButtons
-#define	DUMP_TEXT_WIDTH		PRE_TEXT + BIN64_STR + 15 + 1 + 2
+#define	DUMP_TEXT_WIDTH		DUMP_PRE_TEXT + DUMP_BIN64_STR + 15 + 1 + 2
 #define	DUMP_TEXT_HEIGHT	13
 
 #define	MENU_FORMAT	"[F1]     Help             [F2]     Core\n"               \
@@ -1135,6 +1165,8 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	DUMP_SECTION	"   Addr.     Register               60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0"
 #define	REG_HEXVAL	"%016llX"
 #define	REG_FORMAT	"%02d %05X %s%%%zdc["
+
+#define	TASK_SECTION	"Task Scheduling"
 
 #define	TITLE_MDI_FMT		_APPNAME" %.0fMHz %dC"
 #define	TITLE_MAIN_FMT		_APPNAME" %s.%s-%s"
