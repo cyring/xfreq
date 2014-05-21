@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.26 SR2 by CyrIng
+ * XFreq.h #0.27 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,10 +7,13 @@
 
 #define	_APPNAME "XFreq"
 #define _MAJOR   "0"
-#define _MINOR   "26"
-#define _NIGHTLY "2"
+#define _MINOR   "27"
+#define _NIGHTLY "0"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
+
+#define	ToStr(i)	_ToStr(i)
+#define	_ToStr(i)	#i
 
 #define MAX(M, m)	((M) > (m) ? (M) : (m))
 #define MIN(m, M)	((m) < (M) ? (m) : (M))
@@ -727,10 +730,60 @@ typedef struct
 
 /*
 Borrow from:
-   /include/linux/sched.h
-   /kernel/sched/debug.c
-   /include/linux/limits.h
-   /asm-generic/int-ll64.h
+
+/include/linux/sched.h:
+struct task_struct {
+	int prio, static_prio, normal_prio;
+	struct sched_entity se;
+	struct task_group *sched_task_group;
+	pid_t pid;
+	unsigned long nvcsw, nivcsw;			// context switch counts
+	char comm[TASK_COMM_LEN];			// executable name excluding path
+};
+static inline pid_t task_pid_nr(struct task_struct *tsk)
+static inline int task_node(const struct task_struct *p)
+
+/kernel/sched/sched.h:
+static inline struct task_group *task_group(struct task_struct *p)
+{
+	return p->sched_task_group;
+}
+
+/kernel/sched/debug.c:
+print_task(struct seq_file *m, struct rq *rq, struct task_struct *p)
+{
+	if (rq->curr == p)
+		SEQ_printf(m, "R");
+	else
+		SEQ_printf(m, " ");
+
+	SEQ_printf(m, "%15s %5d %9Ld.%06ld %9Ld %5d ",
+		p->comm, task_pid_nr(p),
+		SPLIT_NS(p->se.vruntime),
+		(long long)(p->nvcsw + p->nivcsw),
+		p->prio);
+//...
+	SEQ_printf(m, "%9Ld.%06ld %9Ld.%06ld %9Ld.%06ld",
+		SPLIT_NS(p->se.vruntime),
+		SPLIT_NS(p->se.sum_exec_runtime),
+		SPLIT_NS(p->se.statistics.sum_sleep_runtime));
+//...
+	SEQ_printf(m, " %d", task_node(p));
+//...
+	SEQ_printf(m, " %s", task_group_path(task_group(p)));
+//...
+	SEQ_printf(m, "\n");
+}
+
+/include/linux/limits.h:
+
+/include/linux/types.h:
+typedef __kernel_pid_t pid_t;
+
+/uapi/asm-generic/int-ll64.h:
+
+/uapi/asm-generic/posix_types.h:
+typedef int __kernel_pid_t;
 */
 
 #define	SCHED_CPU_SECTION	"cpu#%d"
@@ -740,7 +793,7 @@ Borrow from:
 
 #define	TASK_STATE_FMT		"%c"
 #define	TASK_COMM_FMT		"%15s"
-#define	TASK_PID_FMT		"%5ld"
+#define	TASK_PID_FMT		"%5d"
 #define	TASK_TIME_FMT		"%9Ld.%06ld"
 #define	TASK_CTXSWITCH_FMT	"%9Ld"
 #define	TASK_PRIORITY_FMT	"%5d"
@@ -749,7 +802,28 @@ Borrow from:
 
 #define	TASK_STRUCT_FORMAT	TASK_STATE_FMT""TASK_COMM_FMT" "TASK_PID_FMT" "TASK_TIME_FMT" "TASK_CTXSWITCH_FMT" "TASK_PRIORITY_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_NODE_FMT" "TASK_GROUP_FMT
 #define	TASK_COMM_LEN		16
-#define	TASK_PIPE_DEPTH		6
+#define	TASK_PIPE_DEPTH		10
+
+typedef	enum {
+		SORT_FIELD_NONE       = 0x0,
+		SORT_FIELD_STATE      = 0x1,
+		SORT_FIELD_COMM       = 0x2,
+		SORT_FIELD_PID        = 0x3,
+		SORT_FIELD_RUNTIME    = 0x4,
+		SORT_FIELD_CTX_SWITCH = 0x5,
+		SORT_FIELD_PRIORITY   = 0x6,
+		SORT_FIELD_EXEC       = 0x7,
+		SORT_FIELD_SUM_EXEC   = 0x8,
+		SORT_FIELD_SUM_SLEEP  = 0x9,
+		SORT_FIELD_NODE       = 0xa,
+		SORT_FIELD_GROUP      = 0xb
+	} SORT_FIELDS;
+
+typedef	struct
+{
+	long long	nsec_high;
+	long		nsec_low;
+} RUNTIME;
 
 typedef	struct
 {
@@ -757,24 +831,21 @@ typedef	struct
 	{
 		struct TASK_STRUCT
 		{
-			char			state;
-			char			comm[TASK_COMM_LEN + 1];
-			long int		pid;
-			long long		vruntime_nsec_high;
-			long			vruntime_nsec_low;
-			long long		nvcsw;				/* sum of [non]voluntary context switch counts */
-			int			prio;
-			long long		vruntime_dup_nsec_high;		/* a duplicate of vruntime_nsec ? */
-			long			vruntime_dup_nsec_low;
-			long long		sum_exec_runtime_high;
-			long			sum_exec_runtime_low;
-			long long		sum_sleep_runtime_high;
-			long			sum_sleep_runtime_low;
-			int			node;
-			char			group_path[256];		/* #define PATH_MAX 4096 # chars in a path name including nul */
+			char		state;
+			char		comm[TASK_COMM_LEN + 1];
+			int		pid;
+			RUNTIME		vruntime;
+			long long	nvcsw;			/* sum of [non]voluntary context switch counts */
+			int		prio;
+			RUNTIME		exec_vruntime;		/* a duplicate of vruntime ? */
+			RUNTIME		sum_exec_runtime;
+			RUNTIME		sum_sleep_runtime;
+			int		node;
+			char		group_path[32];		/* #define PATH_MAX 4096 # chars in a path name including nul */
 		} Task[TASK_PIPE_DEPTH];
 	} *Pipe;
-	useconds_t			IdleTime;
+	unsigned int	SchedAttr;
+	useconds_t	IdleTime;
 } SCHEDULE;
 
 enum {
@@ -976,8 +1047,8 @@ typedef struct
 
 //			L-CTRL		L-ALT		R-CTRL		L-WIN		R-ALTGR
 #define	AllModMask	(ControlMask	| Mod1Mask	| Mod3Mask	| Mod4Mask	| Mod5Mask)
-#define	BASE_EVENTS	KeyPressMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | FocusChangeMask
-#define	MOVE_EVENTS	ButtonReleaseMask | Button3MotionMask
+#define	BASE_EVENTS	(KeyPressMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | FocusChangeMask)
+#define	MOVE_EVENTS	(ButtonReleaseMask | Button3MotionMask)
 #define	CLICK_EVENTS	ButtonPressMask
 
 typedef struct
@@ -988,6 +1059,10 @@ typedef struct
 			dy;
 } XTARGET;
 
+#define	FONT_ASCENT		11
+#define	FONT_DESCENT		2
+#define	CHARACTER_WIDTH		6
+#define	CHARACTER_HEIGHT	(FONT_ASCENT + FONT_DESCENT)
 #define	HDSIZE		".1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0"
 
 typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
@@ -1012,32 +1087,50 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	Header_Height(N)		(One_Char_Height(N) + Quarter_Char_Height(N))
 #define	Footer_Height(N)		(One_Char_Height(N) + Quarter_Char_Height(N))
 
-#define	MAIN_TEXT_WIDTH		49
-#define	MAIN_TEXT_HEIGHT	14
+#define	GEOMETRY_MAIN_COLS	49
+#define	GEOMETRY_MAIN_ROWS	14
+#define	GEOMETRY_CORES_COLS	22
+#define	GEOMETRY_CORES_ROWS	8
+#define	GEOMETRY_CSTATES_COLS	8
+#define	GEOMETRY_CSTATES_ROWS	10
+#define	GEOMETRY_TEMPS_COLS	32
+#define	GEOMETRY_TEMPS_ROWS	10
+#define	GEOMETRY_SYSINFO_COLS	80
+#define	GEOMETRY_SYSINFO_ROWS	20
+
+#define	MAIN_TEXT_WIDTH		MAX(GEOMETRY_MAIN_COLS, A->L.Page[MAIN].Geometry.cols)
+#define	MAIN_TEXT_HEIGHT	MAX(GEOMETRY_MAIN_ROWS, A->L.Page[MAIN].Geometry.rows)
 
 #define	MAIN_SECTION		_APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" CyrIng"
 
-#define	CORES_TEXT_WIDTH	MAX(A->P.Boost[9], 22)
+#define	CORES_TEXT_WIDTH	MAX(A->P.Boost[9], A->L.Page[CORES].Geometry.cols)
 #define	CORES_TEXT_HEIGHT	(A->P.CPU)
 
 #define	CSTATES_TEXT_SPACING	3
-#define	CSTATES_TEXT_WIDTH	( MAX(A->P.CPU, 8) * CSTATES_TEXT_SPACING )
-#define	CSTATES_TEXT_HEIGHT	10
+#define	CSTATES_TEXT_WIDTH	(MAX(A->P.CPU, A->L.Page[CSTATES].Geometry.cols) * CSTATES_TEXT_SPACING)
+#define	CSTATES_TEXT_HEIGHT	MAX(GEOMETRY_CSTATES_ROWS, A->L.Page[CSTATES].Geometry.rows)
 
-#define	TEMPS_TEXT_WIDTH	MAX((A->P.Features.ThreadCount << 2), 32)
-#define	TEMPS_TEXT_HEIGHT	18
+#define	TEMPS_TEXT_WIDTH	MAX((A->P.Features.ThreadCount << 2), A->L.Page[TEMPS].Geometry.cols)
+#define	TEMPS_TEXT_HEIGHT	MAX(GEOMETRY_TEMPS_ROWS, A->L.Page[TEMPS].Geometry.rows)
 
-#define	SYSINFO_TEXT_WIDTH	80
-#define	SYSINFO_TEXT_HEIGHT	20
+#define	SYSINFO_TEXT_WIDTH	MAX(GEOMETRY_SYSINFO_COLS, A->L.Page[SYSINFO].Geometry.cols)
+#define	SYSINFO_TEXT_HEIGHT	MAX(GEOMETRY_SYSINFO_ROWS, A->L.Page[SYSINFO].Geometry.rows)
 
+#define	DUMP_ARRAY_DIMENSION	11
 #define	DUMP_REG_ALIGN		24
 // BIN64: 16 x 4 digits + '\0'
 #define DUMP_BIN64_STR		(16 * 4) + 1
 // PRE_TEXT: ##' 'Addr[5]' 'Name&Padding[24]'['
-#define DUMP_PRE_TEXT		2 + 1 + 5 + 1 + DUMP_REG_ALIGN + 1
-// WIDTH: PRE_TEXT + BIN64 w/ 15 interspaces + ']' + ScrollButtons
-#define	DUMP_TEXT_WIDTH		DUMP_PRE_TEXT + DUMP_BIN64_STR + 15 + 1 + 2
-#define	DUMP_TEXT_HEIGHT	13
+#define DUMP_PRE_TEXT		(2 + 1 + 5 + 1 + DUMP_REG_ALIGN + 1)
+// Columns: PRE_TEXT + BIN64 w/ 15 interspaces + ']' + ScrollButtons
+#define	GEOMETRY_DUMP_COLS	(DUMP_PRE_TEXT + DUMP_BIN64_STR + 15 + 1 + 2)
+#define	GEOMETRY_DUMP_ROWS	(DUMP_ARRAY_DIMENSION + 2)
+#define	DUMP_TEXT_WIDTH		MAX(GEOMETRY_DUMP_COLS, A->L.Page[DUMP].Geometry.cols)
+#define	DUMP_TEXT_HEIGHT	MAX(GEOMETRY_DUMP_ROWS, A->L.Page[DUMP].Geometry.rows)
+
+#define	GEOMETRY_PARSER	"%dx%d%d%d,%n"
+#define	GEOMETRY_FORMAT	"%dx%d%+d%+d,"
+#define	GEOMETRY_SIZE	strlen("640x360+5120+2880,")
 
 #define	MENU_FORMAT	"[F1]     Help             [F2]     Core\n"               \
 			"[F3]     C-States         [F4]     Temps \n"             \
@@ -1218,12 +1311,9 @@ typedef struct
 {
 	unsigned int		UnMapBitmask;
 	struct	{
-		int		H,
-				V;
-	} Margin, Start;
-	struct	{
 		bool		Pageable;
-		MaxText		Visible,
+		MaxText		Geometry,
+				Visible,
 				Listing,
 				FrameSize;
 		int		hScroll,
@@ -1239,7 +1329,6 @@ typedef struct
 				cycleValues,
 				ratioValues,
 				showSchedule,
-				bootSchedMon,
 				cStatePercent,
 				wallboard,
 				flashCursor,
@@ -1261,7 +1350,7 @@ typedef struct
 	struct {
 		char		*Name;
 		unsigned int	Addr;
-	} DumpTable[DUMP_TEXT_HEIGHT - 2];
+	} DumpTable[DUMP_ARRAY_DIMENSION];
 	struct {;
 		int		N;
 		XSegment	*Segment;
@@ -1302,7 +1391,7 @@ typedef struct
 #define	XDB_KEY_PLAY_CSTATES	"PlayCStates"
 #define	XDB_KEY_PLAY_WALLBOARD	"PlayBrand"
 
-#define	OPTIONS_COUNT	24
+#define	OPTIONS_COUNT	23
 typedef struct
 {
 	char		*argument;
@@ -1320,6 +1409,7 @@ typedef struct
 	Display		*display;
 	Screen		*screen;
 	pthread_t	TID_Draw;
+	char		*Geometries;
 	char		*fontName;
 	XFontStruct	*xfont;
 	char		xACL;

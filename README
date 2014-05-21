@@ -151,24 +151,34 @@
  * + full transparency & opacity.
  * + integrate XCB, wayland ?
  * + handle skins : Done. Colors only.
- * + provide a processor usage history.
+ * + provide a processor usage history : In progress.
  * + gradiant coloring.
  * + screenshot key.
  * + resize footer separator w/ MDI.
- * + give a better disposal of the Widgets using % of screen size and absolute positions.
+ * + give a better disposal of the Widgets using % of screen size and absolute positions : In progress.
  * + discrete temperature graphic: per CPU.
  *
  *
  *  Source code
  * -------------
  * + clang compliant : rewrite code to remove any "warning: use of GNU old-style ..."
- * + provide some configure and install scripts, especially an ArchLinux PKGBUILD.
- * + split the code between GUI and hardware parts.
+ * + provide some configure and install scripts, especially an ArchLinux PKGBUILD : In progress.
+ * + split the code between GUI and hardware parts : postponed R 2.00
  * + release candidate.
  *
  *
  *
  * [HISTORY]
+ *
+ * R 0.27 : 05/21/2014
+ *        - Swap the arguments '-x' and '-a' associated with the option to disable the X ACL.
+ *        - Recode the Widgets layout using geometries.
+ *            use the option -g '[cols]x[rows]+[x]+[y], .. ,[cols]x[rows]+[x]+[y]'
+ *        - Swap the arguments '-y', '-l' (Show the Core cycles) and  '-g' (Fill the graphics).
+ *        - Removed the '-x' and '-y' arguments which were used to set the initial position of the MAIN Widget.
+ *        - Allow to sort the task monitoring using the '-t' option followed by the field number.
+ *            argument is like 0x{R}0{N} from [0x000 / 0x101 .. 0x10b]
+ *              where {R} to reverse sorting and {N} is the field number in the /proc/sched_debug file.
  *
  * R 0.26 : 05/15/2014 SR-2
  *        - Display tasks with the highest execution time.
@@ -178,8 +188,8 @@
  *
  * R 0.25 : 05/07/2014 SR-4
  *        - The feature 'Always on top' is implemented by invoking the Window Manager.
- *        - Widgets can be skipped from the WM taskbar using the argument '-N'
- *        - The Window Manager decorations can be removed using the argument '-n'
+ *        - Widgets can be skipped from the WM taskbar using the option '-N'
+ *        - The Window Manager decorations can be removed using the option '-n'
  *        - Added an icon to all windows, including the Splash one.
  *        - Fix the missing application class and title name required by the Gnome 3 task bar.
  *        - Fix "XIO:  fatal IO error 11 ..."

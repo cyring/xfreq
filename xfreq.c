@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.26 SR2 by CyrIng
+ * XFreq.c #0.27 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -1397,21 +1397,48 @@ void	SelectBaseClock(uARG *A)
 	}
 }
 
+bool IsGreaterRuntime(RUNTIME *rt1, RUNTIME *rt2)
+{
+	return(	( (rt1->nsec_high > rt2->nsec_high) || ((rt1->nsec_high == rt2->nsec_high) && ((rt1->nsec_low > rt2->nsec_low))) ) ? true : false);
+}
+
 static void *uSchedule(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
 
 	FILE	*fSD=NULL;
-	unsigned int cpu=0;
 
 	while(A->LOOP && A->PROC && A->L.Play.showSchedule)
 	{
 		if((A->PROC=((fSD=fopen("/proc/sched_debug", "r")) != NULL)) == true)
 		{
 			pthread_mutex_lock(&uSchedule_mutex);
-			memset(A->S.Pipe, 0, sizeof(struct PIPE_STRUCT) * A->P.CPU);
 
-			struct TASK_STRUCT task;
+			bool Reverse=(A->S.SchedAttr & 0x100) >> 8;
+			short int SortField=A->S.SchedAttr & 0xf;
+
+			struct TASK_STRUCT oTask={0};
+			const struct TASK_STRUCT rTask=
+			{
+				state:0x7f,
+				comm:{0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x0},
+				pid:(unsigned short) -1,
+				vruntime:{(unsigned) -1, (unsigned) -1},
+				nvcsw:(unsigned) -1,
+				prio:(unsigned short) -1,
+				exec_vruntime:{(unsigned) -1, (unsigned) -1},
+				sum_exec_runtime:{(unsigned) -1, (unsigned) -1},
+				sum_sleep_runtime:{(unsigned) -1, (unsigned) -1},
+				node:(unsigned short) -1,
+				group_path:{0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x0}
+			},
+			*pTask=(Reverse) ? &rTask : &oTask;
+
+			unsigned int cpu=0, depth=0;
+			for(cpu=0; cpu < A->P.CPU; cpu++)
+				for(depth=0; depth < TASK_PIPE_DEPTH; depth++)
+					memcpy(&A->S.Pipe[cpu].Task[depth], pTask, sizeof(struct TASK_STRUCT));
+
 			char buffer[1024], schedPidFmt[48];
 			sprintf(schedPidFmt, SCHED_PID_FORMAT, SCHED_PID_FIELD);
 
@@ -1424,69 +1451,121 @@ static void *uSchedule(void *uArg)
 // TRACE END */
 					while(fgets(buffer, sizeof(buffer), fSD) != NULL)
 					{
-						if((buffer[0] == '\n') || (sscanf(buffer, schedPidFmt, &task.pid) > 0))
+						if((buffer[0] == '\n') || (sscanf(buffer, schedPidFmt, &oTask.pid) > 0))
 						{
-							A->S.Pipe[cpu].Task[0].pid=task.pid;
+							A->S.Pipe[cpu].Task[0].pid=oTask.pid;
 
 							while(fgets(buffer, sizeof(buffer), fSD) != NULL)
+							{
 								if(!strncmp(buffer, SCHED_TASK_SECTION, 15))
 								{
-									fgets(buffer, sizeof(buffer), fSD);	// skip "\n"
-									fgets(buffer, sizeof(buffer), fSD);	// skip "\n"
-									int depth=0;
-									do
+									fgets(buffer, sizeof(buffer), fSD);	// skip until "\n"
+									fgets(buffer, sizeof(buffer), fSD);	// skip until "\n"
+
+									while(fgets(buffer, sizeof(buffer), fSD) != NULL)
 									{
-										fgets(buffer, sizeof(buffer), fSD);
+										if((buffer[0] != '\n') && !feof(fSD))
+										{
+											sscanf(	buffer, TASK_STRUCT_FORMAT,
+												&oTask.state,
+												oTask.comm,
+												&oTask.pid,
+												&oTask.vruntime.nsec_high,
+												&oTask.vruntime.nsec_low,
+												&oTask.nvcsw,
+												&oTask.prio,
+												&oTask.exec_vruntime.nsec_high,
+												&oTask.exec_vruntime.nsec_low,
+												&oTask.sum_exec_runtime.nsec_high,
+												&oTask.sum_exec_runtime.nsec_low,
+												&oTask.sum_sleep_runtime.nsec_high,
+												&oTask.sum_sleep_runtime.nsec_low,
+												&oTask.node,
+												oTask.group_path);
 
-										sscanf(	buffer, TASK_STRUCT_FORMAT,
-											&task.state,
-											task.comm,
-											&task.pid,
-											&task.vruntime_nsec_high,
-											&task.vruntime_nsec_low,
-											&task.nvcsw,
-											&task.prio,
-											&task.vruntime_dup_nsec_high,
-											&task.vruntime_dup_nsec_low,
-											&task.sum_exec_runtime_high,
-											&task.sum_exec_runtime_low,
-											&task.sum_sleep_runtime_high,
-											&task.sum_sleep_runtime_low,
-											&task.node,
-											task.group_path);
+											if(A->S.Pipe[cpu].Task[0].pid == oTask.pid)
+												memcpy(&A->S.Pipe[cpu].Task[0], &oTask, sizeof(struct TASK_STRUCT));
+											else	// Insertion Sort.
+												for(depth=1; depth < TASK_PIPE_DEPTH; depth++)
+												{
+													bool isFlag=false;
 
-										depth=(depth < (TASK_PIPE_DEPTH - 1)) ? depth + 1 : 1;
+													switch(SortField)
+													{
+													case SORT_FIELD_NONE:
+														isFlag=true;
+													break;
+													case SORT_FIELD_STATE:
+														isFlag=(oTask.state > A->S.Pipe[cpu].Task[depth].state);
+													break;
+													case SORT_FIELD_COMM:
+														isFlag=(strcasecmp(oTask.comm, A->S.Pipe[cpu].Task[depth].comm) > 0);
+													break;
+													case SORT_FIELD_PID:
+														isFlag=(oTask.pid > A->S.Pipe[cpu].Task[depth].pid);
+													break;
+													case SORT_FIELD_RUNTIME:
+														isFlag=IsGreaterRuntime(&oTask.vruntime, &A->S.Pipe[cpu].Task[depth].vruntime);
+													break;
+													case SORT_FIELD_CTX_SWITCH:
+														isFlag=(oTask.nvcsw > A->S.Pipe[cpu].Task[depth].nvcsw);
+													break;
+													case SORT_FIELD_PRIORITY:
+														isFlag=(oTask.prio > A->S.Pipe[cpu].Task[depth].prio);
+													break;
+													case SORT_FIELD_EXEC:
+														isFlag=IsGreaterRuntime(&oTask.exec_vruntime, &A->S.Pipe[cpu].Task[depth].exec_vruntime);
+													break;
+													case SORT_FIELD_SUM_EXEC:
+														isFlag=IsGreaterRuntime(&oTask.sum_exec_runtime, &A->S.Pipe[cpu].Task[depth].sum_exec_runtime);
+													break;
+													case SORT_FIELD_SUM_SLEEP:
+														isFlag=IsGreaterRuntime(&oTask.sum_sleep_runtime, &A->S.Pipe[cpu].Task[depth].sum_sleep_runtime);
+													break;
+													case SORT_FIELD_NODE:
+														isFlag=(oTask.node > A->S.Pipe[cpu].Task[depth].node);
+													break;
+													case SORT_FIELD_GROUP:
+														isFlag=(strcasecmp(oTask.group_path, A->S.Pipe[cpu].Task[depth].group_path) > 0);
+													break;
+													}
+													if(isFlag ^ Reverse)
+													{
+														size_t shift=(TASK_PIPE_DEPTH - depth - 1) * sizeof(struct TASK_STRUCT);
+														if(shift != 0)
+															memmove(&A->S.Pipe[cpu].Task[depth + 1], &A->S.Pipe[cpu].Task[depth], shift);
 
-										if(A->S.Pipe[cpu].Task[0].pid == task.pid)
-											memcpy(&A->S.Pipe[cpu].Task[0], &task, sizeof(struct TASK_STRUCT));
-									else
-										if( (task.sum_exec_runtime_high > A->S.Pipe[cpu].Task[depth].sum_exec_runtime_high)
-										|| ((task.sum_exec_runtime_high == A->S.Pipe[cpu].Task[depth].sum_exec_runtime_high)
-										&& ((task.sum_exec_runtime_low > A->S.Pipe[cpu].Task[depth].sum_exec_runtime_low))) )
-											memcpy(&A->S.Pipe[cpu].Task[depth], &task, sizeof(struct TASK_STRUCT));
+														memcpy(&A->S.Pipe[cpu].Task[depth], &oTask, sizeof(struct TASK_STRUCT));
 
-									} while((buffer[0] != '\n') && !feof(fSD)) ;
+														break;
+													}
+												}
+										}
+										else
+											break;
+									}
 /* TRACE BEGIN //
 									for(depth=0; depth < TASK_PIPE_DEPTH; depth++)
 										printf(	TASK_STRUCT_FORMAT"\n",
-											!A->S.Pipe[cpu].Task[depth].state ? 'S':A->S.Pipe[cpu].Task[depth].state,
+											A->S.Pipe[cpu].Task[depth].state,
 											A->S.Pipe[cpu].Task[depth].comm,
 											A->S.Pipe[cpu].Task[depth].pid,
-											A->S.Pipe[cpu].Task[depth].vruntime_nsec_high,
-											A->S.Pipe[cpu].Task[depth].vruntime_nsec_low,
+											A->S.Pipe[cpu].Task[depth].vruntime.nsec_high,
+											A->S.Pipe[cpu].Task[depth].vruntime.nsec_low,
 											A->S.Pipe[cpu].Task[depth].nvcsw,
 											A->S.Pipe[cpu].Task[depth].prio,
-											A->S.Pipe[cpu].Task[depth].vruntime_dup_nsec_high,
-											A->S.Pipe[cpu].Task[depth].vruntime_dup_nsec_low,
-											A->S.Pipe[cpu].Task[depth].sum_exec_runtime_high,
-											A->S.Pipe[cpu].Task[depth].sum_exec_runtime_low,
-											A->S.Pipe[cpu].Task[depth].sum_sleep_runtime_high,
-											A->S.Pipe[cpu].Task[depth].sum_sleep_runtime_low,
+											A->S.Pipe[cpu].Task[depth].exec_vruntime.nsec_high,
+											A->S.Pipe[cpu].Task[depth].exec_vruntime.nsec_low,
+											A->S.Pipe[cpu].Task[depth].sum_exec_runtime.nsec_high,
+											A->S.Pipe[cpu].Task[depth].sum_exec_runtime.nsec_low,
+											A->S.Pipe[cpu].Task[depth].sum_sleep_runtime.nsec_high,
+											A->S.Pipe[cpu].Task[depth].sum_sleep_runtime.nsec_low,
 											A->S.Pipe[cpu].Task[depth].node,
 											A->S.Pipe[cpu].Task[depth].group_path);
 // TRACE END */
 									break;
 								}
+							}
 							break;
 						}
 					}
@@ -1866,8 +1945,8 @@ void	ScaleMDI(uARG *A)
 			BottomMost=G;
 		G++ ;
 	}
-	A->W[MAIN].width=A->W[RightMost].x + A->W[RightMost].width + A->L.Margin.H;
-	A->W[MAIN].height=A->W[BottomMost].y + A->W[BottomMost].height + A->L.Margin.V + Footer_Height(G);
+	A->W[MAIN].width=A->W[RightMost].x + A->W[RightMost].width + CHARACTER_WIDTH;
+	A->W[MAIN].height=A->W[BottomMost].y + A->W[BottomMost].height + Footer_Height(G) + CHARACTER_HEIGHT;
 	// Adjust the Header & Footer axes with the new width.
 	int i=0;
 	for(i=0; i < A->L.Axes[MAIN].N; i++)
@@ -2205,17 +2284,6 @@ int	OpenDisplay(uARG *A)
 
 		if((A->xfont=XLoadQueryFont(A->display, A->fontName)) == NULL)
 			noerr=false;
-		else
-		{
-			// Adjust margins using the font size.
-			if(_IS_MDI_) {
-				A->L.Margin.H=(A->xfont->max_bounds.rbearing - A->xfont->min_bounds.lbearing) << 1;
-				A->L.Margin.V=(A->xfont->ascent + A->xfont->descent) + ((A->xfont->ascent + A->xfont->descent) >> 2);
-			} else {
-				A->L.Margin.H=(A->xfont->max_bounds.rbearing - A->xfont->min_bounds.lbearing) << 1;
-				A->L.Margin.V=(A->xfont->ascent + A->xfont->descent) + (A->xfont->ascent + A->xfont->descent);
-			}
-		}
 		if(noerr)
 		{
 			A->MouseCursor[MC_DEFAULT]=XCreateFontCursor(A->display, XC_left_ptr);
@@ -2252,6 +2320,26 @@ void	CloseWidgets(uARG *A)
 	free(A->L.Usage.C6);
 }
 
+void	GeometriesToLayout(uARG *A)
+{
+	if((A->Geometries != NULL) && (strlen(A->Geometries) > 0))
+	{
+		char *pGeometry=A->Geometries;
+		int G=0, n=0, c=0, r=0, x=0, y=0,
+			ws=(!_IS_MDI_ ? WidthOfScreen(A->screen)  : A->W[MAIN].width), hs=(!_IS_MDI_ ? HeightOfScreen(A->screen) : A->W[MAIN].height);
+
+		for(G=MAIN; (strlen(pGeometry) > 0) && (G < WIDGETS); G++, pGeometry+=n)
+		{
+			sscanf(pGeometry, GEOMETRY_PARSER, &c, &r, &x, &y, &n);
+
+			A->L.Page[G].Geometry.cols=(c > 0) ? c : A->L.Page[G].Geometry.cols;
+			A->L.Page[G].Geometry.rows=(r > 0) ? r : A->L.Page[G].Geometry.rows;
+			A->W[G].x=(x < 0) ? ws + x : x;
+			A->W[G].y=(y < 0) ? hs + y : y;
+		}
+	}
+}
+
 // Create the Widgets.
 int	OpenWidgets(uARG *A)
 {
@@ -2275,6 +2363,8 @@ int	OpenWidgets(uARG *A)
 		}
 		XFree(xics);
 	}
+
+	GeometriesToLayout(A);
 
 	XSetWindowAttributes swa={
 	/* Pixmap: background, None, or ParentRelative	*/	background_pixmap:None,
@@ -3512,7 +3602,7 @@ void	FlushLayout(uARG *A, int G)
 			A->L.Page[G].width,
 			A->L.Page[G].height,
 			0,
-			Header_Height(G) + 2 );	// bellow the header line.
+			Header_Height(G) + 2 );	// below the header line.
 
 	XCopyArea(A->display,A->W[G].pixmap.F, A->W[G].window, A->W[G].gc, 0, 0, A->W[G].width, A->W[G].height, 0, 0);
 	XFlush(A->display);
@@ -3629,7 +3719,7 @@ void	DrawLayout(uARG *A, int G)
 								{
 									if(A->S.Pipe[cpu].Task[0].pid > 0)
 									{
-										sprintf(str, "%ld", A->S.Pipe[cpu].Task[0].pid);
+										sprintf(str, TASK_PID_FMT, A->S.Pipe[cpu].Task[0].pid);
 										int l=strlen(str);
 
 										XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH1].RGB);
@@ -3909,12 +3999,8 @@ void	DrawLayout(uARG *A, int G)
 		case DUMP:
 			// Dump a bunch of Registers with their Address, Name & Value.
 		{
-			// Do we dump more than the Widget height ?
-			int Rows=0, row=0;
-			if(A->L.Page[G].Pageable)
-				Rows=GetVViewport(G);
-			else
-				Rows=DUMP_TEXT_HEIGHT - 2;
+			// Dump the built in array then add the user specified registers.
+			int Rows=DUMP_ARRAY_DIMENSION, row=0;
 
 			char *items=calloc(Rows, DUMP_TEXT_WIDTH);
 			for(row=0; row < Rows; row++)
@@ -4280,7 +4366,7 @@ void	Play(uARG *A, int G, char ID)
 								CallBackButton,
 								&Rsc);
 
-						A->L.Play.bootSchedMon=A->L.Play.showSchedule=true;
+						A->L.Play.showSchedule=true;
 						fDraw(CORES, true, false);
 					}
 					else
@@ -4292,7 +4378,7 @@ void	Play(uARG *A, int G, char ID)
 				}
 				else
 				{
-					A->L.Play.bootSchedMon=A->L.Play.showSchedule=false;
+					A->L.Play.showSchedule=false;
 					pthread_join(A->TID_Schedule, NULL);
 					pthread_mutex_lock(&uDraw_mutex);
 					{
@@ -4392,7 +4478,7 @@ char	*FQN_Settings(const char *fName)
 			*rHome=strdup(Home),
 			*dName=dirname(lHome),
 			*bName=basename(rHome),
-			*FQN=calloc(1024, 1);
+			*FQN=malloc(4096);
 
 		if(!strcmp(dName, "/"))
 			sprintf(FQN, "%s%s/%s", dName, bName, fName);
@@ -4409,9 +4495,9 @@ char	*FQN_Settings(const char *fName)
 
 bool	SaveSettings(uARG *A)
 {
-	char storePath[1024]={0};
+	char storePath[4096]={0};
 
-	if(strlen(A->configFile) > 0)
+	if((A->configFile != NULL) && strlen(A->configFile) > 0)
 		strcpy(storePath, A->configFile);
 	else
 	{
@@ -4893,9 +4979,10 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 	int i=0, j=0, G=0;
 	bool noerr=true;
 
-	if((argc >= 3) && !strcmp(argv[1], "-C"))
-		sscanf(argv[2], "%s", A->configFile);
-	if(strlen(A->configFile) > 0)
+	if((argc >= 3) && !strcmp(argv[1], A->Options[0].argument))
+		sscanf(argv[2], A->Options[0].format, A->configFile);
+
+	if((A->configFile != NULL) && (strlen(A->configFile) > 0))
 		xdb=XrmGetFileDatabase(A->configFile);
 	else
 	{
@@ -4936,56 +5023,28 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 				break;
 			}
 		}
-		// If the settings file was not found then dispose Widgets from one to each other,
-		// such as: [Right & Bottom + width & height] Or -[1,-1] = X,Y origin + Margins.
-		if(noerr) {
+		if(noerr)
+		{
 			if(!xdb)
 			{
+				bool noGeometries=(A->Geometries == NULL);
+				if(noGeometries)
+					A->Geometries=calloc(WIDGETS, GEOMETRY_SIZE + 1);
+
 				for(G=MAIN; G < WIDGETS; G++)
 				{
-					int U=A->W[G].x;
-					int V=A->W[G].y;
-					if(_IS_MDI_) {
-						if(G != MAIN) {
-							switch(U) {
-								case -1:
-									A->W[G].x=A->L.Margin.H;
-									break;
-								case MAIN:
-									A->W[G].x=A->L.Margin.H + A->W[U].width;
-									break;
-								default:
-									A->W[G].x=A->L.Margin.H + A->W[U].x + A->W[U].width;
-									break;
-							}
-							switch(V) {
-								case -1:
-									A->W[G].y=A->L.Margin.V;
-									break;
-								case MAIN:
-									A->W[G].y=A->L.Margin.V + A->W[V].height;
-									break;
-								default:
-									A->W[G].y=A->L.Margin.V + A->W[V].y + A->W[V].height;
-									break;
-							}
-						}
-						else {
-							A->W[G].x=A->L.Start.H;
-							A->W[G].y=A->L.Start.V;
-						}
+					if(noGeometries)
+					{
+						char geometry[GEOMETRY_SIZE + 1];
+
+						sprintf(geometry, GEOMETRY_FORMAT,
+								A->L.Page[G].Geometry.cols,
+								A->L.Page[G].Geometry.rows,
+								A->W[G].x,
+								A->W[G].y);
+						strcat(A->Geometries, geometry);
 					}
-					else {
-						if(U == -1)
-							A->W[G].x=A->L.Start.H;
-						else
-							A->W[G].x=A->L.Margin.H + A->W[U].x + A->W[U].width;
-						if(V == -1)
-							A->W[G].y=A->L.Start.V;
-						else
-							A->W[G].y=A->L.Margin.V + A->W[V].y + A->W[V].height;
-					}
-					// Override the compiled colors with argument.
+					// Override the compiled colors with the specified arguments.
 					if(A->L.globalBackground != _BACKGROUND_GLOBAL)
 						A->W[G].background=A->L.globalBackground;
 
@@ -5030,9 +5089,12 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 		XrmDestroyDatabase(xdb);
 
 	if(noerr == false) {
+		char	*program=strdup(argv[0]),
+			*progName=basename(program);
+
 		if(!strcmp(argv[1], "-h"))
 		{
-			printf("Usage: %s [OPTION...]\n\n", argv[0]);
+			printf("Usage: %s [-option argument] .. [-option argument]\n\n", progName);
 			for(i=0; i < OPTIONS_COUNT; i++)
 				printf("\t%s\t%s\n", A->Options[i].argument, A->Options[i].manual);
 
@@ -5054,10 +5116,11 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 		else
 		{
 			if(j > 0)
-				printf("%s: unrecognized option '%s'\nTry '%s -h' for more information.\n", basename(argv[0]), argv[j], basename(argv[0]));
+				printf("%s: unrecognized option '%s'\nTry '%s -h' for more information.\n", progName, argv[j], progName);
 			else
-				printf("%s: malformed options.\nTry '%s -h' for more information.\n", basename(argv[0]), basename(argv[0]));
+				printf("%s: malformed options.\nTry '%s -h' for more information.\n", progName, progName);
 		}
+		free(program);
 	}
 	return(noerr);
 }
@@ -5101,10 +5164,11 @@ static void *uEmergency(void *uArg)
 // Verify the prerequisites & start the threads.
 int main(int argc, char *argv[])
 {
-	uARG	A= {
+	uARG	A={
 			display:NULL,
 			screen:NULL,
 			TID_Draw:0,
+			Geometries: NULL,
 			fontName:calloc(256, sizeof(char)),
 			xfont:NULL,
 			MouseCursor:{0},
@@ -5173,6 +5237,7 @@ int main(int argc, char *argv[])
 				IdleTime:IDLE_COEF_DEF,
 			},
 			S: {
+				SchedAttr:SORT_FIELD_NONE,
 				IdleTime:IDLE_SCHED_DEF,
 			},
 			Splash: {window:0, gc:0, x:0, y:0, w:splash_width + (splash_width >> 2), h:splash_height << 1},
@@ -5182,18 +5247,18 @@ int main(int argc, char *argv[])
 				window:0,
 				pixmap: {B:0, F:0},
 				gc:0,
-				x:-1,
-				y:-1,
-				width:300,
-				height:200,
+				x:+2,
+				y:-200,
+				width:(GEOMETRY_MAIN_COLS * CHARACTER_WIDTH),
+				height:((1 + GEOMETRY_MAIN_ROWS + 1) * CHARACTER_HEIGHT),
 				border_width:1,
 				extents: {
 					overall:{0},
 					dir:0,
-					ascent:11,
-					descent:2,
-					charWidth:6,
-					charHeight:13,
+					ascent:FONT_ASCENT,
+					descent:FONT_DESCENT,
+					charWidth:CHARACTER_WIDTH,
+					charHeight:CHARACTER_HEIGHT,
 				},
 				background:_BACKGROUND_MAIN,
 				foreground:_FOREGROUND_MAIN,
@@ -5204,18 +5269,18 @@ int main(int argc, char *argv[])
 				window:0,
 				pixmap: {B:0, F:0},
 				gc:0,
-				x:-1,
-				y:MAIN,
-				width:300,
-				height:160,
+				x:-300,
+				y:+2,
+				width:(((GEOMETRY_CORES_COLS << 1) + 4 + 1) * CHARACTER_WIDTH),
+				height:((2 + GEOMETRY_CORES_ROWS + 2) * CHARACTER_HEIGHT),
 				border_width:1,
 				extents: {
 					overall:{0},
 					dir:0,
-					ascent:11,
-					descent:2,
-					charWidth:6,
-					charHeight:13,
+					ascent:FONT_ASCENT,
+					descent:FONT_DESCENT,
+					charWidth:CHARACTER_WIDTH,
+					charHeight:CHARACTER_HEIGHT,
 				},
 				background:_BACKGROUND_CORES,
 				foreground:_FOREGROUND_CORES,
@@ -5226,18 +5291,18 @@ int main(int argc, char *argv[])
 				window:0,
 				pixmap: {B:0, F:0},
 				gc:0,
-				x:CORES,
-				y:MAIN,
-				width:240,
-				height:180,
+				x:+2,
+				y:+400,
+				width:((((GEOMETRY_CSTATES_COLS * CSTATES_TEXT_SPACING) << 1) + 2) * CHARACTER_WIDTH),
+				height:((2 + GEOMETRY_CSTATES_ROWS + 2) * CHARACTER_HEIGHT),
 				border_width:1,
 				extents: {
 					overall:{0},
 					dir:0,
-					ascent:11,
-					descent:2,
-					charWidth:6,
-					charHeight:13,
+					ascent:FONT_ASCENT,
+					descent:FONT_DESCENT,
+					charWidth:CHARACTER_WIDTH,
+					charHeight:CHARACTER_HEIGHT,
 				},
 				background:_BACKGROUND_CSTATES,
 				foreground:_FOREGROUND_CSTATES,
@@ -5248,18 +5313,18 @@ int main(int argc, char *argv[])
 				window:0,
 				pixmap: {B:0, F:0},
 				gc:0,
-				x:-1,
-				y:CSTATES,
-				width:230,
-				height:280,
+				x:+2,
+				y:+2,
+				width:((GEOMETRY_TEMPS_COLS + 6) * CHARACTER_WIDTH),
+				height:((2 + GEOMETRY_TEMPS_ROWS + 2) * CHARACTER_HEIGHT),
 				border_width:1,
 				extents: {
 					overall:{0},
 					dir:0,
-					ascent:11,
-					descent:2,
-					charWidth:6,
-					charHeight:13,
+					ascent:FONT_ASCENT,
+					descent:FONT_DESCENT,
+					charWidth:CHARACTER_WIDTH,
+					charHeight:CHARACTER_HEIGHT,
 				},
 				background:_BACKGROUND_TEMPS,
 				foreground:_FOREGROUND_TEMPS,
@@ -5270,18 +5335,18 @@ int main(int argc, char *argv[])
 				window:0,
 				pixmap: {B:0, F:0},
 				gc:0,
-				x:TEMPS,
-				y:CSTATES,
-				width:480,
-				height:280,
+				x:-500,
+				y:-300,
+				width:(GEOMETRY_SYSINFO_COLS * CHARACTER_WIDTH),
+				height:((1 + GEOMETRY_SYSINFO_ROWS + 1) * CHARACTER_HEIGHT),
 				border_width:1,
 				extents: {
 					overall:{0},
 					dir:0,
-					ascent:11,
-					descent:2,
-					charWidth:6,
-					charHeight:13,
+					ascent:FONT_ASCENT,
+					descent:FONT_DESCENT,
+					charWidth:CHARACTER_WIDTH,
+					charHeight:CHARACTER_HEIGHT,
 				},
 				background:_BACKGROUND_SYSINFO,
 				foreground:_FOREGROUND_SYSINFO,
@@ -5292,18 +5357,18 @@ int main(int argc, char *argv[])
 				window:0,
 				pixmap: {B:0, F:0},
 				gc:0,
-				x:-1,
-				y:TEMPS,
-				width:710,
-				height:190,
+				x:+300,
+				y:+2,
+				width:(GEOMETRY_DUMP_COLS * CHARACTER_WIDTH),
+				height:((1 + GEOMETRY_DUMP_ROWS + 1) * CHARACTER_HEIGHT),
 				border_width:1,
 				extents: {
 					overall:{0},
 					dir:0,
-					ascent:11,
-					descent:2,
-					charWidth:6,
-					charHeight:13,
+					ascent:FONT_ASCENT,
+					descent:FONT_DESCENT,
+					charWidth:CHARACTER_WIDTH,
+					charHeight:CHARACTER_HEIGHT,
 				},
 				background:_BACKGROUND_DUMP,
 				foreground:_FOREGROUND_DUMP,
@@ -5350,19 +5415,11 @@ int main(int argc, char *argv[])
 					{RGB:_COLOR_FOCUS,        xrmClass:"Color",      xrmKey:"Focus"      },
 					{RGB:_COLOR_MDI_SEP,      xrmClass:"Color",      xrmKey:"MDIlineSep" },
 				},
-				// Margins must be initialized with a zero size.
-				Margin: {
-					H:16,
-					V:16,
-				},
-				Start: {
-					H:0,
-					V:0,
-				},
 				Page: {
 					// MAIN
 					{
 						Pageable:true,
+						Geometry: {cols:GEOMETRY_MAIN_COLS, rows:GEOMETRY_MAIN_ROWS},
 						Visible: {cols:0, rows:0},
 						Listing: {cols:0, rows:1},
 						FrameSize: {cols:1, rows:1},
@@ -5376,6 +5433,7 @@ int main(int argc, char *argv[])
 					// CORES
 					{
 						Pageable:false,
+						Geometry: {cols:GEOMETRY_CORES_COLS, rows:GEOMETRY_CORES_ROWS},
 						Visible: {cols:0, rows:0},
 						Listing: {cols:0, rows:0},
 						FrameSize: {cols:1, rows:1},
@@ -5389,6 +5447,7 @@ int main(int argc, char *argv[])
 					// CSTATES
 					{
 						Pageable:false,
+						Geometry: {cols:GEOMETRY_CSTATES_COLS, rows:GEOMETRY_CSTATES_ROWS},
 						Visible: {cols:0, rows:0},
 						Listing: {cols:0, rows:0},
 						FrameSize: {cols:1, rows:1},
@@ -5402,6 +5461,7 @@ int main(int argc, char *argv[])
 					// TEMPS
 					{
 						Pageable:false,
+						Geometry: {cols:GEOMETRY_TEMPS_COLS, rows:GEOMETRY_TEMPS_ROWS},
 						Visible: {cols:0, rows:0},
 						Listing: {cols:0, rows:0},
 						FrameSize: {cols:1, rows:1},
@@ -5415,6 +5475,7 @@ int main(int argc, char *argv[])
 					// SYSINFO
 					{
 						Pageable:true,
+						Geometry: {cols:GEOMETRY_SYSINFO_COLS, rows:GEOMETRY_SYSINFO_ROWS},
 						Visible: {cols:0, rows:0},
 						Listing: {cols:0, rows:1},
 						FrameSize: {cols:1, rows:1},
@@ -5428,6 +5489,7 @@ int main(int argc, char *argv[])
 					// DUMP
 					{
 						Pageable:true,
+						Geometry: {cols:GEOMETRY_DUMP_COLS, rows:GEOMETRY_DUMP_ROWS},
 						Visible: {cols:0, rows:0},
 						Listing: {cols:0, rows:1},
 						FrameSize: {cols:1, rows:1},
@@ -5445,7 +5507,6 @@ int main(int argc, char *argv[])
 					cycleValues:false,
 					ratioValues:true,
 					showSchedule:false,
-					bootSchedMon:false,
 					cStatePercent:false,
 					wallboard:false,
 					flashCursor:true,
@@ -5483,33 +5544,43 @@ int main(int argc, char *argv[])
 			LOOP: true,
 			PAUSE: {false},
 			PROC: true,
-			configFile:calloc(1024, sizeof(char)),
+			configFile:NULL,
 			Options:
 			{
-				{"-C", "%s", A.configFile,            "Path & file configuration name (String) {must be first}",    NULL                                       },
-				{"-D", "%d", &A.MDI,                  "Run as a MDI Window (Bool) [0/1]",                           NULL                                       },
-				{"-U", "%x", &A.L.UnMapBitmask,       "Bitmap of unmap Widgets (Hex) [0x]",                         NULL                                       },
-				{"-F", "%s", A.fontName,              "Font name (String) {default to 'Fixed'}",                    XDB_CLASS_MAIN"."XDB_KEY_FONT              },
-				{"-a", "%c", &A.xACL,                 "Enable or disable X ACL (Char) [Y/N]",                       NULL                                       },
-				{"-x", "%d", &A.L.Start.H,            "Initial left position (Int) [pixel]",                        NULL                                       },
-				{"-y", "%d", &A.L.Start.V,            "Initial top position (Int) [pixel]",                         NULL                                       },
-				{"-b", "%x", &A.L.globalBackground,   "Background color (Hex) {RGB}",                               NULL                                       },
-				{"-f", "%x", &A.L.globalForeground,   "Foreground color (Hex) {RGB}",                               NULL                                       },
-				{"-c", "%d", &A.P.ArchID,             "Pick up an architecture# (Char) {'-A' to list arch. array}", NULL                                       },
-				{"-S", "%u", &A.P.ClockSrc,           "Clock source (Int) {TSC(0) BIOS(1) SPEC(2) ROM(3) USER(4)}", XDB_CLASS_SYSINFO"."XDB_KEY_CLOCK_SOURCE   },
-				{"-M", "%x", &A.P.BClockROMaddr,      "ROM address of the Base Clock (Hex) [0x]",                   XDB_CLASS_SYSINFO"."XDB_KEY_ROM_ADDRESS    },
-				{"-s", "%u", &A.P.IdleTime,           "Idle time multiplier (Int) {where N x 50000 usec}",          NULL                                       },
-				{"-g", "%u", &A.L.Play.fillGraphics,  "Fill the graphics (Bool) [0/1]",                             XDB_CLASS_CORES"."XDB_KEY_PLAY_GRAPHICS    },
-				{"-z", "%u", &A.L.Play.freqHertz,     "Show the Core frequency (Bool) [0/1]",                       XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
-				{"-l", "%u", &A.L.Play.cycleValues,   "Show the Core Cycles (Bool) [0/1]",                          XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
-				{"-r", "%u", &A.L.Play.ratioValues,   "Show the Core Ratio (Bool) [0/1]",                           XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
-				{"-t", "%u", &A.L.Play.bootSchedMon,  "Task scheduling monitoring (Bool) [0/1]",                    XDB_CLASS_CORES"."XDB_KEY_PLAY_SCHEDULE    },
-				{"-p", "%u", &A.L.Play.cStatePercent, "Show the Core C-State percentage (Bool) [0/1]",              XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
-				{"-w", "%u", &A.L.Play.wallboard,     "Scroll the Brand wallboard (Bool) [0/1]",                    XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
-				{"-o", "%u", &A.L.Play.alwaysOnTop,   "Keep always on top (Bool) [0/1]",                            NULL                                       },
-				{"-n", "%u", &A.L.Play.noDecorations, "Remove the WM decorations (Bool) [0/1]",                     NULL                                       },
-				{"-N", "%u", &A.L.Play.skipTaskbar,   "Skip from the WM taskbar (Bool) [0/1]",                      NULL                                       },
-				{"-i", "%u", &A.L.Play.hideSplash,    "Hide the splash screen (Bool) [0/1]",                        NULL                                       },
+				{"-C", "%ms", &A.configFile,           "Path & file configuration name (String)\n"\
+				                                       "\t\tthis option must be first; default is $HOME/.xfreq",               NULL                                       },
+				{"-D", "%d",  &A.MDI,                  "Run as a MDI Window (Bool) [0/1]",                                     NULL                                       },
+				{"-U", "%x",  &A.L.UnMapBitmask,       "Bitmap of unmap Widgets (Hex)\n"\
+								       "\t\twhere each bit set in the argument is a hidden Widget",            NULL                                       },
+				{"-F", "%s",  A.fontName,              "Font name (String)\n"\
+				                                       "\t\tdefault font is 'Fixed'",                                          XDB_CLASS_MAIN"."XDB_KEY_FONT              },
+				{"-x", "%c",  &A.xACL,                 "Enable or disable the X ACL (Char) [Y/N]",                             NULL                                       },
+				{"-g", "%ms", &A.Geometries,           "Widgets geometries (String)\n"\
+				                                       "\t\targument is a series of '[cols]x[rows]+[x]+[y], .. ,'",            NULL                                       },
+				{"-b", "%x",  &A.L.globalBackground,   "Background color (Hex) {RGB}\n"\
+								       "\t\targument is coded with primary colors 0xRRGGBB",                   NULL                                       },
+				{"-f", "%x",  &A.L.globalForeground,   "Foreground color (Hex) {RGB}",                                         NULL                                       },
+				{"-c", "%d",  &A.P.ArchID,             "Pick up an architecture # (Char)\n"\
+				                                       "\t\tuse '-A' option to display the built-in architectures",            NULL                                       },
+				{"-S", "%u",  &A.P.ClockSrc,           "Clock source (Int)\n"\
+								       "\t\targument is one of the [0]TSC [1]BIOS [2]SPEC [3]ROM [4]USER",     XDB_CLASS_SYSINFO"."XDB_KEY_CLOCK_SOURCE   },
+				{"-M", "%x",  &A.P.BClockROMaddr,      "ROM address of the Base Clock (Hex)\n"\
+				                                       "\t\targument is the BCLK memory address to read from",                 XDB_CLASS_SYSINFO"."XDB_KEY_ROM_ADDRESS    },
+				{"-s", "%u",  &A.P.IdleTime,           "Idle time multiplier (Int)\n"\
+				                                       "\t\targument is a coefficient multiplied by 50000 usec",               NULL                                       },
+				{"-l", "%u",  &A.L.Play.fillGraphics,  "Fill or not the graphics (Bool) [0/1]",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_GRAPHICS    },
+				{"-z", "%u",  &A.L.Play.freqHertz,     "Show the Core frequency (Bool) [0/1]",                                 XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
+				{"-y", "%u",  &A.L.Play.cycleValues,   "Show the Core Cycles (Bool) [0/1]",                                    XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
+				{"-r", "%u",  &A.L.Play.ratioValues,   "Show the Core Ratio (Bool) [0/1]",                                     XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
+				{"-t", "%x",  &A.S.SchedAttr,          "Task scheduling monitoring sorted by a specified field (Hex)\n"\
+								       "\t\targument is like 0x{R}0{N} from [0x000 / 0x101 .. 0x10b]\n"\
+								       "\t\twhere {R} to reverse sorting, {N} is a '/proc/sched_debug' field", XDB_CLASS_CORES"."XDB_KEY_PLAY_SCHEDULE    },
+				{"-p", "%u",  &A.L.Play.cStatePercent, "Show the Core C-State percentage (Bool) [0/1]",                        XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
+				{"-w", "%u",  &A.L.Play.wallboard,     "Scroll the Processor brand wallboard (Bool) [0/1]",                    XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
+				{"-o", "%u",  &A.L.Play.alwaysOnTop,   "Keep the Widgets always on top of the screen (Bool) [0/1]",            NULL                                       },
+				{"-n", "%u",  &A.L.Play.noDecorations, "Remove the Window Manager decorations (Bool) [0/1]",                   NULL                                       },
+				{"-N", "%u",  &A.L.Play.skipTaskbar,   "Remove the Widgets title name from the WM taskbar (Bool) [0/1]",       NULL                                       },
+				{"-i", "%u",  &A.L.Play.hideSplash,    "Hide the splash screen (Bool) [0/1]",                                  NULL                                       },
 			},
 		};
 	{
@@ -5635,7 +5706,7 @@ int main(int argc, char *argv[])
 				pthread_t TID_Cycle=0;
 				if((A.P.ArchID != -1) && !pthread_create(&TID_Cycle, NULL, A.P.Arch[A.P.ArchID].uCycle, &A))
 				{
-					if(A.L.Play.bootSchedMon)
+					if((A.S.SchedAttr & 0xf) != SORT_FIELD_NONE)
 						Play(&A, CORES, ID_SCHED);
 
 					Output(&A, BootLog);
@@ -5687,8 +5758,13 @@ int main(int argc, char *argv[])
 	{
 		rc=1;
 	}
-	free(A.fontName);
-	free(A.configFile);
+
+	if(A.Geometries != NULL)
+		free(A.Geometries);
+	if(A.fontName != NULL)
+		free(A.fontName);
+	if(A.configFile != NULL)
+		free(A.configFile);
 
 	free(A.P.Arch[0].Architecture);
 
