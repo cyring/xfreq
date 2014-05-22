@@ -170,6 +170,11 @@
  *
  * [HISTORY]
  *
+ * R 0.27 : 05/22/2014 SR-1
+ *        - Fix: pointer to configFile and scanning options.
+ *        - Fix: adjust space between task names when reverse sorting.
+ *        - Fix: startup of task monitoring from settings file if no field defined.
+ *
  * R 0.27 : 05/21/2014
  *        - Swap the arguments '-x' and '-a' associated with the option to disable the X ACL.
  *        - Recode the Widgets layout using geometries.

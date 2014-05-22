@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.27 SR0 by CyrIng
+ * XFreq.c #0.27 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -3741,10 +3741,10 @@ void	DrawLayout(uARG *A, int G)
 								int depth=0, L=(CORES_TEXT_WIDTH << 1);
 								do
 								{
-									int l=strlen(A->S.Pipe[cpu].Task[depth].comm);
+									int l=(A->S.Pipe[cpu].Task[depth].pid == 0) ? 0 : strlen(A->S.Pipe[cpu].Task[depth].comm);
 									L-=((l > 0) ? (l + 2) : 0);
 
-									if((A->S.Pipe[cpu].Task[depth].pid > 0) && (l > 0))
+									if(l > 0)
 									{
 										XSetForeground(	A->display, A->W[G].gc,
 												(depth == 0) ? A->L.Colors[COLOR_PULSE].RGB
@@ -4366,7 +4366,10 @@ void	Play(uARG *A, int G, char ID)
 								CallBackButton,
 								&Rsc);
 
+						if((A->S.SchedAttr & 0xf) == SORT_FIELD_NONE)
+							A->S.SchedAttr=SORT_FIELD_RUNTIME;
 						A->L.Play.showSchedule=true;
+
 						fDraw(CORES, true, false);
 					}
 					else
@@ -4515,7 +4518,7 @@ bool	SaveSettings(uARG *A)
 		char strVal[256]={0};
 		char strKey[32]={0};
 		int i=0;
-		for(i=0; i < OPTIONS_COUNT; i++)
+		for(i=1; i < OPTIONS_COUNT; i++)
 			if(A->Options[i].xrmName != NULL)
 			{
 				switch(A->Options[i].format[1])
@@ -4979,9 +4982,10 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 	int i=0, j=0, G=0;
 	bool noerr=true;
 
+	// Is the option '-C' specified ?
 	if((argc >= 3) && !strcmp(argv[1], A->Options[0].argument))
-		sscanf(argv[2], A->Options[0].format, A->configFile);
-
+		sscanf(argv[2], A->Options[0].format, A->Options[0].pointer);
+	// then use it as the settings configuration file.
 	if((A->configFile != NULL) && (strlen(A->configFile) > 0))
 		xdb=XrmGetFileDatabase(A->configFile);
 	else
@@ -5006,12 +5010,12 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 				sscanf(xvalue.addr, "%x", &A->L.Colors[i].RGB);
 		}
 	}
-	//  Parse the command line arguments which may override settings.
+	//  Parse the command line options which may override settings.
 	if( (argc - ((argc >> 1) << 1)) )
 	{
-		for(j=1; j < argc; j+=2)
-		{
-			for(i=0; i < OPTIONS_COUNT; i++)
+		for(j=(A->configFile != NULL) ? 3 : 1; j < argc; j+=2)
+		{	// Count from 1 to ignore scanning the '-C option.
+			for(i=1; i < OPTIONS_COUNT; i++)
 				if(!strcmp(argv[j], A->Options[i].argument))
 				{
 					sscanf(argv[j+1], A->Options[i].format, A->Options[i].pointer);
@@ -5094,11 +5098,14 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 
 		if(!strcmp(argv[1], "-h"))
 		{
-			printf("Usage: %s [-option argument] .. [-option argument]\n\n", progName);
+			printf(	"Usage: %s [-option argument] .. [-option argument]\n\n" \
+				"\t-h\tPrint out this message\n", progName);
+
 			for(i=0; i < OPTIONS_COUNT; i++)
 				printf("\t%s\t%s\n", A->Options[i].argument, A->Options[i].manual);
 
-			printf(	"\nExit status:\n0\tif OK,\n1\tif problems,\n2\tif serious trouble.\n" \
+			printf(	"\t-A\tPrint out the built-in architectures\n" \
+				"\nExit status:\n0\tif OK,\n1\tif problems,\n2\tif serious trouble.\n" \
 				"\nReport bugs to webmaster@cyring.fr\n");
 		}
 		else if(!strcmp(argv[1], "-A"))
@@ -5247,8 +5254,8 @@ int main(int argc, char *argv[])
 				window:0,
 				pixmap: {B:0, F:0},
 				gc:0,
-				x:+2,
-				y:-200,
+				x:+0,
+				y:+0,
 				width:(GEOMETRY_MAIN_COLS * CHARACTER_WIDTH),
 				height:((1 + GEOMETRY_MAIN_ROWS + 1) * CHARACTER_HEIGHT),
 				border_width:1,
@@ -5269,8 +5276,8 @@ int main(int argc, char *argv[])
 				window:0,
 				pixmap: {B:0, F:0},
 				gc:0,
-				x:-300,
-				y:+2,
+				x:+0,
+				y:+230,
 				width:(((GEOMETRY_CORES_COLS << 1) + 4 + 1) * CHARACTER_WIDTH),
 				height:((2 + GEOMETRY_CORES_ROWS + 2) * CHARACTER_HEIGHT),
 				border_width:1,
@@ -5291,8 +5298,8 @@ int main(int argc, char *argv[])
 				window:0,
 				pixmap: {B:0, F:0},
 				gc:0,
-				x:+2,
-				y:+400,
+				x:+300,
+				y:+230,
 				width:((((GEOMETRY_CSTATES_COLS * CSTATES_TEXT_SPACING) << 1) + 2) * CHARACTER_WIDTH),
 				height:((2 + GEOMETRY_CSTATES_ROWS + 2) * CHARACTER_HEIGHT),
 				border_width:1,
@@ -5313,8 +5320,8 @@ int main(int argc, char *argv[])
 				window:0,
 				pixmap: {B:0, F:0},
 				gc:0,
-				x:+2,
-				y:+2,
+				x:+550,
+				y:+230,
 				width:((GEOMETRY_TEMPS_COLS + 6) * CHARACTER_WIDTH),
 				height:((2 + GEOMETRY_TEMPS_ROWS + 2) * CHARACTER_HEIGHT),
 				border_width:1,
@@ -5335,8 +5342,8 @@ int main(int argc, char *argv[])
 				window:0,
 				pixmap: {B:0, F:0},
 				gc:0,
-				x:-500,
-				y:-300,
+				x:+0,
+				y:+430,
 				width:(GEOMETRY_SYSINFO_COLS * CHARACTER_WIDTH),
 				height:((1 + GEOMETRY_SYSINFO_ROWS + 1) * CHARACTER_HEIGHT),
 				border_width:1,
@@ -5357,8 +5364,8 @@ int main(int argc, char *argv[])
 				window:0,
 				pixmap: {B:0, F:0},
 				gc:0,
-				x:+300,
-				y:+2,
+				x:+0,
+				y:+730,
 				width:(GEOMETRY_DUMP_COLS * CHARACTER_WIDTH),
 				height:((1 + GEOMETRY_DUMP_ROWS + 1) * CHARACTER_HEIGHT),
 				border_width:1,
@@ -5547,34 +5554,35 @@ int main(int argc, char *argv[])
 			configFile:NULL,
 			Options:
 			{
-				{"-C", "%ms", &A.configFile,           "Path & file configuration name (String)\n"\
-				                                       "\t\tthis option must be first; default is $HOME/.xfreq",               NULL                                       },
+				{"-C", "%ms", &A.configFile,           "Path & file configuration name (String)\n" \
+				                                       "\t\t  this option must be first\n" \
+				                                       "\t\t  default is $HOME/.xfreq",                                        NULL                                       },
 				{"-D", "%d",  &A.MDI,                  "Run as a MDI Window (Bool) [0/1]",                                     NULL                                       },
-				{"-U", "%x",  &A.L.UnMapBitmask,       "Bitmap of unmap Widgets (Hex)\n"\
-								       "\t\twhere each bit set in the argument is a hidden Widget",            NULL                                       },
-				{"-F", "%s",  A.fontName,              "Font name (String)\n"\
-				                                       "\t\tdefault font is 'Fixed'",                                          XDB_CLASS_MAIN"."XDB_KEY_FONT              },
+				{"-U", "%x",  &A.L.UnMapBitmask,       "Bitmap of unmap Widgets (Hex) eq. 0b00111111\n" \
+								       "\t\t  where each bit set in the argument is a hidden Widget",          NULL                                       },
+				{"-F", "%s",  A.fontName,              "Font name (String)\n" \
+				                                       "\t\t  default font is 'Fixed'",                                        XDB_CLASS_MAIN"."XDB_KEY_FONT              },
 				{"-x", "%c",  &A.xACL,                 "Enable or disable the X ACL (Char) [Y/N]",                             NULL                                       },
-				{"-g", "%ms", &A.Geometries,           "Widgets geometries (String)\n"\
-				                                       "\t\targument is a series of '[cols]x[rows]+[x]+[y], .. ,'",            NULL                                       },
-				{"-b", "%x",  &A.L.globalBackground,   "Background color (Hex) {RGB}\n"\
-								       "\t\targument is coded with primary colors 0xRRGGBB",                   NULL                                       },
+				{"-g", "%ms", &A.Geometries,           "Widgets geometries (String)\n" \
+				                                       "\t\t  argument is a series of '[cols]x[rows]+[x]+[y], .. ,'",          NULL                                       },
+				{"-b", "%x",  &A.L.globalBackground,   "Background color (Hex) {RGB}\n" \
+								       "\t\t  argument is coded with primary colors 0xRRGGBB",                 NULL                                       },
 				{"-f", "%x",  &A.L.globalForeground,   "Foreground color (Hex) {RGB}",                                         NULL                                       },
-				{"-c", "%d",  &A.P.ArchID,             "Pick up an architecture # (Char)\n"\
-				                                       "\t\tuse '-A' option to display the built-in architectures",            NULL                                       },
-				{"-S", "%u",  &A.P.ClockSrc,           "Clock source (Int)\n"\
-								       "\t\targument is one of the [0]TSC [1]BIOS [2]SPEC [3]ROM [4]USER",     XDB_CLASS_SYSINFO"."XDB_KEY_CLOCK_SOURCE   },
+				{"-c", "%d",  &A.P.ArchID,             "Pick up an architecture # (Char)\n" \
+				                                       "\t\t  refer to the '-A' option",                                       NULL                                       },
+				{"-S", "%u",  &A.P.ClockSrc,           "Clock source (Int)\n" \
+								       "\t\t  argument is one of the [0]TSC [1]BIOS [2]SPEC [3]ROM [4]USER",   XDB_CLASS_SYSINFO"."XDB_KEY_CLOCK_SOURCE   },
 				{"-M", "%x",  &A.P.BClockROMaddr,      "ROM address of the Base Clock (Hex)\n"\
-				                                       "\t\targument is the BCLK memory address to read from",                 XDB_CLASS_SYSINFO"."XDB_KEY_ROM_ADDRESS    },
-				{"-s", "%u",  &A.P.IdleTime,           "Idle time multiplier (Int)\n"\
-				                                       "\t\targument is a coefficient multiplied by 50000 usec",               NULL                                       },
+				                                       "\t\t  argument is the BCLK memory address to read from",               XDB_CLASS_SYSINFO"."XDB_KEY_ROM_ADDRESS    },
+				{"-s", "%u",  &A.P.IdleTime,           "Idle time multiplier (Int)\n" \
+				                                       "\t\t  argument is a coefficient multiplied by 50000 usec",             NULL                                       },
 				{"-l", "%u",  &A.L.Play.fillGraphics,  "Fill or not the graphics (Bool) [0/1]",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_GRAPHICS    },
 				{"-z", "%u",  &A.L.Play.freqHertz,     "Show the Core frequency (Bool) [0/1]",                                 XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
 				{"-y", "%u",  &A.L.Play.cycleValues,   "Show the Core Cycles (Bool) [0/1]",                                    XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
 				{"-r", "%u",  &A.L.Play.ratioValues,   "Show the Core Ratio (Bool) [0/1]",                                     XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
-				{"-t", "%x",  &A.S.SchedAttr,          "Task scheduling monitoring sorted by a specified field (Hex)\n"\
-								       "\t\targument is like 0x{R}0{N} from [0x000 / 0x101 .. 0x10b]\n"\
-								       "\t\twhere {R} to reverse sorting, {N} is a '/proc/sched_debug' field", XDB_CLASS_CORES"."XDB_KEY_PLAY_SCHEDULE    },
+				{"-t", "%x",  &A.S.SchedAttr,          "Task scheduling monitoring sorted by 0x{R}0{N} (Hex)\n" \
+								       "\t\t  where {R} bit set to reverse sorting\n" \
+								       "\t\t  and {N} is a '/proc/sched_debug' field# from [0x1] to [0xb]",    XDB_CLASS_CORES"."XDB_KEY_PLAY_SCHEDULE    },
 				{"-p", "%u",  &A.L.Play.cStatePercent, "Show the Core C-State percentage (Bool) [0/1]",                        XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
 				{"-w", "%u",  &A.L.Play.wallboard,     "Scroll the Processor brand wallboard (Bool) [0/1]",                    XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
 				{"-o", "%u",  &A.L.Play.alwaysOnTop,   "Keep the Widgets always on top of the screen (Bool) [0/1]",            NULL                                       },
