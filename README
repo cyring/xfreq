@@ -109,11 +109,11 @@
  * + The temperature thresholds MSR does not return any value.
  *     Need to investigate ACPI.
  *
- * + Program freeze after a long run. Probably due to a semaphore lock overload.
+ * + Program freeze after a long run. Probably due to a semaphore lock overload. So far limited to Core2
  *
  * + Fast-Strings reported as not available in CPUID but enabled in MSR.
  *
- * + Virtual memory leak : investigation in progress with Valgrind
+ * + Memory leak related to XrmDatabase reported by Valgrind.
  *
  *
  *
@@ -169,6 +169,10 @@
  *
  *
  * [HISTORY]
+ *
+ * R 0.27 : 05/24/2014 SR-2
+ *        - While reinforcing integer data type variables, then scanning for errors with Valgrind, raised a duplicated definition of 'Status'
+ *            with the header file X11/Xlib.h. Thus in the THERM_STATUS structure, the field has been renamed to 'StatusBit'.
  *
  * R 0.27 : 05/22/2014 SR-1
  *        - Fix: pointer to configFile and scanning options.

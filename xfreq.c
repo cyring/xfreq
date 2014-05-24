@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.27 SR1 by CyrIng
+ * XFreq.c #0.27 SR2 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -34,7 +34,7 @@ static pthread_mutex_t	uDraw_mutex, uSchedule_mutex;
 static void *uDraw(void *uArg);
 
 unsigned long long
-	DumpRegister(signed int FD, unsigned long long msr, char *pHexStr, char *pBinStr)
+	DumpRegister(signed int FD, unsigned long long int msr, char *pHexStr, char *pBinStr)
 {
 	unsigned long long value=0;
 	Read_MSR(FD, msr, &value);
@@ -436,7 +436,7 @@ void	Close_MSR(uARG *A)
 }
 
 // Read the Time Stamp Counter.
-static __inline__ unsigned long long RDTSC(void)
+static __inline__ unsigned long long int RDTSC(void)
 {
 	unsigned Hi, Lo;
 
@@ -446,7 +446,7 @@ static __inline__ unsigned long long RDTSC(void)
 		:"=a" (Lo),
 		 "=d" (Hi)
 	);
-	return ((unsigned long long) Lo) | (((unsigned long long) Hi) << 32);
+	return ((unsigned long long int) Lo) | (((unsigned long long int) Hi) << 32);
 }
 
 // Architecture specifications helper functions.
@@ -463,7 +463,7 @@ double	ClockSpeed_Core()
 	int FD=0;
 	if( (FD=open("/dev/cpu/0/msr", O_RDONLY)) != -1) {
 		FSB_FREQ FSB={0};
-		Read_MSR(FD, MSR_FSB_FREQ, (unsigned long long *) &FSB);
+		Read_MSR(FD, MSR_FSB_FREQ, (unsigned long long int *) &FSB);
 		close(FD);
 
 		switch(FSB.Bus_Speed)
@@ -493,7 +493,7 @@ double	ClockSpeed_Core2()
 	int FD=0;
 	if( (FD=open("/dev/cpu/0/msr", O_RDONLY)) != -1) {
 		FSB_FREQ FSB={0};
-		Read_MSR(FD, MSR_FSB_FREQ, (unsigned long long *) &FSB);
+		Read_MSR(FD, MSR_FSB_FREQ, (unsigned long long int *) &FSB);
 		close(FD);
 
 		switch(FSB.Bus_Speed)
@@ -535,7 +535,7 @@ double	ClockSpeed_Atom()
 	int FD=0;
 	if( (FD=open("/dev/cpu/0/msr", O_RDONLY)) != -1) {
 		FSB_FREQ FSB={0};
-		Read_MSR(FD, MSR_FSB_FREQ, (unsigned long long *) &FSB);
+		Read_MSR(FD, MSR_FSB_FREQ, (unsigned long long int *) &FSB);
 		close(FD);
 
 		switch(FSB.Bus_Speed)
@@ -568,7 +568,7 @@ double	ClockSpeed_Silvermont()
 	int FD=0;
 	if( (FD=open("/dev/cpu/0/msr", O_RDONLY)) != -1) {
 		FSB_FREQ FSB={0};
-		Read_MSR(FD, MSR_FSB_FREQ, (unsigned long long *) &FSB);
+		Read_MSR(FD, MSR_FSB_FREQ, (unsigned long long int *) &FSB);
 		close(FD);
 
 		switch(FSB.Bus_Speed)
@@ -609,10 +609,10 @@ static void *uCycle_GenuineIntel(void *uArg)
 		if(A->P.Topology[cpu].CPU != NULL)
 		{
 			// Initial read of the Unhalted Core & Reference Cycles.
-			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_APERF, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].UCC);
-			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_MPERF, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].URC);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_APERF, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C0[0].UCC);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_MPERF, (unsigned long long int*) &A->P.Topology[cpu].CPU->Cycles.C0[0].URC);
 			// Initial read of the TSC in relation to the Logical Core.
-			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[0]);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.TSC[0]);
 			/* Initial read of other C-States.
 			ToDo*/
 		}
@@ -629,10 +629,10 @@ static void *uCycle_GenuineIntel(void *uArg)
 			if(A->P.Topology[cpu].CPU != NULL)
 			{
 				// Update the Unhalted Core & the Reference Cycles.
-				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_APERF, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].UCC);
-				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_MPERF, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_APERF, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C0[1].UCC);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_MPERF, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
 				// Update TSC.
-				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[1]);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.TSC[1]);
 				/* Update C-States.
 				ToDo*/
 			}
@@ -722,10 +722,10 @@ static void *uCycle_Core(void *uArg)
 		if(A->P.Topology[cpu].CPU != NULL)
 		{
 			// Initial read of the Unhalted Core & Reference Cycles.
-			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].UCC);
-			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].URC);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C0[0].UCC);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C0[0].URC);
 			// Initial read of the TSC in relation to the Logical Core.
-			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[0]);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.TSC[0]);
 			/* Initial read of other C-States.
 			ToDo*/
 		}
@@ -742,10 +742,10 @@ static void *uCycle_Core(void *uArg)
 			if(A->P.Topology[cpu].CPU != NULL)
 			{
 				// Update the Unhalted Core & the Reference Cycles.
-				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].UCC);
-				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C0[1].UCC);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
 				// Update TSC.
-				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[1]);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.TSC[1]);
 				/* Update C-States.
 				ToDo*/
 			}
@@ -843,13 +843,13 @@ static void *uCycle_Nehalem(void *uArg)
 		if(A->P.Topology[cpu].CPU != NULL)
 		{
 			// Initial read of the Unhalted Core & Reference Cycles.
-			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].UCC);
-			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[0].URC);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C0[0].UCC);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C0[0].URC);
 			// Initial read of the TSC in relation to the Logical Core.
-			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[0]);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.TSC[0]);
 			// Initial read of other C-States.
-			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C3[0]);
-			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C6[0]);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C3[0]);
+			Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C6[0]);
 		}
 	if(A->P.IdleTime < IDLE_COEF_MIN)	A->P.IdleTime=IDLE_COEF_MIN;
 	if(A->P.IdleTime > IDLE_COEF_MAX)	A->P.IdleTime=IDLE_COEF_MAX;
@@ -864,13 +864,13 @@ static void *uCycle_Nehalem(void *uArg)
 			if(A->P.Topology[cpu].CPU != NULL)
 			{
 				// Update the Unhalted Core & the Reference Cycles.
-				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].UCC);
-				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR1, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C0[1].UCC);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_FIXED_CTR2, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C0[1].URC);
 				// Update TSC.
-				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.TSC[1]);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, IA32_TIME_STAMP_COUNTER, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.TSC[1]);
 				// Update C-States.
-				Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C3[1]);
-				Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long *) &A->P.Topology[cpu].CPU->Cycles.C6[1]);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C3_RESIDENCY, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C3[1]);
+				Read_MSR(A->P.Topology[cpu].CPU->FD, MSR_CORE_C6_RESIDENCY, (unsigned long long int *) &A->P.Topology[cpu].CPU->Cycles.C6[1]);
 			}
 /* CRITICAL_OUT */
 
@@ -1016,7 +1016,7 @@ int	Read_SMBIOS(int structure, int instance, off_t offset, void *buf, size_t nby
 // Estimate the Bus Clock Frequency from the TSC.
 double	Compute_ExtClock(int Coef)
 {
-	unsigned long long TSC[2];
+	unsigned long long int TSC[2];
 	TSC[0]=RDTSC();
 	usleep(IDLE_BASE_USEC * Coef);
 	TSC[1]=RDTSC();
@@ -1316,13 +1316,13 @@ struct IMCINFO *IMC_Read_Info()
 
 	if(!iopl(3))
 	{
-		unsigned bus=0xff, dev=0x4, func=0;
+		unsigned int bus=0xff, dev=0x4, func=0;
 		outl(PCI_CONFIG_ADDRESS(bus, 3, 0, 0x48), 0xcf8);
 		int code=(inw(0xcfc + (0x48 & 2)) >> 8) & 0x7;
 		imc->ChannelCount=(code == 7 ? 3 : code == 4 ? 1 : code == 2 ? 1 : code == 1 ? 1 : 2);
 		imc->Channel=calloc(imc->ChannelCount, sizeof(struct CHANNEL));
 
-		unsigned cha=0;
+		unsigned int cha=0;
 		for(cha=0; cha < imc->ChannelCount; cha++)
 		{
 			unsigned int MRs=0, RANK_TIMING_B=0, BANK_TIMING=0, REFRESH_TIMING=0;
@@ -1734,7 +1734,7 @@ void	DrawIconButton(uARG *A, WBUTTON *wButton)
 }
 
 // Create a button, supplying the callback, the drawing & the collision functions.
-void	CreateButton(uARG *A, WBTYPE Type, char ID, int Target, int x, int y, unsigned int w, unsigned h, void *CallBack, RESOURCE *Resource)
+void	CreateButton(uARG *A, WBTYPE Type, char ID, int Target, int x, int y, unsigned int w, unsigned int h, void *CallBack, RESOURCE *Resource)
 {
 	WBUTTON *NewButton=calloc(1, sizeof(WBUTTON));
 
@@ -1897,7 +1897,7 @@ void	DrawCursor(uARG *A, int G, XPoint *Origin)
 }
 
 // Draw the shape for a window icon.
-void	DrawIconWindow(Display *display, Drawable drawable, GC gc, XRectangle *rect, unsigned long bg, unsigned long fg)
+void	DrawIconWindow(Display *display, Drawable drawable, GC gc, XRectangle *rect, unsigned long int bg, unsigned long int fg)
 {
 	XSetForeground(display, gc, bg);
 	XFillRectangle(display, drawable, gc, 0, 0, rect->width, rect->height);
@@ -2180,11 +2180,11 @@ void	StartSplash(uARG *A)
 		if(property != None)
 		{
 			struct {
-				unsigned long   flags,
-						functions,
-						decorations;
-				long		inputMode;
-				unsigned long	status;
+				unsigned long int	flags,
+							functions,
+							decorations;
+				long int		inputMode;
+				unsigned long int	status;
 				}
 					data={flags:2, functions:0, decorations:0, inputMode:0, status:0};
 
@@ -3089,11 +3089,11 @@ int	OpenWidgets(uARG *A)
 			XSetWMProtocols(A->display, A->W[G].window, &A->atom[0], 1);
 
 			struct {
-				unsigned long   flags,
-						functions,
-						decorations;
-				long		inputMode;
-				unsigned long	status;
+				unsigned long int	flags,
+							functions,
+							decorations;
+				long int		inputMode;
+				unsigned long int	status;
 				}
 				wmProp={flags:(1L << 1), functions:0, decorations:0, inputMode:0, status:0};
 
@@ -3523,7 +3523,7 @@ void	BuildLayout(uARG *A, int G)
 
 				if(A->M != NULL)	// Is the IMC found ?
 				{
-					unsigned cha=0;
+					unsigned int cha=0;
 					for(cha=0; cha < A->M->ChannelCount; cha++)
 					{
 						sprintf(str, CAS_FORMAT,
@@ -3646,7 +3646,7 @@ void	DrawLayout(uARG *A, int G)
 				{
 					// Select a color based ratio.
 					const struct {
-						unsigned long Bg, Fg;
+						unsigned long int Bg, Fg;
 					} Bar[10]
 					= {
 						{A->L.Colors[COLOR_INIT_VALUE].RGB, A->L.Colors[COLOR_DYNAMIC].RGB},
@@ -4976,8 +4976,8 @@ static void *uLoop(uARG *A)
 int	LoadSettings(uARG *A, int argc, char *argv[])
 {
 	XrmDatabase xdb=NULL;
-	char *xtype;
-	XrmValue xvalue;
+	char *xtype=NULL;
+	XrmValue xvalue={0, NULL};
 	char xrmKey[32]={0};
 	int i=0, j=0, G=0;
 	bool noerr=true;
@@ -5000,7 +5000,8 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 	if(xdb != NULL)
 	{
 		for(i=0; i < OPTIONS_COUNT; i++)
-			if((A->Options[i].xrmName != NULL) && XrmGetResource(xdb, A->Options[i].xrmName, NULL, &xtype, &xvalue))
+			if((A->Options[i].xrmName != NULL)
+			 && XrmGetResource(xdb, A->Options[i].xrmName, NULL, &xtype, &xvalue))
 				sscanf(xvalue.addr, A->Options[i].format, A->Options[i].pointer);
 
 		for(i=0; i < COLOR_COUNT; i++)
@@ -5213,13 +5214,13 @@ int main(int argc, char *argv[])
 				},
 				Features: {
 					VendorID:{0},
-					Std:{{0}},
+					Std:{AX:{0}, BX:{0}, CX:{0}, DX:{0}},
 					ThreadCount:0,
-					Thermal_Power_Leaf:{{0}},
-					Perf_Monitoring_Leaf:{{0}},
-					ExtFeature:{{0}},
+					Thermal_Power_Leaf:{AX:{0}, BX:{0}, CX:{0}, DX:{0}},
+					Perf_Monitoring_Leaf:{AX:{0}, BX:{0}, CX:{0}, DX:{0}},
+					ExtFeature:{AX:{0}, BX:{0}, CX:0, DX:0},
 					LargestExtFunc:0,
-					ExtFunc:{{0}},
+					ExtFunc:{CX:{0}, DX:{0}},
 					BrandString:{0},
 					InvariantTSC:false,
 					HTT_enabled:false,

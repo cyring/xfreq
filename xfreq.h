@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.27 SR1 by CyrIng
+ * XFreq.h #0.27 SR2 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -8,7 +8,7 @@
 #define	_APPNAME "XFreq"
 #define _MAJOR   "0"
 #define _MINOR   "27"
-#define _NIGHTLY "1"
+#define _NIGHTLY "2"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 
@@ -27,7 +27,7 @@ typedef struct
 	{
 		struct SIGNATURE
 		{
-			unsigned
+			unsigned int
 			Stepping	:  4-0,
 			Model		:  8-4,
 			Family		: 12-8,
@@ -39,7 +39,7 @@ typedef struct
 		} AX;
 		struct
 		{
-			unsigned
+			unsigned int
 			Brand_ID	:  8-0,
 			CLFSH_Size	: 16-8,
 			MaxThread	: 24-16,
@@ -47,7 +47,7 @@ typedef struct
 		} BX;
 		struct
 		{
-			unsigned
+			unsigned int
 			SSE3	:  1-0,
 			PCLMULDQ:  2-1,
 			DTES64	:  3-2,
@@ -83,7 +83,7 @@ typedef struct
 		} CX;
 		struct
 		{
-			unsigned
+			unsigned int
 			FPU	:  1-0,
 			VME	:  2-1,
 			DE	:  3-2,
@@ -118,12 +118,12 @@ typedef struct
 			PBE	: 32-31;
 		} DX;
 	} Std;
-	unsigned	ThreadCount;
+	unsigned int	ThreadCount;
 	struct
 	{
 		struct
 		{
-			unsigned
+			unsigned int
 			DTS	:  1-0,
 			TurboIDA:  2-1,
 			ARAT	:  3-2,
@@ -135,13 +135,13 @@ typedef struct
 		} AX;
 		struct
 		{
-			unsigned
+			unsigned int
 			Threshld:  4-0,
 			Unused1	: 32-4;
 		} BX;
 		struct
 		{
-			unsigned
+			unsigned int
 			HCF_Cap	:  1-0,
 			ACNT_Cap:  2-1,
 			Unused1	:  3-2,
@@ -150,7 +150,7 @@ typedef struct
 		} CX;
 		struct
 		{
-			unsigned
+			unsigned int
 			Unused1	: 32-0;
 		} DX;
 	} Thermal_Power_Leaf;
@@ -158,7 +158,7 @@ typedef struct
 	{
 		struct
 		{
-			unsigned
+			unsigned int
 			Version	:  8-0,
 			MonCtrs	: 16-8,
 			MonWidth: 24-16,
@@ -166,7 +166,7 @@ typedef struct
 		} AX;
 		struct
 		{
-			unsigned
+			unsigned int
 			CoreCycl:  1-0,
 			InRetire:  2-1,
 			RefCycle:  3-2,
@@ -178,12 +178,12 @@ typedef struct
 		} BX;
 		struct
 		{
-			unsigned
+			unsigned int
 			Unused1	: 32-0;
 		} CX;
 		struct
 		{
-			unsigned
+			unsigned int
 			FixCtrs	:  5-0,
 			FixWidth: 13-5,
 			Unused1	: 32-13;
@@ -193,12 +193,12 @@ typedef struct
 	{
 		struct
 		{
-			unsigned
+			unsigned int
 			MaxSubLeaf	: 32-0;
 		} AX;
 		struct
 		{
-			unsigned
+			unsigned int
 			FSGSBASE	:  1-0,
 			TSC_ADJUST	:  2-1,
 			Unused1		:  3-2,
@@ -215,23 +215,23 @@ typedef struct
 			FPU_CS_DS	: 14-13,
 			Unused3		: 32-14;
 		} BX;
-			unsigned
+			unsigned int
 		CX			: 32-0,
 		DX			: 32-0;
 
 	} ExtFeature;
-	unsigned	LargestExtFunc;
+	unsigned int	LargestExtFunc;
 	struct
 	{
 		struct
 		{
-			unsigned
+			unsigned int
 			LAHFSAHF:  1-0,
 			Unused1	: 32-1;
 		} CX;
 		struct
 		{
-			unsigned
+			unsigned int
 			Unused1	: 11-0,
 			SYSCALL	: 12-11,
 			Unused2	: 20-12,
@@ -253,38 +253,38 @@ typedef	struct {
 		union {
 			struct
 			{
-				unsigned
+				unsigned int
 				SHRbits	:  5-0,
 				Unused1	: 32-5;
 			};
-			unsigned Register;
+			unsigned int Register;
 		} AX;
 		union {
 			struct
 			{
-				unsigned
+				unsigned int
 				Threads	: 16-0,
 				Unused1	: 32-16;
 			};
-			unsigned Register;
+			unsigned int Register;
 		} BX;
 		union {
 			struct
 			{
-				unsigned
+				unsigned int
 				Level	:  8-0,
 				Type	: 16-8,
 				Unused1 : 32-16;
 			};
-			unsigned Register;
+			unsigned int Register;
 		} CX;
 		union {
 			struct
 			{
-				unsigned
+				unsigned int
 				 x2APIC_ID: 32-0;
 			};
-			unsigned Register;
+			unsigned int Register;
 		} DX;
 } CPUID_TOPOLOGY;
 
@@ -297,12 +297,12 @@ typedef	struct {
 
 struct IMCINFO
 {
-	unsigned ChannelCount;
+	unsigned int ChannelCount;
 	struct CHANNEL
 	{
 		struct
 		{
-			unsigned
+			unsigned int
 			tCL,
 			tRCD,
 			tRP,
@@ -355,7 +355,7 @@ struct IMCINFO
 
 typedef	struct
 {
-	unsigned long long
+	unsigned long long int
 		ReservedBits1	:  8-0,
 		MaxBusRatio	: 13-8,
 		ReservedBits2	: 50-13,
@@ -365,14 +365,14 @@ typedef	struct
 
 typedef	struct
 {
-	unsigned long long
+	unsigned long long int
 		Bus_Speed	:  3-0,
 		ReservedBits	: 64-3;
 } FSB_FREQ;
 
 typedef	struct
 {
-	unsigned long long
+	unsigned long long int
 		CurrentRatio	: 16-0,
 		ReservedBits1	: 31-16,
 		XE		: 32-31,
@@ -385,7 +385,7 @@ typedef	struct
 
 typedef struct
 {
-	unsigned long long
+	unsigned long long int
 		ReservedBits1	:  8-0,
 		MaxNonTurboRatio: 16-8,
 		ReservedBits2	: 28-16,
@@ -402,7 +402,7 @@ typedef struct
 
 typedef struct
 {
-	unsigned long long
+	unsigned long long int
 		MaxRatio_1C	:  8-0,
 		MaxRatio_2C	: 16-8,
 		MaxRatio_3C	: 24-16,
@@ -415,7 +415,7 @@ typedef struct
 
 typedef	struct
 {
-	unsigned long long
+	unsigned long long int
 		FastStrings	:  1-0,
 		ReservedBits1	:  3-1,
 		TCC		:  4-3,
@@ -442,7 +442,7 @@ typedef	struct
 
 typedef struct
 {
-	unsigned long long
+	unsigned long long int
 		EN_PMC0		:  1-0,
 		EN_PMC1		:  2-1,
 		ReservedBits1	: 32-2,
@@ -454,7 +454,7 @@ typedef struct
 
 typedef struct
 {
-	unsigned long long
+	unsigned long long int
 		EN0_OS		:  1-0,
 		EN0_Usr		:  2-1,
 		AnyThread_EN0	:  3-2,
@@ -472,7 +472,7 @@ typedef struct
 
 typedef struct
 {
-	unsigned long long
+	unsigned long long int
 		Overflow_PMC0	:  1-0,
 		Overflow_PMC1	:  2-1,
 		Overflow_PMC2	:  3-2,
@@ -489,7 +489,7 @@ typedef struct
 
 typedef	struct
 {
-	unsigned long long
+	unsigned long long int
 		Clear_Ovf_PMC0	:  1-0,
 		Clear_Ovf_PMC1	:  2-1,
 		ReservedBits1	: 32-2,
@@ -508,7 +508,7 @@ typedef	struct
 
 typedef struct
 {
-	unsigned long long
+	unsigned long long int
 		HighTempEnable	:  1-0,
 		LowTempEnable	:  2-1,
 		PROCHOTEnable	:  3-2,
@@ -525,8 +525,8 @@ typedef struct
 
 typedef struct
 {
-	unsigned long long
-		Status		:  1-0,
+	unsigned long long int
+		StatusBit	:  1-0,
 		StatusLog	:  2-1,
 		PROCHOT		:  3-2,
 		PROCHOTLog	:  4-3,
@@ -548,7 +548,7 @@ typedef struct
 
 typedef struct
 {
-	unsigned long long
+	unsigned long long int
 		ReservedBits1	: 16-0,
 		Target		: 24-16,
 		ReservedBits2	: 64-24;
@@ -624,7 +624,7 @@ enum {	GenuineIntel,		\
 #define	_Haswell_ULT			{ExtFamily:0x0, Family:0x6, ExtModel:0x4, Model:0x5}
 #define	_Haswell_ULX			{ExtFamily:0x0, Family:0x6, ExtModel:0x4, Model:0x6}
 
-typedef	const struct
+typedef	struct
 {
 	struct	SIGNATURE	Signature;
 		unsigned int	MaxOfCores;
@@ -643,11 +643,11 @@ typedef	struct {
 			struct {
 				struct
 				{
-				unsigned long long
+				unsigned long long int
 					UCC,
 					URC;
 				}		C0[2];
-				unsigned long long
+				unsigned long long int
 						C3[2],
 						C6[2],
 						TSC[2];
@@ -655,11 +655,11 @@ typedef	struct {
 			struct {
 				struct
 				{
-				unsigned long long
+				unsigned long long int
 					UCC,
 					URC;
 				}		C0;
-				unsigned long long
+				unsigned long long int
 						C3,
 						C6,
 						TSC;
@@ -821,8 +821,8 @@ typedef	enum {
 
 typedef	struct
 {
-	long long	nsec_high;
-	long		nsec_low;
+	long long int	nsec_high;
+	long int	nsec_low;
 } RUNTIME;
 
 typedef	struct
@@ -835,7 +835,7 @@ typedef	struct
 			char		comm[TASK_COMM_LEN + 1];
 			int		pid;
 			RUNTIME		vruntime;
-			long long	nvcsw;			/* sum of [non]voluntary context switch counts */
+			long long int	nvcsw;			/* sum of [non]voluntary context switch counts */
 			int		prio;
 			RUNTIME		exec_vruntime;		/* a duplicate of vruntime ? */
 			RUNTIME		sum_exec_runtime;
@@ -1361,7 +1361,7 @@ typedef struct
 		int		KeyLength;
 	} Input;
 	char			*Output;
-	unsigned long		globalBackground,
+	unsigned long int	globalBackground,
 				globalForeground;
 	COLORS			Colors[COLOR_COUNT];
 } LAYOUT;
