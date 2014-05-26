@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.27 SR2 by CyrIng
+ * XFreq.h #0.28 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -7,8 +7,8 @@
 
 #define	_APPNAME "XFreq"
 #define _MAJOR   "0"
-#define _MINOR   "27"
-#define _NIGHTLY "2"
+#define _MINOR   "28"
+#define _NIGHTLY "0"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 
@@ -1043,6 +1043,7 @@ typedef struct
 			icon;
 	int		x, y,
 			w, h;
+	short int	attributes;
 } XSPLASH;
 
 //			L-CTRL		L-ALT		R-CTRL		L-WIN		R-ALTGR
@@ -1334,8 +1335,7 @@ typedef struct
 				flashCursor,
 				alwaysOnTop,
 				noDecorations,
-				skipTaskbar,
-				hideSplash;
+				skipTaskbar;
 	} Play;
 	struct {;
 		int		Scroll,
@@ -1366,8 +1366,10 @@ typedef struct
 	COLORS			Colors[COLOR_COUNT];
 } LAYOUT;
 
-#define	_IS_MDI_	(A->MDI != false)
+#define	_IS_MDI_		(A->MDI != false)
 
+#define	SPLASH_HIDDEN_FLAG	((A.Splash.attributes & 0x1000) >> 12)
+#define	SPLASH_DEFERRED_TIME	(__useconds_t) (A.Splash.attributes & 0xFFF)
 
 #define	XDB_SETTINGS_FILE	".xfreq"
 #define	XDB_CLASS_MAIN		"Main"

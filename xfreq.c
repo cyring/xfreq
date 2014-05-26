@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.27 SR2 by CyrIng
+ * XFreq.c #0.28 SR0 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -1446,9 +1446,6 @@ static void *uSchedule(void *uArg)
 			{
 				if((sscanf(buffer, SCHED_CPU_SECTION, &cpu) > 0) && (cpu >= 0) && (cpu < A->P.CPU))
 				{
-/* TRACE BEGIN //
-					printf(	"CPU#%d\n", cpu);
-// TRACE END */
 					while(fgets(buffer, sizeof(buffer), fSD) != NULL)
 					{
 						if((buffer[0] == '\n') || (sscanf(buffer, schedPidFmt, &oTask.pid) > 0))
@@ -1544,25 +1541,6 @@ static void *uSchedule(void *uArg)
 										else
 											break;
 									}
-/* TRACE BEGIN //
-									for(depth=0; depth < TASK_PIPE_DEPTH; depth++)
-										printf(	TASK_STRUCT_FORMAT"\n",
-											A->S.Pipe[cpu].Task[depth].state,
-											A->S.Pipe[cpu].Task[depth].comm,
-											A->S.Pipe[cpu].Task[depth].pid,
-											A->S.Pipe[cpu].Task[depth].vruntime.nsec_high,
-											A->S.Pipe[cpu].Task[depth].vruntime.nsec_low,
-											A->S.Pipe[cpu].Task[depth].nvcsw,
-											A->S.Pipe[cpu].Task[depth].prio,
-											A->S.Pipe[cpu].Task[depth].exec_vruntime.nsec_high,
-											A->S.Pipe[cpu].Task[depth].exec_vruntime.nsec_low,
-											A->S.Pipe[cpu].Task[depth].sum_exec_runtime.nsec_high,
-											A->S.Pipe[cpu].Task[depth].sum_exec_runtime.nsec_low,
-											A->S.Pipe[cpu].Task[depth].sum_sleep_runtime.nsec_high,
-											A->S.Pipe[cpu].Task[depth].sum_sleep_runtime.nsec_low,
-											A->S.Pipe[cpu].Task[depth].node,
-											A->S.Pipe[cpu].Task[depth].group_path);
-// TRACE END */
 									break;
 								}
 							}
@@ -3387,9 +3365,9 @@ void	BuildLayout(uARG *A, int G)
 			if(A->L.Page[G].Pageable)
 			{
 				char 		*items=calloc(8192, 1);
-				const char	powered[2]={'N', 'Y'},
-						*enabled[2]={"OFF", "ON"},
-						*ClockSrcStr[SRC_COUNT]={"TSC", "BIOS", "SPEC", "ROM", "USER"};
+				#define		powered(bit) ((bit == 1) ? 'Y' : 'N')
+				#define		enabled(bit) ((bit == 1) ? "ON" : "OFF")
+				const char	*ClockSrcStr[SRC_COUNT]={"TSC", "BIOS", "SPEC", "ROM", "USER"};
 
 				sprintf(items, PROC_FORMAT,
 					A->P.Features.BrandString,
@@ -3399,82 +3377,82 @@ void	BuildLayout(uARG *A, int G)
 					A->P.Features.Std.AX.Stepping,
 					A->P.Features.ThreadCount,
 					A->P.Arch[A->P.ArchID].Architecture,
-					powered[A->P.Features.Std.DX.VME],
-					powered[A->P.Features.Std.DX.DE],
-					powered[A->P.Features.Std.DX.PSE],
-					A->P.Features.InvariantTSC ? "INVARIANT":"VARIANT",	powered[A->P.Features.Std.DX.TSC],
-					powered[A->P.Features.Std.DX.MSR],			enabled[A->MSR],
-					powered[A->P.Features.Std.DX.PAE],
-					powered[A->P.Features.Std.DX.APIC],
-					powered[A->P.Features.Std.DX.MTRR],
-					powered[A->P.Features.Std.DX.PGE],
-					powered[A->P.Features.Std.DX.MCA],
-					powered[A->P.Features.Std.DX.PAT],
-					powered[A->P.Features.Std.DX.PSE36],
-					powered[A->P.Features.Std.DX.PSN],
-					powered[A->P.Features.Std.DX.DS_PEBS],			enabled[!A->P.MiscFeatures.PEBS],
-					powered[A->P.Features.Std.DX.ACPI],
-					powered[A->P.Features.Std.DX.SS],
-					powered[A->P.Features.Std.DX.HTT],			enabled[A->P.Features.HTT_enabled],
-					powered[A->P.Features.Std.DX.TM1],
-					powered[A->P.Features.Std.CX.TM2],
-					powered[A->P.Features.Std.DX.PBE],
-					powered[A->P.Features.Std.CX.DTES64],
-					powered[A->P.Features.Std.CX.DS_CPL],
-					powered[A->P.Features.Std.CX.VMX],
-					powered[A->P.Features.Std.CX.SMX],
-					powered[A->P.Features.Std.CX.EIST],			enabled[A->P.MiscFeatures.EIST],
-					powered[A->P.Features.Std.CX.CNXT_ID],
-					powered[A->P.Features.Std.CX.FMA],
-					powered[A->P.Features.Std.CX.xTPR],			enabled[!A->P.MiscFeatures.xTPR],
-					powered[A->P.Features.Std.CX.PDCM],
-					powered[A->P.Features.Std.CX.PCID],
-					powered[A->P.Features.Std.CX.DCA],
-					powered[A->P.Features.Std.CX.x2APIC],
-					powered[A->P.Features.Std.CX.TSCDEAD],
-					powered[A->P.Features.Std.CX.XSAVE],
-					powered[A->P.Features.Std.CX.OSXSAVE],
-					powered[A->P.Features.ExtFunc.DX.XD_Bit],		enabled[!A->P.MiscFeatures.XD_Bit],
-					powered[A->P.Features.ExtFunc.DX.PG_1GB],
-					powered[A->P.Features.ExtFeature.BX.HLE],
-					powered[A->P.Features.ExtFeature.BX.RTM],
-					powered[A->P.Features.ExtFeature.BX.FastStrings],	enabled[A->P.MiscFeatures.FastStrings],
-					powered[A->P.Features.Thermal_Power_Leaf.AX.DTS],
-												enabled[A->P.MiscFeatures.TCC],
-												enabled[A->P.MiscFeatures.PerfMonitoring],
-												enabled[!A->P.MiscFeatures.BTS],
-												enabled[A->P.MiscFeatures.CPUID_MaxVal],
-					powered[A->P.Features.Thermal_Power_Leaf.AX.TurboIDA],	enabled[!A->P.MiscFeatures.Turbo_IDA],
+					powered(A->P.Features.Std.DX.VME),
+					powered(A->P.Features.Std.DX.DE),
+					powered(A->P.Features.Std.DX.PSE),
+					A->P.Features.InvariantTSC ? "INVARIANT":"VARIANT",	powered(A->P.Features.Std.DX.TSC),
+					powered(A->P.Features.Std.DX.MSR),			enabled(A->MSR),
+					powered(A->P.Features.Std.DX.PAE),
+					powered(A->P.Features.Std.DX.APIC),
+					powered(A->P.Features.Std.DX.MTRR),
+					powered(A->P.Features.Std.DX.PGE),
+					powered(A->P.Features.Std.DX.MCA),
+					powered(A->P.Features.Std.DX.PAT),
+					powered(A->P.Features.Std.DX.PSE36),
+					powered(A->P.Features.Std.DX.PSN),
+					powered(A->P.Features.Std.DX.DS_PEBS),			enabled(!A->P.MiscFeatures.PEBS),
+					powered(A->P.Features.Std.DX.ACPI),
+					powered(A->P.Features.Std.DX.SS),
+					powered(A->P.Features.Std.DX.HTT),			enabled(A->P.Features.HTT_enabled),
+					powered(A->P.Features.Std.DX.TM1),
+					powered(A->P.Features.Std.CX.TM2),
+					powered(A->P.Features.Std.DX.PBE),
+					powered(A->P.Features.Std.CX.DTES64),
+					powered(A->P.Features.Std.CX.DS_CPL),
+					powered(A->P.Features.Std.CX.VMX),
+					powered(A->P.Features.Std.CX.SMX),
+					powered(A->P.Features.Std.CX.EIST),			enabled(A->P.MiscFeatures.EIST),
+					powered(A->P.Features.Std.CX.CNXT_ID),
+					powered(A->P.Features.Std.CX.FMA),
+					powered(A->P.Features.Std.CX.xTPR),			enabled(!A->P.MiscFeatures.xTPR),
+					powered(A->P.Features.Std.CX.PDCM),
+					powered(A->P.Features.Std.CX.PCID),
+					powered(A->P.Features.Std.CX.DCA),
+					powered(A->P.Features.Std.CX.x2APIC),
+					powered(A->P.Features.Std.CX.TSCDEAD),
+					powered(A->P.Features.Std.CX.XSAVE),
+					powered(A->P.Features.Std.CX.OSXSAVE),
+					powered(A->P.Features.ExtFunc.DX.XD_Bit),		enabled(!A->P.MiscFeatures.XD_Bit),
+					powered(A->P.Features.ExtFunc.DX.PG_1GB),
+					powered(A->P.Features.ExtFeature.BX.HLE),
+					powered(A->P.Features.ExtFeature.BX.RTM),
+					powered(A->P.Features.ExtFeature.BX.FastStrings),	enabled(A->P.MiscFeatures.FastStrings),
+					powered(A->P.Features.Thermal_Power_Leaf.AX.DTS),
+												enabled(A->P.MiscFeatures.TCC),
+												enabled(A->P.MiscFeatures.PerfMonitoring),
+												enabled(!A->P.MiscFeatures.BTS),
+												enabled(A->P.MiscFeatures.CPUID_MaxVal),
+					powered(A->P.Features.Thermal_Power_Leaf.AX.TurboIDA),	enabled(!A->P.MiscFeatures.Turbo_IDA),
 
 					A->P.Boost[0], A->P.Boost[1], A->P.Boost[2], A->P.Boost[3], A->P.Boost[4], A->P.Boost[5], A->P.Boost[6], A->P.Boost[7], A->P.Boost[8], A->P.Boost[9],
 
-					powered[A->P.Features.Std.DX.FPU],
-					powered[A->P.Features.Std.DX.CX8],
-					powered[A->P.Features.Std.DX.SEP],
-					powered[A->P.Features.Std.DX.CMOV],
-					powered[A->P.Features.Std.DX.CLFSH],
-					powered[A->P.Features.Std.DX.MMX],
-					powered[A->P.Features.Std.DX.FXSR],
-					powered[A->P.Features.Std.DX.SSE],
-					powered[A->P.Features.Std.DX.SSE2],
-					powered[A->P.Features.Std.CX.SSE3],
-					powered[A->P.Features.Std.CX.SSSE3],
-					powered[A->P.Features.Std.CX.SSE41],
-					powered[A->P.Features.Std.CX.SSE42],
-					powered[A->P.Features.Std.CX.PCLMULDQ],
-					powered[A->P.Features.Std.CX.MONITOR],			enabled[A->P.MiscFeatures.FSM],
-					powered[A->P.Features.Std.CX.CX16],
-					powered[A->P.Features.Std.CX.MOVBE],
-					powered[A->P.Features.Std.CX.POPCNT],
-					powered[A->P.Features.Std.CX.AES],
-					powered[A->P.Features.Std.CX.AVX], powered[A->P.Features.ExtFeature.BX.AVX2],
-					powered[A->P.Features.Std.CX.F16C],
-					powered[A->P.Features.Std.CX.RDRAND],
-					powered[A->P.Features.ExtFunc.CX.LAHFSAHF],
-					powered[A->P.Features.ExtFunc.DX.SYSCALL],
-					powered[A->P.Features.ExtFunc.DX.RDTSCP],
-					powered[A->P.Features.ExtFunc.DX.IA64],
-					powered[A->P.Features.ExtFeature.BX.BMI1], powered[A->P.Features.ExtFeature.BX.BMI2]);
+					powered(A->P.Features.Std.DX.FPU),
+					powered(A->P.Features.Std.DX.CX8),
+					powered(A->P.Features.Std.DX.SEP),
+					powered(A->P.Features.Std.DX.CMOV),
+					powered(A->P.Features.Std.DX.CLFSH),
+					powered(A->P.Features.Std.DX.MMX),
+					powered(A->P.Features.Std.DX.FXSR),
+					powered(A->P.Features.Std.DX.SSE),
+					powered(A->P.Features.Std.DX.SSE2),
+					powered(A->P.Features.Std.CX.SSE3),
+					powered(A->P.Features.Std.CX.SSSE3),
+					powered(A->P.Features.Std.CX.SSE41),
+					powered(A->P.Features.Std.CX.SSE42),
+					powered(A->P.Features.Std.CX.PCLMULDQ),
+					powered(A->P.Features.Std.CX.MONITOR),			enabled(A->P.MiscFeatures.FSM),
+					powered(A->P.Features.Std.CX.CX16),
+					powered(A->P.Features.Std.CX.MOVBE),
+					powered(A->P.Features.Std.CX.POPCNT),
+					powered(A->P.Features.Std.CX.AES),
+					powered(A->P.Features.Std.CX.AVX), powered(A->P.Features.ExtFeature.BX.AVX2),
+					powered(A->P.Features.Std.CX.F16C),
+					powered(A->P.Features.Std.CX.RDRAND),
+					powered(A->P.Features.ExtFunc.CX.LAHFSAHF),
+					powered(A->P.Features.ExtFunc.DX.SYSCALL),
+					powered(A->P.Features.ExtFunc.DX.RDTSCP),
+					powered(A->P.Features.ExtFunc.DX.IA64),
+					powered(A->P.Features.ExtFeature.BX.BMI1), powered(A->P.Features.ExtFeature.BX.BMI2));
 
 				sprintf(str, TOPOLOGY_SECTION, A->P.OnLine);
 				strcat(items, str);
@@ -3487,11 +3465,11 @@ void	BuildLayout(uARG *A, int G)
 							A->P.Topology[cpu].APIC_ID,
 							A->P.Topology[cpu].Core_ID,
 							A->P.Topology[cpu].Thread_ID,
-							enabled[1]);
+							enabled(1));
 					else
 						sprintf(str, "%03u        -       -       -   [%3s]\n",
 							cpu,
-							enabled[0]);
+							enabled(0));
 					strcat(items, str);
 				}
 
@@ -5106,8 +5084,9 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 				printf("\t%s\t%s\n", A->Options[i].argument, A->Options[i].manual);
 
 			printf(	"\t-A\tPrint out the built-in architectures\n" \
+				"\t-v\tPrint version information\n" \
 				"\nExit status:\n0\tif OK,\n1\tif problems,\n2\tif serious trouble.\n" \
-				"\nReport bugs to webmaster@cyring.fr\n");
+				"\nReport bugs to xfreq[at]cyring.fr\n");
 		}
 		else if(!strcmp(argv[1], "-A"))
 		{
@@ -5121,6 +5100,8 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 					A->P.Arch[i].Signature.ExtModel, A->P.Arch[i].Signature.Model,
 					A->P.Arch[i].MaxOfCores, A->P.Arch[i].ClockSpeed());
 		}
+		else if(!strcmp(argv[1], "-v"))
+			printf(Version);
 		else
 		{
 			if(j > 0)
@@ -5248,7 +5229,7 @@ int main(int argc, char *argv[])
 				SchedAttr:SORT_FIELD_NONE,
 				IdleTime:IDLE_SCHED_DEF,
 			},
-			Splash: {window:0, gc:0, x:0, y:0, w:splash_width + (splash_width >> 2), h:splash_height << 1},
+			Splash: {window:0, gc:0, x:0, y:0, w:splash_width + (splash_width >> 2), h:splash_height << 1, attributes:0x1000},
 			W: {
 				// MAIN
 				{
@@ -5520,7 +5501,6 @@ int main(int argc, char *argv[])
 					flashCursor:true,
 					alwaysOnTop: false,
 					noDecorations: false,
-					hideSplash:false,
 				},
 				WB: {
 					Scroll:0,
@@ -5557,13 +5537,13 @@ int main(int argc, char *argv[])
 			{
 				{"-C", "%ms", &A.configFile,           "Path & file configuration name (String)\n" \
 				                                       "\t\t  this option must be first\n" \
-				                                       "\t\t  default is $HOME/.xfreq",                                        NULL                                       },
+				                                       "\t\t  default is '$HOME/.xfreq'",                                      NULL                                       },
 				{"-D", "%d",  &A.MDI,                  "Run as a MDI Window (Bool) [0/1]",                                     NULL                                       },
 				{"-U", "%x",  &A.L.UnMapBitmask,       "Bitmap of unmap Widgets (Hex) eq. 0b00111111\n" \
 								       "\t\t  where each bit set in the argument is a hidden Widget",          NULL                                       },
 				{"-F", "%s",  A.fontName,              "Font name (String)\n" \
 				                                       "\t\t  default font is 'Fixed'",                                        XDB_CLASS_MAIN"."XDB_KEY_FONT              },
-				{"-x", "%c",  &A.xACL,                 "Enable or disable the X ACL (Char) [Y/N]",                             NULL                                       },
+				{"-x", "%c",  &A.xACL,                 "Enable or disable the X ACL (Char) ['Y'/'N']",                         NULL                                       },
 				{"-g", "%ms", &A.Geometries,           "Widgets geometries (String)\n" \
 				                                       "\t\t  argument is a series of '[cols]x[rows]+[x]+[y], .. ,'",          NULL                                       },
 				{"-b", "%x",  &A.L.globalBackground,   "Background color (Hex) {RGB}\n" \
@@ -5582,14 +5562,15 @@ int main(int argc, char *argv[])
 				{"-y", "%u",  &A.L.Play.cycleValues,   "Show the Core Cycles (Bool) [0/1]",                                    XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
 				{"-r", "%u",  &A.L.Play.ratioValues,   "Show the Core Ratio (Bool) [0/1]",                                     XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
 				{"-t", "%x",  &A.S.SchedAttr,          "Task scheduling monitoring sorted by 0x{R}0{N} (Hex)\n" \
-								       "\t\t  where {R} bit set to reverse sorting\n" \
-								       "\t\t  and {N} is a '/proc/sched_debug' field# from [0x1] to [0xb]",    XDB_CLASS_CORES"."XDB_KEY_PLAY_SCHEDULE    },
+								       "\t\t  where {R} bit:8 is set to reverse sorting\n" \
+								       "\t\t  and {N} is one '/proc/sched_debug' field# from [0x1] to [0xb]",  XDB_CLASS_CORES"."XDB_KEY_PLAY_SCHEDULE    },
 				{"-p", "%u",  &A.L.Play.cStatePercent, "Show the Core C-State percentage (Bool) [0/1]",                        XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
 				{"-w", "%u",  &A.L.Play.wallboard,     "Scroll the Processor brand wallboard (Bool) [0/1]",                    XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
 				{"-o", "%u",  &A.L.Play.alwaysOnTop,   "Keep the Widgets always on top of the screen (Bool) [0/1]",            NULL                                       },
 				{"-n", "%u",  &A.L.Play.noDecorations, "Remove the Window Manager decorations (Bool) [0/1]",                   NULL                                       },
 				{"-N", "%u",  &A.L.Play.skipTaskbar,   "Remove the Widgets title name from the WM taskbar (Bool) [0/1]",       NULL                                       },
-				{"-i", "%u",  &A.L.Play.hideSplash,    "Hide the splash screen (Bool) [0/1]",                                  NULL                                       },
+				{"-i", "%hx", &A.Splash.attributes,    "Splash screen attributs 0x{H}{NNN} (Hex)\n" \
+				                                       "\t\t  where {H} bit:11 hides Splash and {NNN} (usec) defers startup",  NULL                                       },
 			},
 		};
 	{
@@ -5622,8 +5603,11 @@ int main(int argc, char *argv[])
 			else
 				strcat(BootLog, "Remark: cannot start the signal handler.\n");
 
-			if(!A.L.Play.hideSplash)
+			if(!SPLASH_HIDDEN_FLAG)
 				StartSplash(&A);
+
+			if(SPLASH_DEFERRED_TIME > 0)
+				usleep(SPLASH_DEFERRED_TIME * IDLE_BASE_USEC);
 
 			if(!ROOT)
 				strcat(BootLog, "Warning: root permission is denied.\n");
@@ -5697,7 +5681,7 @@ int main(int argc, char *argv[])
 
 			SelectBaseClock(&A);
 
-			if(!A.L.Play.hideSplash)
+			if(!SPLASH_HIDDEN_FLAG)
 				StopSplash(&A);
 
 			if(OpenWidgets(&A))

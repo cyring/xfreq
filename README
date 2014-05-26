@@ -170,6 +170,11 @@
  *
  * [HISTORY]
  *
+ * R 0.28 : 05/26/2014 SR-0
+ *        - Added the '-v' option to print the version number.
+ *        - Enhanced the '-i' option with a Splash attributes argument which allows to hide the Window and to defer the startup time.
+ *        - Changed the bit field tests to avoid a potential stack overflow.
+ *
  * R 0.27 : 05/24/2014 SR-2
  *        - While reinforcing integer data type variables, then scanning for errors with Valgrind, raised a duplicated definition of 'Status'
  *            with the header file X11/Xlib.h. Thus in the THERM_STATUS structure, the field has been renamed to 'StatusBit'.
