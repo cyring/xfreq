@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.28 SR0 by CyrIng
+ * XFreq.c #0.28 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -5569,8 +5569,8 @@ int main(int argc, char *argv[])
 				{"-o", "%u",  &A.L.Play.alwaysOnTop,   "Keep the Widgets always on top of the screen (Bool) [0/1]",            NULL                                       },
 				{"-n", "%u",  &A.L.Play.noDecorations, "Remove the Window Manager decorations (Bool) [0/1]",                   NULL                                       },
 				{"-N", "%u",  &A.L.Play.skipTaskbar,   "Remove the Widgets title name from the WM taskbar (Bool) [0/1]",       NULL                                       },
-				{"-i", "%hx", &A.Splash.attributes,    "Splash screen attributs 0x{H}{NNN} (Hex)\n" \
-				                                       "\t\t  where {H} bit:11 hides Splash and {NNN} (usec) defers startup",  NULL                                       },
+				{"-i", "%hx", &A.Splash.attributes,    "Splash screen attributes 0x{H}{NNN} (Hex)\n" \
+				                                       "\t\t  where {H} bit:11 hides Splash and {NNN} (usec) defers start-up", NULL                                       },
 			},
 		};
 	{

@@ -1,5 +1,5 @@
 /*
- * XFreq.h #0.28 SR0 by CyrIng
+ * XFreq.h #0.28 SR1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
@@ -8,7 +8,7 @@
 #define	_APPNAME "XFreq"
 #define _MAJOR   "0"
 #define _MINOR   "28"
-#define _NIGHTLY "0"
+#define _NIGHTLY "1"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 

@@ -25,7 +25,7 @@
  * Makefile
  *
  *
- * 2- in a terminal, run the compilation of the source code
+ * 2- compile the source code
  *
  * make
  *
@@ -68,33 +68,32 @@
  * +---------------------------+-----------+--------------------------------------+
  *
  *
- * 2- if already logged into an X session as a regular user, you have to disable the X ACL using one of this two solutions.
+ * 2- if already logged into an X session as a regular user, you may have to disable the X ACL using one of this two solutions.
  *
- * xhost +
+ * 'xhost +'
+ * or
+ * './bin/xfreq -a N'
  *
- * ./bin/xfreq -a N
  *
- *
- * 3- then as root(with the X ACL already disabled), launch XFreq
+ * 3- then as root start XFreq
  *
  * ./bin/xfreq
  *
  *
  * Note:
  *   some DE, such as KDE, provides their all-in-one launcher which simplify the previous steps (2 & 3)
- *   try
- *       kdesu ./bin/xfreq
+ *   try 'kdesu ./bin/xfreq'
  *
  *
  *
  * [TESTBED]
  *
  * +-------------------+---------------------------+--------+-------+---------+
- * | Intel Processors  | System [Desktop/Laptop]   | Status |  Date | Release | Issue
+ * | Intel Processors  | System [Desktop/Laptop]   | Status |  Date | Release |
  * +-------------------+---------------------------+--------+-------+---------+
- * | Core i7-920       | Asus Rampage II Gene [D]  |   OK   |Nightly| Nightly | The ddd debugger has caught a SIGQUIT signal.
+ * | Core i7-920       | Asus Rampage II Gene [D]  |   OK   |Nightly| Nightly |
  * +-------------------+---------------------------+--------+-------+---------+
- * | Core 2 Duo T5500  | Acer Aspire 5633 [L]      |   OK   | 04/30 | 0.25-2  | random exit without dumping a core.
+ * | Core 2 Duo T5500  | Acer Aspire 5633 [L]      |   OK   | 04/30 | 0.25-2  |
  * +-------------------+---------------------------+--------+-------+---------+
  * + Core 2 Quad Q8200 | Unknown [L]               |   OK   | 05/02 + 0.25-2  |
  * +-------------------+---------------------------+--------+-------+---------+
@@ -113,7 +112,7 @@
  *
  * + Fast-Strings reported as not available in CPUID but enabled in MSR.
  *
- * + Memory leak related to XrmDatabase reported by Valgrind.
+ * + Ponctual memory leak related to XrmDatabase is reported by Valgrind.
  *
  *
  *
@@ -155,7 +154,6 @@
  * + gradiant coloring.
  * + screenshot key.
  * + resize footer separator w/ MDI.
- * + give a better disposal of the Widgets using % of screen size and absolute positions : In progress.
  * + discrete temperature graphic: per CPU.
  *
  *
@@ -169,6 +167,9 @@
  *
  *
  * [HISTORY]
+ *
+ * R 0.28 : 05/26/2014 SR-1
+ *        - Fixed some typos.
  *
  * R 0.28 : 05/26/2014 SR-0
  *        - Added the '-v' option to print the version number.
