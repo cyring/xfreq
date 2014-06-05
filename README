@@ -163,12 +163,30 @@
  * + provide some configure and install scripts, especially an ArchLinux PKGBUILD : In progress.
  * + split the code between GUI and hardware parts : postponed R 2.00
  * + release candidate.
+ * + The threads asynchronism is a mess, one needs to follow the guidelines
+ *   defined in http://www.cs.kent.edu/~ruttan/sysprog/lectures/multi-thread/multi-thread.html
  *
  *
  *
  * [HISTORY]
  *
- * R 0.28 : 05/26/2014 SR-1
+ * R 0.31 : 06/04/2014 [unpublished]
+ *        - XFreq for X11 is renamed to XFreq-Gui:
+ *            it has been ported to the SHM and since runs with the regular user permissions.
+ *        - Create a client as a code template. XFreq-Cli is a text mode client.
+ *        - The XFreq-Intel server is the only process which now requires the root permissions.
+ *        - Synchronization of the SHM using mutex and condition wait.
+ *
+ * R 0.30 : 05/29/2014 [unpublished]
+ *        - Split the code into Client/Server.
+ *        - Create a shared memory.
+ *        - Un/serialize the data into the SHM.
+ *
+ * R 0.29 : 05/28/2014 [unpublished]
+ *        - Mutex correction before rewriting the all part of the asynchronism.
+ *        - Enhanced the Help banner.
+ *
+ * R 0.28 : 05/26/2014 SR-1 [RC1]
  *        - Fixed some typos.
  *
  * R 0.28 : 05/26/2014 SR-0
