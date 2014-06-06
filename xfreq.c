@@ -1,5 +1,5 @@
 /*
- * XFreq.c #0.28 SR1 by CyrIng
+ * XFreq.c #1.00 RC1 by CyrIng
  *
  * Copyright (C) 2013-2014 CYRIL INGENIERIE
  * Licenses: GPL2
