@@ -1,0 +1,560 @@
+/*
+ * XFreq by CyrIng
+ *
+ *
+ * [PURPOSE]
+ *
+ * XFreq provides some Widgets to display the frequency (incl. turbo), the temperature, C-States and other features of the Intel Core i7, i5 processors.
+ * It also works with Core 2 architectures.
+ *
+ * Copyright (C) 2013-2014 CYRIL INGENIERIE
+ * http://blog.cyring.fr
+ *
+ * Licenses: GPL2
+ *
+ *
+ *
+ * [BUILD]
+ *
+ * 1- download the source code into a working directory
+ *
+ * xfreq.c
+ *
+ * xfreq.h
+ *
+ * Makefile
+ *
+ *
+ * 2- compile the source code
+ *
+ * make
+ *
+ *
+ * 3- the following output will be displayed
+ *
+ * +-------------------------------------------------------------------------------------+
+ * | Compiling : Done.                                                                   |
+ * | Linking   : Done.                                                                   |
+ * | Ready     : ./bin/xfreq                                                             |
+ * | --- Prerequisites ---                                                               |
+ * | 1- Super User privileges                                                            |
+ * | 2- Insert or modprobe the Kernel modules : dmi_sysfs (optional) and msr (mandatory) |
+ * | 3- Allow root access to the X Server (with the xhost + command for instance)        |
+ * +-------------------------------------------------------------------------------------+
+ *
+ *
+ * 4- depending of your packages distribution, the libraries required to compile the source code are the following
+ *
+ * XLIB developer (libX11)
+ *
+ * POSIX threads (pthreads)
+ *
+ *
+ *
+ * [RUN]
+ *
+ * 1- the following kernel modules and file systems are prerequisites to run XFreq
+ *
+ * +---------------------------+-----------+--------------------------------------+
+ * | msr.ko                    | mandatory | model specific registers (1)         |
+ * +---------------------------+-----------+--------------------------------------+
+ * | dmi-sysfs.ko              | optional  | DMI tables (2)                       |
+ * +---------------------------+-----------+--------------------------------------+
+ * | /proc/sched_debug         | optional  | reference: kernel/sched/debug.c      |
+ * +---------------------------+-----------+--------------------------------------+
+ * | /proc/<pid>/*             | optional  | reference: linux/fs/proc/base.c      |
+ * +---------------------------+-----------+--------------------------------------+
+ * | iopl                      | optional  | change I/O privilege level           |
+ * +---------------------------+-----------+--------------------------------------+
+ *
+ *
+ * 2- if already logged into an X session as a regular user, you may have to disable the X ACL using one of this two solutions.
+ *
+ * 'xhost +'
+ * or
+ * './bin/xfreq -a N'
+ *
+ *
+ * 3- then as root start XFreq
+ *
+ * ./bin/xfreq
+ *
+ *
+ * Note:
+ *   some DE, such as KDE, provides their all-in-one launcher which simplify the previous steps (2 & 3)
+ *   try 'kdesu ./bin/xfreq'
+ *
+ *
+ *
+ * [TESTBED]
+ *
+ * +-------------------+---------------------------+--------+-------+---------+
+ * | Intel Processors  | System [Desktop/Laptop]   | Status |  Date | Release |
+ * +-------------------+---------------------------+--------+-------+---------+
+ * | Core i7-920       | Asus Rampage II Gene [D]  |   OK   |Nightly| Nightly |
+ * +-------------------+---------------------------+--------+-------+---------+
+ * | Core 2 Duo T5500  | Acer Aspire 5633 [L]      |   OK   | 04/30 | 0.25-2  |
+ * +-------------------+---------------------------+--------+-------+---------+
+ * + Core 2 Quad Q8200 | Unknown [L]               |   OK   | 05/02 + 0.25-2  |
+ * +-------------------+---------------------------+--------+-------+---------+
+ *
+ *
+ *
+ * [ISSUE]
+ *
+ * + The live CD is too big (more than 500 MB).
+ *     So I packed other benchmark tools inside ;-)
+ *
+ * + The temperature thresholds MSR does not return any value.
+ *     Need to investigate ACPI.
+ *
+ * + V1 freeze after a long run. Probably due to a semaphore lock overload. So far limited to Core2
+ *
+ * + Fast-Strings reported as not available in CPUID but enabled in MSR.
+ *
+ * + Ponctual memory leak related to XrmDatabase is reported by Valgrind : Solved.
+ *
+ * + The RAM timings are wrong when running with FreeBSD.
+ *
+ *
+ *
+ * [TODO]
+ *
+ *  Hardware
+ * ----------
+ *
+ * + power energy performance counters
+ *
+ * + kernel module : to reduce cpu usage near to 0.01% : In Progress.
+ *     using mmap to transfer the complete RO data structure to userland.
+ *     compute the best idle sleep time.
+ *     change from "pull" to "push" with a "data is ready" event.
+ *
+ * + memory fetch : to remove dependancies with the dmi_sysfs & msr Linux modules.
+ *     using a R/O mmap to "/dev/mem".
+ *     rather use the msr assembler instruction.
+ *
+ * + GPU sensors.
+ *     compile with the NVIDIA (first), the AMD & Intel frameworks (seconds) ?
+ *
+ * + scripting, editor, push alarms : write user defined bit values in MSR.
+ *
+ *
+ *  Graphical
+ * -----------
+ *
+ * + power energy Widget using a slider to:
+ *     select a Policy Preference in IA32_ENERGY_PERF_BIAS , MSR_MISC_PWR_MGMT(0x1aa),
+ *     set On-Demand Clock Modulation in IA32_CLOCK_MODULATION(0x19a) (duplicated for each Thread),
+ *     enable / disable C1E in MSR_POWER_CTL(0x1fc),
+ *     C-State auto demotion with MSR_PKG_CST_CONFIG_CONTROL(0xe2).
+ * + some button-switchs & sliders to enable/disable/set the PKG/Core features in the System Info Widget.
+ * + full transparency & opacity.
+ * + integrate XCB, wayland ?
+ * + handle skins : Done. Colors only.
+ * + provide a processor usage history : Done.
+ * + gradiant coloring.
+ * + screenshot key.
+ * + resize footer separator w/ MDI.
+ * + discrete temperature graphic: per CPU : Done.
+ *
+ *
+ *  Source code
+ * -------------
+ * + clang compliant : rewrite code to remove any "warning: use of GNU old-style ..." : Done.
+ * + provide some configure and install scripts, especially an ArchLinux PKGBUILD : Done.
+ * + split the code between GUI and hardware parts : Done.
+ * + release candidate : Done.
+ * + The threads asynchronism is a mess, one needs to follow the guidelines
+ *   defined in http://www.cs.kent.edu/~ruttan/sysprog/lectures/multi-thread/multi-thread.html
+ *   Done. Changed to Atomic Variables
+ *
+ *
+ * [HISTORY]
+ *
+ * R 2.1.40: 12/28/2014
+ *        - Threads synchronism is now managed with atomics variables.
+ *        - Ported to FreeBSD.
+ *
+ * R 0.37 : 07/20/2014
+ *        - Adding commands:
+ *            get & set colors.
+ *        - Allow to use numpad keys.
+ *
+ * R 0.36 : 07/14/2014
+ *        - Display the Thermal Monitor activated state.
+ *        - Fixed the buttons state.
+ *
+ * R 0.35 : 07/06/2014
+ *        - Highlight buttons depending on state.
+ *
+ * R 0.34 : 07/05/2014
+ *        - Added Thread buttons in the TEMP Widget to draw or not discrete temperature.
+ *
+ * R 0.33 : 06/26/2014
+ *        - Draw the temperature per logical core.
+ *
+ * R 0.32 : 06/09/2014
+ *        - New flags added to the System Information Widget:
+ *            SYSCALL/SYSRET instructions enabled
+ *            MTRR Default Type enabled
+ *
+ * R 0.31 : 06/04/2014 [unpublished]
+ *        - XFreq for X11 is renamed to XFreq-Gui:
+ *            it has been ported to the SHM and since runs with the regular user permissions.
+ *        - Create a client as a code template. XFreq-Cli is a text mode client.
+ *        - The XFreq-Intel server is the only process which now requires the root permissions.
+ *        - Synchronization of the SHM using mutex and condition wait.
+ *
+ * R 0.30 : 05/29/2014 [unpublished]
+ *        - Split the code into Client/Server.
+ *        - Create a shared memory.
+ *        - Un/serialize the data into the SHM.
+ *
+ * R 0.29 : 05/28/2014 [unpublished]
+ *        - Mutex correction before rewriting the all part of the asynchronism.
+ *        - Enhanced the Help banner.
+ *
+ * R 0.28 : 05/26/2014 SR-1 [RC1]
+ *        - Fixed some typos.
+ *
+ * R 0.28 : 05/26/2014 SR-0
+ *        - Added the '-v' option to print the version number.
+ *        - Enhanced the '-i' option with a Splash attributes argument which allows to hide the Window and to defer the startup time.
+ *        - Changed the bit field tests to avoid a potential stack overflow.
+ *
+ * R 0.27 : 05/24/2014 SR-2
+ *        - While reinforcing integer data type variables, then scanning for errors with Valgrind, raised a duplicated definition of 'Status'
+ *            with the header file X11/Xlib.h. Thus in the THERM_STATUS structure, the field has been renamed to 'StatusBit'.
+ *
+ * R 0.27 : 05/22/2014 SR-1
+ *        - Fix: pointer to configFile and scanning options.
+ *        - Fix: adjust space between task names when reverse sorting.
+ *        - Fix: startup of task monitoring from settings file if no field defined.
+ *
+ * R 0.27 : 05/21/2014
+ *        - Swap the arguments '-x' and '-a' associated with the option to disable the X ACL.
+ *        - Recode the Widgets layout using geometries.
+ *            use the option -g '[cols]x[rows]+[x]+[y], .. ,[cols]x[rows]+[x]+[y]'
+ *        - Swap the arguments '-y', '-l' (Show the Core cycles) and  '-g' (Fill the graphics).
+ *        - Removed the '-x' and '-y' arguments which were used to set the initial position of the MAIN Widget.
+ *        - Allow to sort the task monitoring using the '-t' option followed by the field number.
+ *            argument is like 0x{R}0{N} from [0x000 / 0x101 .. 0x10b]
+ *              where {R} to reverse sorting and {N} is the field number in the /proc/sched_debug file.
+ *
+ * R 0.26 : 05/15/2014 SR-2
+ *        - Display tasks with the highest execution time.
+ *
+ * R 0.26 : 05/10/2014
+ *        - Simplify the Task Scheduler Monitoring thread to process only one file: "/proc/sched_debug"
+ *
+ * R 0.25 : 05/07/2014 SR-4
+ *        - The feature 'Always on top' is implemented by invoking the Window Manager.
+ *        - Widgets can be skipped from the WM taskbar using the option '-N'
+ *        - The Window Manager decorations can be removed using the option '-n'
+ *        - Added an icon to all windows, including the Splash one.
+ *        - Fix the missing application class and title name required by the Gnome 3 task bar.
+ *        - Fix "XIO:  fatal IO error 11 ..."
+ *        - After moving a paused Widget the Cursor is restored to its previous shape.
+ *        - The MAIN Widget is the only window which buffers the input keys.
+ *
+ * R 0.25 : 05/01/2014 SR-3
+ *        - Written more details into the README file.
+ *        - Fix few errors mentioned by Valgrind -;)
+ *        - Fix some command line arguments:
+ *            '-t' was a duplicate and has been replaced by '-o' to keep Widgets always on top;
+ *            '-t' to boot the task scheduling monitor is now correctly saved into the settings file.
+ *
+ * R 0.25 : 04/30/2014 SR-2
+ *        - When pressed, flash buttons with the COLOR_PULSE during a usleep of 50000.
+ *            could be enhanced with a dedicated pixmap loop running its own thread.
+ *        - Changed the default RGB value of _COLOR_GRAPH1 to 0xadadff , _COLOR_GRAPH2 to 0x50508a and _COLOR_GRAPH3 to 0x515172
+ *        - With the none filled graphic mode activated:
+ *            added the PID number instead of the ratio value if the [Ratio] button is pressed;
+ *            modified the disposal and the scalling of the task command names;
+ *            fix the text foreground color inside the Core usage rectangles.
+ *
+ * R 0.25 : 04/29/2014 SR-1
+ *        - In the Core Widget, a button allows to switch graphic mode between filled or not.
+ *        - Prints some perror().
+ *        - Outputs a warning if file '/proc/sched_debug' cannot be opened.
+ *
+ * R 0.25 : 04/28/2014
+ *        - Display the Task Scheduling in the Core Widget.
+ *            start XFreq with the '-t' argument or click the [Task] button,
+ *            then adjust the polling loop with buttons [+] and [-]
+ *
+ * R 0.24 : 04/25/2014
+ *        - Added 2 arguments:
+ *            '-C' to load and store settings from an alternate configuration file.
+ *            '-U' with a bitmask of unmap Widgets.
+ *
+ * R 0.23 : 04/03/2014 SR-4
+ *        - Store all Ratios in a Boost array which is also display at the section Boost of the Widget SysInfo.
+ *        - Change the Code::Blocks project to be like the Makefile. Thus 'xfreq' is the only binary produced.
+ *        - Check if an invariant TSC is available and display result in the SysInfo Widget.
+ *        - Fixed some major memory leak.
+ *            pthread : OK
+ *            font : OK
+ *            display : OK
+ *            xrm database : still an issue
+ *        - Change the argument '-h' to '-z' to show the frequencies in the Core Widget. the menu key is modified the same way.
+ *        - Change the architecture detection to handle the processors of generation Core and above.
+ *            So far, 3 arlgorithms are implemented in the following functions.
+ *              uCycle_GenuineIntel(): C0 state only. Based on MSR IA32_APERF / IA32_MPERF
+ *              uCycle_Core()        : C0 state only. Based on MSR IA32_FIXED_CTR1 / IA32_FIXED_CTR2
+ *              uCycle_Nehalem()     : C0, C3, C6 states. Based on the fixed counters.
+ *
+ * R 0.23 : 03/30 2014 SR-3
+ *        - Added an emergency exit function if a POSIX signal is caught.
+ *
+ * R 0.23 : 03/29 2014 SR-2
+ *        - For any disable CPU:
+ *            fixed the chart drawing in the CStates Widget
+ *            change some texts in the SysInfo Widget.
+ *        - Auto adjusting the width of the Widgets & the positions of Ratios & Temps values.
+ *
+ * R 0.23 : 03/28 2014 SR-1
+ *        - Added the '-A' program argument to dump the list of compiled Architectures.
+ *        - Fixed an infinite loop in uReadAPIC() which locks when processing with Core2 architectures.
+ *
+ * R 0.23 : 03/27 2014
+ *        - Added the '-c' program argument to force specifications of another architecture.
+ *        - Redefined the Architecture table to allow the addition of other Processors and their associated processing loop,
+ *
+ * R 0.22 : 03/26 2014 SR-5
+ *        - Fixed a bug in uLoop() if G >= WIDGETS.
+ *
+ * R 0.22 : 03/25 2014 SR-4
+ *        - Save & load colors from the settings file.
+ *
+ * R 0.22 : 03/24 2014 SR-3
+ *        - Save settings into the '.xfreq' file in home directory.
+ *
+ * R 0.22 : 03/23 2014 SR-2
+ *        - Load settings from .xfreq file in home directory.
+ *        - Provid a new button to Reset the coldest temperature.
+ *        - Added the '-i' command line argument to hide the Splash screen.
+ *        - Fixed margins when in non MDI.
+ *        - Fixed the scale of the Cold Temperature.
+ *
+ * R 0.22 : 03/20 2014 SR-1
+ *        - Fixed the Splash startup.
+ *
+ * R 0.22 : 03/19 2014
+ *        - The initial disposal of the Widgets is corrected.
+ *        - Change the scale of the temperature graphic.
+ *        - Added a splash screen during the initialization.
+ *        - Postponed the Thermal thresholds treatment.
+ *        - Display the followings into the System Info Widget:
+ *            Hardware Lock Elision (HLE)
+ *            Restricted Transactional Memory (RTE)
+ *            All Turbo Boost Ratios
+ *            BM1 / BM2
+ *            Topology & State of CPU
+ *            Performance Counters matrix
+ *        - Removed the '-c' (per Core) argument.
+ *            AnyThread Counters are now automatically set just after the Processor topology enumeration function.
+ *
+ * R 0.21 : 03/15 2014 SR-2
+ *        - Allows to read the Base Clock frequency at a user's specified address in ROM memory.
+ *            use the new command line argument '-M'
+ *            defaults to 0xf08d9 + 0x12 which is the ASUS Rampage II GENE motherboard address.
+ *
+ * R 0.21 : 03/14 2014 SR-1
+ *        - Fix the Topology algorithm to get a list of enabled CPU and show if HTT is enabled.
+ *        - Fix a Graphic regression in the Widget Temperature. Now displays the coldest value.
+ *
+ * R 0.21 : 03/12 2014
+ *        - Implemented an enumeration of the Processor topology to get a list of the activated Threads and Cores;
+ *            and conclude if Hyperthreading is actually enabled.
+ *
+ * R 0.20 : 03/07 2014
+ *        - Provide an option to select the Clock source between the TSC, BIOS, Specifications, ROM, and an user defined value.
+ *            Use the '-S' command line argument or one of the buttons in the System Info Widget.
+ *            The current source is displayed beside the Base Clock.
+ *
+ * R 0.19 : 03/06 2014 SR-2
+ *        - Added a new Quit decoration button.
+ *        - Modified the Minimize decoration button.
+ *        - Fix the scrolling boundaries & the icon names updates.
+ *
+ * R 0.19 : 03/05 2014 SR-1
+ *        - Fix the icons size & position.
+ *        - To get a smoother motion, the Scrolling code has been reprogrammed using an additional pixmap.
+ *
+ * R 0.19 : 03/01 2014
+ *        - Allow the Widget title to be still refreshed when the window is minimized, iconified or paused.
+ *            By the way, when MDI is enabled, the title of the main window is updated with the top frequency & temperature.
+ *        - Solved the Widgets moving issue using the 'ConfigureNotify' event.
+ *            However the top frame border added by the WM is not counted in the Window position.
+ *
+ * R 0.18 : 02/27 2014 SR-3
+ *        - Kernel NMI Watchdog must be disabled because it interferes XFreq when reading UNC & URC counters.
+ *            to disable the watchdog, append the Kernel parameter nmi_watchdog=0
+ *            or into Shell, echo "0" > /proc/sys/kernel/nmi_watchdog before starting XFreq.
+ *
+ *        - The semaphore locks the drawing thread when increasing, decreasing the loop idle time.
+ *        - The loop idle time is displayed in the System Info Widget.
+ *        - The Processor Brand name is now shown beside the System Info title :
+ *            a new button [Brand] starts and stops this wallboard.
+ *        - An new argument "-a" is provided to enable or disable X Access Control List".
+ *
+ * R 0.18 : 02/26 2014 SR-2
+ *        - The decoration is now put on the top-right corner.
+ *        - A message is output when Counters are reset.
+ *
+ * R 0.18 : 02/24 2014 SR-1
+ *        - In case of counters overflowed, reset them.
+ *        - In the System Info Widget, two buttons are added to increase, decrease the sleep time.
+ *        - A "ReClock" button in the System Info Widget allows to re-estimate the Base Clock.
+ *        - The Mouse Cursors are implemented.
+ *        - Moving the Widgets is managed in both cases, with or without the MDI mode.
+ *          Thus, no Window Manager is required. Use right mouse button to move a Widget.
+ *
+ * R 0.17 : 02/22 2014 SR-5
+ *        - Clean up some code.
+ *        - Added to System Info Widget the CPUID functions :
+ *            leaf (0x6) Digital Thermal Sensor & Power Management
+ *            leaf (0x7) Extended Feature Flags
+ *            leaf (0xa) Performance Monitoring
+ *
+ * R 0.17 : 02/20 2014 SR-4
+ *        - Display Ratio formula :
+ *
+ *            DisplayRatio=TurboRatio x State(C0) * MaxNonTurboRatio
+ *              where
+ *                  TurboRatio=Delta(UCC) / Delta(URC)
+ *              and State(C0)=Delta(URC) / Delta(TSC)
+ *              and MaxNonTurboRatio=MSR_PLATFORM_INFO[15-8]
+ *
+ * R 0.17 : 02/18 2014 SR-3
+ *        - In Cycles calculation, test for 64 bits overflow.
+ *
+ * R 0.17 : 02/16 2014 SR-2
+ *        - Added Decoration buttons.
+ *        - Highlight button when clicked.
+ *
+ * R 0.17 : 02/15 2014 SR-1
+ *        - Corrected the Turbo ratio calculation.
+ *        - A Core frequency is displayed when the ratio is greater or equal 5
+ *        - A minimized Widget has an associated icon button in the Main Widget right bar.
+ *        - Cycle and C-State options are now dissociated.
+ *
+ * R 0.16 : 02/12 2014 SR-5
+ *        - Registers Dump Widget is now auto refreshed.
+ *        - [CTRL]+[P] or startup option '-p 1'prints the following :
+ *            Raw Cycles values in the Core Widget.
+ *            C-States % in its own Widget.
+ *        - In the System Info Widget the Base Clock frequency is now printed below the Processor brand string.
+ *
+ * R 0.16 : 02/11 2014 SR-4
+ *        - In main() provide a none stop program startup and log any missing prerequisites.
+ *        - Modified Ratio & Frequency computation to Relative values.
+ *
+ * R 0.16 : 02/10 2014 SR-3
+ *        - A few scripting commands are implemented.
+ *        - The mouse is supported for some functions such as scrolling buttons and moving Widget.
+ *        - Rolling back to an unique input buffer located in the MAIN Widget:
+ *            some option keys need to be pressed with the [Control] key.
+ *        - Simplify all code using macros:
+ *            [Quarter][Half][One][Twice][Twice_Half]_Char_Width
+ *            [Quarter][Half][One][Twice][Twice_Half]_Char_Height
+ *
+ * R 0.16 : 02/01 2014 SR-2
+ *        - Implemented a global handling of input characters string.
+ *
+ * R 0.16 : 01/31 2014 SR-1
+ *        - Added a new Widget to dump MSR registers in binary.
+ *
+ * R 0.16 : 01/29 2014
+ *        - Read the TSC per logical Core using IA32_TIME_STAMP_COUNTER(0x10) rather than RDTSC instruction.
+ *        - Integrate the Misc Processor Features into the System Info Widget. See IA32_MISC_ENABLE(0x1a0).
+ *        - Attempt to handle the temperature Threshold values with IA32_THERM_INTERRUPT(0x19b) : no data !
+ *
+ * R 0.15 : 01/28 2014 SR-4
+ *        - Reorganized the time critical part in the uCycle thread.
+ *        - Reduced the CPU overhead in Events loop and the Drawing thread.
+ *
+ * R 0.15 : 01/24 2014 SR-3
+ *        - Cosmetic changes with the MDI window. Use '-D 1' to enable the MDI.
+ *        - Minimizing or unmapping a widget stops its drawing.
+ *        - The command argument '-D' enables the Multiple Document Interface management mode.
+ *        - The Widgets are now gracefully disposed.
+ *        - Added an architecture table with default processors values.
+ *        - Implemented the C3 and C6 C-States counters.
+ *        - Create 2 new Widgets:
+ *            C-States per Core and in Processor average.
+ *            Temperature per Core and hottest.
+ *        - Protect the drawing thread with a mutex.
+ *        - Scroll the Processor brand name (Wallboard).
+ *        - Changed the action associated with [Page Down] & [Page Up] keys.
+ *        - The [+] and [-] keys of the NumPad allow to decrase or increase the idle time.
+ *        - In the Core Widget :
+ *            the [H] key hide / unhide the frequencies.
+ *            the [P] key hide / unhide the C-States counters.
+ *        - The System Information Widget now gathers all detail about Processor, RAM and BIOS.
+ *
+ * R 0.14 : 01/19 2014
+ *        - Added the option '-c' to monitor the processor either per threads, either per cores.
+ *        - The Cores load is now based on the C0 performance counter and relatively to the TSC.
+ *
+ * R 0.13 : 01/14 2014 SR-1
+ *        - The program is changed from 2 to 3 threads:
+ *            uCycle to compute the actual frequency.
+ *            uDraw to paint the foreground.
+ *            uLoop to handle X events. (called by the main thread)
+ *        - The calculation of the Cores frequency is now as follow :
+ *            (Base Operating Ratio) x (Delta of Unhalted Cycles) x (Bus CLOCK frequency)
+ *
+ * R 0.12 : 01/14 2014
+ *        - Use the MSR performance counters to provide a better computation accuracy of the Cores frequency multiplier.
+ *        - Intel Core Architecture detected.
+ *        - Blink yellow when in pause mode.
+ *
+ * R 0.11 : 01/09 2014
+ *        - add specifications pages for Processor (features), RAM (timings & channels count) and BIOS (BCLK).
+ *            press [F1] to get help and scroll with arrow keys.
+ *        - provide a compact string for processor brand.
+ *        - better font support.
+ *            layout scaling is based on loaded font.
+ *            "fixed" font as a default.
+ *
+ * R 0.10 : 01/04 2014
+ *        - the MSR readings are optimized a little bit, however turbo ratios don't show up yet.
+ *        - drawing is now done with 2 pixmaps :
+ *            B, for the background layout,
+ *            F, to display the dynamics.
+ *        - the event loop does not sleep anymore but waits for any event on the socket.
+ *        - the '-a' argument allows to show the activity of the loop.
+ *        - transparency only works with a composite manager.
+ *        - the project is ported to Code::Blocks, however not delivered yet.
+ *        - semaphore lock is still questioned ?
+ * R 0.09 : 01/01 2014
+ *        - PAUSE key to suspend drawing.
+ *        - double buffering.
+ *        - pseudo transparency with any window id (see option -D[esktop]).
+ *        - read SMBIOS @ 0x24 to get the true number of active Core threads (instead of CPUID).
+ *        - some drawing alignment; text scaling; coloring based on the ratios.
+ *        - add the temperature & a few spaces in the application title name.
+ *        - inform the WM of the Widget fixed size : no resize faisable.
+ *        - new option -s to set the idle time (micro-seconds) inside function uExec().
+ *        - leave Event Loop, uLoop() as the main thread.
+ * R 0.08 : Widget ready as a beta release.
+ * R 0.01 to 0.07 : initial source code.
+ *
+ *
+ *
+ * [DOCUMENTATION]
+ *
+ * +-----+--------------------------------------------------------------------------------------------+
+ * | (1) | Intel 64 and IA-32 Software Developer Manual Vol 3A 3B 3C                                  |
+ * +-----+--------------------------------------------------------------------------------------------+
+ * | (2) | DMTF: System Management BIOS (SMBIOS) Reference Specification                              |
+ * +-----+--------------------------------------------------------------------------------------------+
+ * | (3) | Intel Turbo Boost Technology in Intel CoreTM Microarchitecture (Nehalem) Based Processors  |
+ * +-----+--------------------------------------------------------------------------------------------+
+ * | (4) | Micron Technology: Technical Note DDR3 Power-Up, Initialization, and Reset                 |
+ * +-----+--------------------------------------------------------------------------------------------+
+ *
+ */

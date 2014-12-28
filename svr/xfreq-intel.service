@@ -1,0 +1,12 @@
+[Unit]
+Description=XFreq Intel Daemon
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/xfreq-intel
+ExecStop=/bin/kill -QUIT $MAINPID
+RemainAfterExit=no
+SuccessExitStatus=SIGQUIT SIGUSR1 SIGTERM
+
+[Install]
+WantedBy=multi-user.target
