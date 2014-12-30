@@ -1,5 +1,6 @@
-CC = gcc
+CC = cc
 CFLAGS = -Wall -pthread -x c
+KERNEL = `uname -s`
 APP_NAME=xfreq-intel
 SRC_PATH=.
 OBJ_PATH=./obj
@@ -26,8 +27,8 @@ clean-all:
 #
 $(APP_NAME)	: $(APP_NAME).o
 		@if [ ! -d $(BIN_PATH) ]; then mkdir $(BIN_PATH); fi
-		$(CC) $(OBJ_PATH)/$(APP_NAME).o $(LIB4x86_FLAGS) -o $(BIN_PATH)/$(APP_NAME)
+		cc $(OBJ_PATH)/$(APP_NAME).o $(LIB4x86_FLAGS) -o $(BIN_PATH)/$(APP_NAME)
 #
 $(APP_NAME).o	: $(APP_NAME).c
 		@if [ ! -d $(OBJ_PATH) ]; then mkdir $(OBJ_PATH); fi
-		$(CC) $(CFLAGS) -c $(APP_NAME).c $(INC4x86_PATH) -o $(OBJ_PATH)/$(APP_NAME).o
+		cc -D$(KERNEL) $(CFLAGS) -c $(APP_NAME).c $(INC4x86_PATH) -o $(OBJ_PATH)/$(APP_NAME).o
