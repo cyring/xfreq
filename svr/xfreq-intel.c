@@ -34,9 +34,6 @@
 #include <sys/cpuctl.h>
 #include <sys/cpuset.h>
 #include <pthread_np.h>
-/*
-#include <semaphore.h>
-*/
 #endif
 
 #define	_APPNAME "XFreq-Intel"
@@ -1659,10 +1656,7 @@ int main(int argc, char *argv[])
 
 			if(ScanOptions(&A, argc, argv))
 			{
-				if(Init_IF(&A.SHM->Lock))
-					perror("Warning: condition attribute object 'Lock.IF'");
-				if(Init_IF(&A.SHM->Request))
-					perror("Warning: condition attribute object 'Request.IF'");
+				Sync_Init(&A.SHM->Sync);
 
 				sigemptyset(&A.Signal);
 				sigaddset(&A.Signal, SIGINT);	// [CTRL] + [C]
@@ -1835,11 +1829,11 @@ int main(int argc, char *argv[])
 						if(fJoinSchedThread == true)
 							A.SHM->S.Monitor=(pthread_join(A.TID_Schedule, NULL) == 0);
 
-						if(Signal_IF(&A.SHM->Lock, true))
-							perror("uCycle(Signal_IF)");
+						Sync_Signal(1, &A.SHM->Sync);
 
 						// Settle down N x 50000 microseconds as specified by the command argument.
-						if(Wait_IF(&A.SHM->Request, A.SHM->P.IdleTime) == 0)
+						long int idleRemaining;
+						if((idleRemaining=Sync_Wait(0, &A.SHM->Sync, A.SHM->P.IdleTime)))
 						{
 							if(A.SHM->PlayID != ID_NULL)
 							{
@@ -1850,6 +1844,7 @@ int main(int argc, char *argv[])
 								if(A.SHM->P.IdleTime < IDLE_COEF_MIN)	A.SHM->P.IdleTime=IDLE_COEF_MIN;
 								if(A.SHM->P.IdleTime > IDLE_COEF_MAX)	A.SHM->P.IdleTime=IDLE_COEF_MAX;
 							}
+							usleep(IDLE_BASE_USEC*idleRemaining);
 						}
 					}
 					// Shutting down.
@@ -1868,8 +1863,7 @@ int main(int argc, char *argv[])
 					pthread_kill(A.TID_SigHandler, SIGUSR1);
 					pthread_join(A.TID_SigHandler, NULL);
 				}
-				Destroy_IF(&A.SHM->Lock);
-				Destroy_IF(&A.SHM->Request);
+				Sync_Destroy(&A.SHM->Sync);
 			}
 			else
 				rc=1;

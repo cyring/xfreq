@@ -2947,7 +2947,7 @@ void	Play(uARG *A, int G, char ID)
 
 				A->SHM->PlayID=ID;
 
-				Signal_IF(&A->SHM->Request, false);
+				Sync_Signal(0, &A->SHM->Sync);
 
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
@@ -3194,33 +3194,18 @@ static void *uDraw(void *uArg)
 	uARG *A=(uARG *) uArg;
 	pthread_setname_np(A->TID_Draw, "xfreq-gui-draw");
 
-	int deadLock=IDLE_COEF_MIN, rc=0;
+	long int idleRemaining;
 	while(A->LOOP)
-		if(deadLock > 0)
+		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + 1)))
 		{
-			if((rc=Wait_IF(&A->SHM->Lock, IDLE_COEF_MAX + 1)) == 0)
+			int G=0;
+			for(G=MAIN; G < WIDGETS; G++)
 			{
-				int G=0;
-				for(G=MAIN; G < WIDGETS; G++)
-				{
-					if(!A->PAUSE[G])
-						fDraw(G, (A->SHM->PlayID == ID_DONE) ? true : false, true);
+				if(!A->PAUSE[G])
+					fDraw(G, (A->SHM->PlayID == ID_DONE) ? true : false, true);
 
-					if(!(A->L.UnMapBitmask & (1 << G)))
-						UpdateWidgetName(A, G);
-				}
-			}
-			else
-			{
-				switch(rc)
-				{
-				case ETIMEDOUT:
-					deadLock--;
-					break;
-				default:
-					deadLock=0;
-					break;
-				}
+				if(!(A->L.UnMapBitmask & (1 << G)))
+					UpdateWidgetName(A, G);
 			}
 		}
 		else
@@ -4021,8 +4006,8 @@ int main(int argc, char *argv[])
 				.Input={.KeyBuffer="", .KeyLength=0,},
 				.Output=NULL,
 			},
-			.LOOP= true,
-			.RESTART= false,
+			.LOOP=true,
+			.RESTART=false,
 			.PAUSE={false},
 			.configFile=NULL,
 			.Options=
@@ -4100,11 +4085,13 @@ int main(int argc, char *argv[])
 				strcat(BootLog, "Error: opening the shared memory.\n");
 			else if((fstat(A.FD, &shmStat) != -1) && (A.SHM=mmap(0, shmStat.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, A.FD, 0)) == MAP_FAILED)
 				strcat(BootLog, "Error: mapping the shared memory.\n");
+			else
+				A.Room=Sync_Open(&A.SHM->Sync);
 
 			if(!SPLASH_HIDDEN_FLAG)
 				StopSplash(&A);
 
-			if(OpenWidgets(&A))
+			if((A.FD != -1) && (A.Room != 0) && OpenWidgets(&A))
 			{
 				int G=0;
 				for(G=MAIN; G < WIDGETS; G++)
@@ -4125,12 +4112,13 @@ int main(int argc, char *argv[])
 					uLoop(&A);
 
 					// Shutting down.
-					if(pthread_tryjoin_np(A.TID_Draw, NULL) == EBUSY)
+					struct timespec absoluteTime={.tv_sec=0, .tv_nsec=0}, gracePeriod={.tv_sec=0, .tv_nsec=0};
+					abstimespec(IDLE_BASE_USEC * IDLE_COEF_MAX, &absoluteTime);
+					if(!addtimespec(&gracePeriod, &absoluteTime)
+					&& pthread_timedjoin_np(A.TID_Draw, NULL, &gracePeriod))
 					{
-						usleep(IDLE_BASE_USEC * IDLE_COEF_MAX);
-
-						if((rc=pthread_tryjoin_np(A.TID_Draw, NULL)))
-							pthread_kill(A.TID_Draw, SIGKILL);
+						rc=pthread_kill(A.TID_Draw, SIGKILL);
+						rc=pthread_join(A.TID_Draw, NULL);
 					}
 				}
 				else
@@ -4146,6 +4134,8 @@ int main(int argc, char *argv[])
 				rc=2;
 			}
 			// Release the ressources.
+			if(A.Room)
+				Sync_Close(A.Room, &A.SHM->Sync);
 			if((A.SHM != MAP_FAILED) && (munmap(A.SHM, shmStat.st_size) == -1))
 				perror("Error: unmapping the shared memory");
 			if((A.FD != -1) && (close(A.FD) == -1))

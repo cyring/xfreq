@@ -571,6 +571,7 @@ typedef struct
 {
 	int		FD;
 	SHM_STRUCT	*SHM;
+	unsigned int	Room;
 
 	Display		*display;
 	Screen		*screen;

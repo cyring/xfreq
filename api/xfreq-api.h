@@ -8,7 +8,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "40"
+#define _NIGHTLY "41"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #define	ToStr(_inst)	_ToStr(_inst)
@@ -723,13 +723,13 @@ typedef	struct {
 		char		comm[TASK_COMM_LEN + 1];
 		int		pid;
 		RUNTIME		vruntime;
-		long long int	nvcsw;			/* sum of [non]voluntary context switch counts */
+		long long int	nvcsw;			// sum of [non]voluntary context switch counts
 		int		prio;
-		RUNTIME		exec_vruntime;		/* a duplicate of vruntime ? */
+		RUNTIME		exec_vruntime;		// a duplicate of vruntime ?
 		RUNTIME		sum_exec_runtime;
 		RUNTIME		sum_sleep_runtime;
 		int		node;
-		char		group_path[32];		/* #define PATH_MAX 4096 # chars in a path name including nul */
+		char		group_path[32];		// #define PATH_MAX 4096 # chars in a path name including nul
 	} Task[TASK_PIPE_DEPTH];
 } CPU_STRUCT;
 
@@ -743,7 +743,8 @@ typedef	struct
 
 typedef struct
 {
-	atomic_long		IF;
+	atomic_ullong	IF;
+	atomic_ullong	Rooms;
 } SYNCHRONIZATION;
 
 typedef	struct
@@ -751,8 +752,7 @@ typedef	struct
 	char		AppName[TASK_COMM_LEN],
 			PlayID;
 
-	SYNCHRONIZATION	Lock,
-			Request;
+	SYNCHRONIZATION	Sync;
 
 	PRIVILEGE_LEVEL	CPL;
 	PROCESSOR	P;
@@ -779,6 +779,12 @@ typedef	struct
 #define	SIG_EMERGENCY_FMT	"\nShutdown(%02d)"
 #define	TASK_PID_FMT		"%5d"
 
+void	abstimespec(useconds_t usec, struct timespec *tsec)
+{
+	tsec->tv_sec=usec / 1000000L;
+	tsec->tv_nsec=(usec % 1000000L) * 1000;
+}
+
 int	addtimespec(struct timespec *asec, const struct timespec *tsec)
 {
 	int rc=0;
@@ -797,34 +803,55 @@ int	addtimespec(struct timespec *asec, const struct timespec *tsec)
 		return(errno);
 }
 
-int	Init_IF(SYNCHRONIZATION *sync)
+void	Sync_Init(SYNCHRONIZATION *sync)
 {
-	atomic_init(&sync->IF, 0);
-	return(atomic_load(&sync->IF));
+	atomic_init(&sync->IF, 0x0);
+	atomic_init(&sync->Rooms, 0x1);
 }
 
-void	Destroy_IF(SYNCHRONIZATION *sync)
+void	Sync_Destroy(SYNCHRONIZATION *sync)
 {
+	atomic_store(&sync->IF, 0x0);
 }
 
-int	Wait_IF(SYNCHRONIZATION *sync, useconds_t idleTime)
+unsigned int Sync_Open(SYNCHRONIZATION *sync)
 {
-	useconds_t idleSlot=idleTime;
-	while((atomic_load(&sync->IF) != 1) && idleSlot)
+	unsigned int room;
+	for(room=63; room > 0; room--)
+	{
+		const unsigned long long int roomBit=(unsigned long long int) 1<<room;
+
+		if(!(atomic_load(&sync->Rooms) & roomBit))
+		{
+			atomic_fetch_or(&sync->Rooms, roomBit);
+			break;
+		}
+	}
+	return(room);
+}
+
+void	Sync_Close(unsigned int room, SYNCHRONIZATION *sync)
+{
+	const unsigned long long int roomCmp=(unsigned long long int) ~(1<<room);
+
+	atomic_fetch_and(&sync->Rooms, roomCmp);
+}
+
+long int Sync_Wait(unsigned int room, SYNCHRONIZATION *sync, useconds_t idleTime)
+{
+	const unsigned long int roomBit=(unsigned long long int) 1<<room, roomCmp=~roomBit;
+	useconds_t idleRemaining=idleTime;
+
+	while(!(atomic_load(&sync->IF) & roomBit) && idleRemaining)
 	{
 		usleep(IDLE_BASE_USEC);
-		idleSlot--;
+		idleRemaining--;
 	}
-	atomic_store(&sync->IF, 0);
-
-	if(idleSlot)
-		return(false);
-	else
-		return(ETIMEDOUT);
+	atomic_fetch_and(&sync->IF, roomCmp);
+	return(idleRemaining);
 }
 
-int	Signal_IF(SYNCHRONIZATION *sync, bool fBroadcast)
+void	Sync_Signal(unsigned int room, SYNCHRONIZATION *sync)
 {
-		atomic_store(&sync->IF, 1);
-		return(false);
+	atomic_fetch_or(&sync->IF, (!room) ? 0x1 : 0xfffffffffffffffe);
 }

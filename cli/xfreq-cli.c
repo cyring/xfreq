@@ -24,9 +24,6 @@
 
 #if defined(FreeBSD)
 #include <pthread_np.h>
-/*
-#include <semaphore.h>
-*/
 #endif
 
 #define	_APPNAME "XFreq-Client"
@@ -53,45 +50,30 @@ static void *uRead(void *uArg)
 	uARG *A=(uARG *) uArg;
 	pthread_setname_np(A->TID_Read, "xfreq-cli-read");
 
-	int deadLock=IDLE_COEF_MIN, rc=0;
+	long int idleRemaining;
 	while(A->LOOP)
-		if(deadLock > 0)
+		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + 1)))
 		{
-			if((rc=Wait_IF(&A->SHM->Lock, IDLE_COEF_MAX + 1)) == 0)
-			{
-				printf("\nCPU# Freq. Ratio x BCLK Temps\tTask scheduling\n");
-				int cpu=0;
-				for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
-					if(A->SHM->C[cpu].T.Offline != true)
-						printf(	"%3d %7.2f%6.2f %6.2f %3d\t%15s(%5d) %15s(%5d)\n",
-							cpu,
-							A->SHM->C[cpu].RelativeFreq,
-							A->SHM->C[cpu].RelativeRatio,
-							A->SHM->P.ClockSpeed,
-							A->SHM->C[cpu].TjMax.Target - A->SHM->C[cpu].ThermStat.DTS,
-							A->SHM->C[cpu].Task[0].comm, A->SHM->C[cpu].Task[0].pid,
-							A->SHM->C[cpu].Task[1].comm, A->SHM->C[cpu].Task[1].pid);
+			printf("\nCPU# Freq. Ratio x BCLK Temps\tTask scheduling\n");
+			int cpu=0;
+			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+				if(A->SHM->C[cpu].T.Offline != true)
+					printf(	"%3d %7.2f%6.2f %6.2f %3d\t%15s(%5d) %15s(%5d)\n",
+						cpu,
+						A->SHM->C[cpu].RelativeFreq,
+						A->SHM->C[cpu].RelativeRatio,
+						A->SHM->P.ClockSpeed,
+						A->SHM->C[cpu].TjMax.Target - A->SHM->C[cpu].ThermStat.DTS,
+						A->SHM->C[cpu].Task[0].comm, A->SHM->C[cpu].Task[0].pid,
+						A->SHM->C[cpu].Task[1].comm, A->SHM->C[cpu].Task[1].pid);
 
-				printf(	"\nAverage C-states\n" \
-					"Turbo\t  C0\t  C3\t  C6\n" \
-					"%6.2f%%\t%6.2f%%\t%6.2f\t%6.2f%%\n",
-					100.f * A->SHM->P.Avg.Turbo,
-					100.f * A->SHM->P.Avg.C0,
-					100.f * A->SHM->P.Avg.C3,
-					100.f * A->SHM->P.Avg.C6);
-			}
-			else
-			{
-				switch(rc)
-				{
-				case ETIMEDOUT:
-					deadLock--;
-					break;
-				default:
-					deadLock=0;
-					break;
-				}
-			}
+			printf(	"\nAverage C-states\n" \
+				"Turbo\t  C0\t  C3\t  C6\n" \
+				"%6.2f%%\t%6.2f%%\t%6.2f\t%6.2f%%\n",
+				100.f * A->SHM->P.Avg.Turbo,
+				100.f * A->SHM->P.Avg.C0,
+				100.f * A->SHM->P.Avg.C3,
+				100.f * A->SHM->P.Avg.C6);
 		}
 		else
 			Play(A, ID_QUIT);
@@ -263,7 +245,8 @@ int main(int argc, char *argv[])
 		struct stat shmStat={0};
 		if(((A.FD=shm_open(SHM_FILENAME, O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) != -1)
 		&& ((fstat(A.FD, &shmStat) != -1)
-		&& ((A.SHM=mmap(0, shmStat.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, A.FD, 0)) != MAP_FAILED)))
+		&& ((A.SHM=mmap(0, shmStat.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, A.FD, 0)) != MAP_FAILED))
+		&& ((A.Room=Sync_Open(&A.SHM->Sync)) != 0))
 		{
 			if(!pthread_create(&A.TID_Read, NULL, uRead, &A))
 			{
@@ -275,12 +258,13 @@ int main(int argc, char *argv[])
 				}
 
 				// shutting down
-				if(pthread_tryjoin_np(A.TID_Read, NULL) == EBUSY)
+				struct timespec absoluteTime={.tv_sec=0, .tv_nsec=0}, gracePeriod={.tv_sec=0, .tv_nsec=0};
+				abstimespec(IDLE_BASE_USEC * IDLE_COEF_MAX, &absoluteTime);
+				if(!addtimespec(&gracePeriod, &absoluteTime)
+				&& pthread_timedjoin_np(A.TID_Read, NULL, &gracePeriod))
 				{
-					usleep(IDLE_BASE_USEC * IDLE_COEF_MAX);
-
-					if((rc=pthread_tryjoin_np(A.TID_Read, NULL)) != 0)
-						pthread_kill(A.TID_Read, SIGKILL);
+					rc=pthread_kill(A.TID_Read, SIGKILL);
+					rc=pthread_join(A.TID_Read, NULL);
 				}
 			}
 			else
@@ -295,10 +279,13 @@ int main(int argc, char *argv[])
 			rc=2;
 		}
 		// Release the ressources.
+		if(A.Room)
+			Sync_Close(A.Room, &A.SHM->Sync);
 		if((A.SHM != MAP_FAILED) && (munmap(A.SHM, shmStat.st_size) == -1))
 			perror("Error: unmapping the shared memory");
 		if((A.FD != -1) && (close(A.FD) == -1))
 			perror("Error: closing the shared memory");
+
 		if(fEmergencyThread)
 		{
 			pthread_kill(A.TID_SigHandler, SIGUSR1);

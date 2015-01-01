@@ -25,6 +25,7 @@ typedef struct
 {
 	int		FD;
 	SHM_STRUCT	*SHM;
+	unsigned int	Room;
 
 	sigset_t	Signal;
 	pthread_t	TID_SigHandler,
