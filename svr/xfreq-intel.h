@@ -1,10 +1,14 @@
 /*
  * xfreq-intel.h by CyrIng
  *
- * Copyright (C) 2013-2014 CYRIL INGENIERIE
+ * Copyright (C) 2013-2015 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
+
+#define	LEVEL_INVALID	0
+#define	LEVEL_THREAD	1
+#define	LEVEL_CORE	2
 
 typedef	struct {
 		union {
@@ -142,12 +146,8 @@ typedef	struct
 		char		*Architecture;
 		void		*(*uCycle)(void *uA, int cpu, int T);
 		bool		(*Init_MSR)(void *);
+		bool		(*Close_MSR)(void *);
 } ARCH;
-
-
-#define	LEVEL_INVALID	0
-#define	LEVEL_THREAD	1
-#define	LEVEL_CORE	2
 
 
 /*
@@ -223,7 +223,7 @@ typedef int __kernel_pid_t;
 
 #define	TASK_STRUCT_FORMAT	TASK_STATE_FMT""TASK_COMM_FMT" "TASK_PID_FMT" "TASK_TIME_FMT" "TASK_CTXSWITCH_FMT" "TASK_PRIORITY_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_NODE_FMT" "TASK_GROUP_FMT
 
-#define	OPTIONS_COUNT	6
+#define	OPTIONS_COUNT	7
 typedef struct
 {
 	char		*argument;
@@ -231,6 +231,7 @@ typedef struct
 	void		*pointer;
 	char		*manual;
 } OPTIONS;
+
 #define	OPTIONS_LIST												\
 {														\
 	{"-c", "%d", NULL,	"Pick up an architecture # (Char)\n"						\
@@ -241,10 +242,11 @@ typedef struct
 				"\t\t  argument is the BCLK memory address to read from"               },	\
 	{"-s", "%u", NULL,	"Idle time multiplier (Int)\n"							\
 				"\t\t  argument is a coefficient multiplied by 50000 usec"             },	\
-	{"-d", "%x", NULL,	"Registers dump enablement (Bool)\n"			               },	\
+	{"-d", "%x", NULL,	"Registers dump enablement (Bool)"			               },	\
 	{"-t", "%x", NULL,	"Task scheduling monitoring sorted by 0x{R}0{N} (Hex)\n"			\
 				"\t\t  where {R} bit:8 is set to reverse sorting\n"				\
 				"\t\t  and {N} is one '/proc/sched_debug' field# from [0x1] to [0xb]"  },	\
+	{"-z", "%x", NULL,	"Reset the MSR counters (Bool)"			                       },	\
 }
 
 typedef struct
@@ -263,6 +265,11 @@ const	DUMP_STRUCT	Loader;
 			TID_Read,
 			TID_Dump,
 			TID_Schedule;
+	struct SAVEAREA
+	{
+		GLOBAL_PERF_COUNTER	GlobalPerfCounter;
+		FIXED_PERF_COUNTER	FixedPerfCounter;
+	} *SaveArea;
 } uARG;
 
 typedef struct

@@ -1,7 +1,7 @@
 /*
  * xfreq-cli.h by CyrIng
  *
- * Copyright (C) 2013-2014 CYRIL INGENIERIE
+ * Copyright (C) 2013-2015 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 

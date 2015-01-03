@@ -7,7 +7,7 @@
  * XFreq provides some Widgets to display the frequency (incl. turbo), the temperature, C-States and other features of the Intel Core i7, i5 processors.
  * It also works with Core 2 architectures.
  *
- * Copyright (C) 2013-2014 CYRIL INGENIERIE
+ * Copyright (C) 2013-2015 CYRIL INGENIERIE
  * http://blog.cyring.fr
  *
  * Licenses: GPL2
@@ -171,6 +171,10 @@
  *
  *
  * [HISTORY]
+ *
+ * R 2.1.40-a: 01/03/2015
+ *        - Preserve the MSR Counters in a Save Area.
+ *        - Apply an atomic variable to server requests.
  *
  * R 2.1.40: 12/28/2014
  *        - Threads synchronism is now managed with atomics variables.

@@ -1,14 +1,14 @@
 /*
  * xfreq-api.c by CyrIng
  *
- * Copyright (C) 2013-2014 CYRIL INGENIERIE
+ * Copyright (C) 2013-2015 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "41"
+#define _NIGHTLY "41-a"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #define	ToStr(_inst)	_ToStr(_inst)
@@ -736,6 +736,7 @@ typedef	struct {
 typedef	struct
 {
 	bool	MSR,
+		RESET,
 		BIOS,
 		IMC,
 		PROC;
@@ -749,8 +750,8 @@ typedef struct
 
 typedef	struct
 {
-	char		AppName[TASK_COMM_LEN],
-			PlayID;
+	char		AppName[TASK_COMM_LEN];
+	atomic_char	PlayID;
 
 	SYNCHRONIZATION	Sync;
 

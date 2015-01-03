@@ -1,7 +1,7 @@
 /*
  * xfreq-intel.c by CyrIng
  *
- * Copyright (C) 2013-2014 CYRIL INGENIERIE
+ * Copyright (C) 2013-2015 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
@@ -95,6 +95,9 @@ bool	Init_MSR_GenuineIntel(void *uArg)
 			sprintf(pathname, CPU_DEV, cpu);
 			if( (rc=((A->SHM->C[cpu].FD=open(pathname, O_RDWR)) != -1)) )
 			{
+				// Initialize C-States.
+				A->Arch[A->SHM->P.ArchID].uCycle(A, cpu, 0);
+
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->SHM->C[cpu].ThermIntr)) != -1);
 			}
 			A->SHM->C[cpu].TjMax.Target=100;
@@ -155,6 +158,7 @@ bool	Init_MSR_Core(void *uArg)
 				// Enable the Performance Counters 1 and 2 :
 				// - Set the global counter bits
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
+				A->SaveArea[cpu].GlobalPerfCounter=A->SHM->C[cpu].GlobalPerfCounter;
 				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1 != 0)
 				{
 					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #1 is already activated", cpu);
@@ -171,6 +175,7 @@ bool	Init_MSR_Core(void *uArg)
 
 				// - Set the fixed counter bits
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->SHM->C[cpu].FixedPerfCounter)) != -1);
+				A->SaveArea[cpu].FixedPerfCounter=A->SHM->C[cpu].FixedPerfCounter;
 				A->SHM->C[cpu].FixedPerfCounter.EN1_OS=1;
 				A->SHM->C[cpu].FixedPerfCounter.EN2_OS=1;
 				A->SHM->C[cpu].FixedPerfCounter.EN1_Usr=1;
@@ -208,6 +213,8 @@ bool	Init_MSR_Core(void *uArg)
 					perror(warning);
 					rc=((retval=Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_OVF_CTRL, (GLOBAL_PERF_OVF_CTRL *) &OvfControl)) != -1);
 				}
+				// Initialize C-States.
+				A->Arch[A->SHM->P.ArchID].uCycle(A, cpu, 0);
 
 				// Retreive the Thermal Junction Max. Fallback to 100°C if not available.
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, MSR_TEMPERATURE_TARGET, (TJMAX *) &A->SHM->C[cpu].TjMax)) != -1);
@@ -269,6 +276,7 @@ bool	Init_MSR_Nehalem(void *uArg)
 				// Enable the Performance Counters 1 and 2 :
 				// - Set the global counter bits
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
+				A->SaveArea[cpu].GlobalPerfCounter=A->SHM->C[cpu].GlobalPerfCounter;
 				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1 != 0)
 				{
 					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #1 is already activated", cpu);
@@ -285,6 +293,7 @@ bool	Init_MSR_Nehalem(void *uArg)
 
 				// - Set the fixed counter bits
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->SHM->C[cpu].FixedPerfCounter)) != -1);
+				A->SaveArea[cpu].FixedPerfCounter=A->SHM->C[cpu].FixedPerfCounter;
 				A->SHM->C[cpu].FixedPerfCounter.EN1_OS=1;
 				A->SHM->C[cpu].FixedPerfCounter.EN2_OS=1;
 				A->SHM->C[cpu].FixedPerfCounter.EN1_Usr=1;
@@ -322,6 +331,8 @@ bool	Init_MSR_Nehalem(void *uArg)
 					perror(warning);
 					rc=((retval=Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_OVF_CTRL, (GLOBAL_PERF_OVF_CTRL *) &OvfControl)) != -1);
 				}
+				// Initialize C-States.
+				A->Arch[A->SHM->P.ArchID].uCycle(A, cpu, 0);
 
 				// Retreive the Thermal Junction Max. Fallback to 100°C if not available.
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, MSR_TEMPERATURE_TARGET, (TJMAX *) &A->SHM->C[cpu].TjMax)) != -1);
@@ -343,28 +354,48 @@ bool	Init_MSR_Nehalem(void *uArg)
 }
 
 // Close all MSR handles.
-void	Close_MSR(uARG *A)
+bool	Close_MSR_Only(void *uArg)
 {
+	uARG *A=(uARG *) uArg;
+
 	int	cpu=0;
 	for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
 		if(A->SHM->C[cpu].T.Offline != true)
 		{
-			// Reset the fixed counters.
-			A->SHM->C[cpu].FixedPerfCounter.EN1_Usr=0;
-			A->SHM->C[cpu].FixedPerfCounter.EN2_Usr=0;
-			A->SHM->C[cpu].FixedPerfCounter.EN1_OS=0;
-			A->SHM->C[cpu].FixedPerfCounter.EN2_OS=0;
-			A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN1=0;
-			A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN2=0;
-			Write_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR_CTRL, &A->SHM->C[cpu].FixedPerfCounter);
-			// Reset the global counters.
-			A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1=0;
-			A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR2=0;
-			Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, &A->SHM->C[cpu].GlobalPerfCounter);
 			// Release the MSR handle associated to the Core.
 			if(A->SHM->C[cpu].FD != -1)
 				close(A->SHM->C[cpu].FD);
 		}
+	return(false);
+}
+
+bool	Close_MSR_Counters(void *uArg)
+{
+	uARG *A=(uARG *) uArg;
+
+	int	cpu=0;
+	for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+		if(A->SHM->C[cpu].T.Offline != true)
+		{
+			// Reset the fixed and the global counters.
+			if(A->SHM->CPL.RESET == true)
+			{
+				A->SaveArea[cpu].FixedPerfCounter.EN1_Usr=0;
+				A->SaveArea[cpu].FixedPerfCounter.EN2_Usr=0;
+				A->SaveArea[cpu].FixedPerfCounter.EN1_OS=0;
+				A->SaveArea[cpu].FixedPerfCounter.EN2_OS=0;
+				A->SaveArea[cpu].FixedPerfCounter.AnyThread_EN1=0;
+				A->SaveArea[cpu].FixedPerfCounter.AnyThread_EN2=0;
+				A->SaveArea[cpu].GlobalPerfCounter.EN_FIXED_CTR1=0;
+				A->SaveArea[cpu].GlobalPerfCounter.EN_FIXED_CTR2=0;
+			}
+			Write_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR_CTRL, &A->SaveArea[cpu].FixedPerfCounter);
+			Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, &A->SaveArea[cpu].GlobalPerfCounter);
+			// Release the MSR handle associated to the Core.
+			if(A->SHM->C[cpu].FD != -1)
+				close(A->SHM->C[cpu].FD);
+		}
+	return(false);
 }
 
 // Read the Time Stamp Counter.
@@ -374,7 +405,7 @@ static __inline__ unsigned long long int RDTSC(void)
 
 	__asm__ volatile
 	(
-		"rdtsc;"
+		"rdtsc"
 		:"=a" (Lo),
 		 "=d" (Hi)
 	);
@@ -699,7 +730,6 @@ void	Read_Features(FEATURES *features)
 	int BX=0, DX=0, CX=0;
 	__asm__ volatile
 	(
-		";xorq	%%rax, %%rax    \n\t"
 		"cpuid"
 		: "=b"	(BX),
 		  "=d"	(DX),
@@ -715,7 +745,6 @@ void	Read_Features(FEATURES *features)
 
 	__asm__ volatile
 	(
-		";movq	$0x1, %%rax     \n\t"
 		"cpuid"
 		: "=a"	(features->Std.AX),
 		  "=b"	(features->Std.BX),
@@ -728,7 +757,6 @@ void	Read_Features(FEATURES *features)
 	);
 	__asm__ volatile
 	(
-		";movq	$0x4, %%rax     \n\t"
 		"xorq	%%rcx, %%rcx    \n\t"
 		"cpuid                  \n\t"
 		"shr	$26, %%rax      \n\t"
@@ -742,8 +770,7 @@ void	Read_Features(FEATURES *features)
 	);
 	__asm__ volatile
 	(
-		";movq	$0x6, %%rax     \n\t"
-		"cpuid;"
+		"cpuid"
 		: "=a"	(features->Thermal_Power_Leaf.AX),
 		  "=b"	(features->Thermal_Power_Leaf.BX),
 		  "=c"	(features->Thermal_Power_Leaf.CX),
@@ -755,7 +782,6 @@ void	Read_Features(FEATURES *features)
 	);
 	__asm__ volatile
 	(
-		";movq	$0x7, %%rax     \n\t"
 		"xorq	%%rbx, %%rbx    \n\t"
 		"xorq	%%rcx, %%rcx    \n\t"
 		"xorq	%%rdx, %%rdx    \n\t"
@@ -771,7 +797,6 @@ void	Read_Features(FEATURES *features)
 	);
 	__asm__ volatile
 	(
-		";movq	$0xa, %%rax     \n\t"
 		"cpuid"
 		: "=a"	(features->Perf_Monitoring_Leaf.AX),
 		  "=b"	(features->Perf_Monitoring_Leaf.BX),
@@ -784,7 +809,6 @@ void	Read_Features(FEATURES *features)
 	);
 	__asm__ volatile
 	(
-		";movq	$0x80000000, %%rax      \n\t"
 		"cpuid"
 		: "=a"	(features->LargestExtFunc)
                 : "a" (0x80000000)
@@ -796,7 +820,6 @@ void	Read_Features(FEATURES *features)
 	{
 		__asm__ volatile
 		(
-			";movq	$0x80000007, %%rax      \n\t"
 			"cpuid                          \n\t"
 			"and	$0x100, %%rdx           \n\t"
 			"shr	$8, %%rdx"
@@ -808,7 +831,6 @@ void	Read_Features(FEATURES *features)
 		);
 		__asm__ volatile
 		(
-			";movq	$0x80000001, %%rax      \n\t"
 			"cpuid"
 			: "=c"	(features->ExtFunc.CX),
 			  "=d"	(features->ExtFunc.DX)
@@ -879,7 +901,6 @@ static void *uReadAPIC(void *uApic)
 		{
 			__asm__ volatile
 			(
-				";movq	$0xb, %%rax     \n\t"
 				"cpuid"
 				: "=a"	(ExtTopology.AX),
 				  "=b"	(ExtTopology.BX),
@@ -1337,10 +1358,11 @@ void	Play(uARG *A, char ID)
 	switch(ID)
 	{
 		case ID_DONE:
-				A->SHM->PlayID=ID_NULL;
+			atomic_store(&A->SHM->PlayID, ID_NULL);
 			break;
 		case ID_QUIT:
-				A->LOOP=false;
+			A->LOOP=false;
+			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_INCLOOP:
 			if(A->SHM->P.IdleTime < IDLE_COEF_MAX)
@@ -1348,6 +1370,7 @@ void	Play(uARG *A, char ID)
 				A->SHM->P.IdleTime++;
 				SelectBaseClock(A);
 			}
+			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_DECLOOP:
 			if(A->SHM->P.IdleTime > IDLE_COEF_MIN)
@@ -1355,6 +1378,7 @@ void	Play(uARG *A, char ID)
 				A->SHM->P.IdleTime--;
 				SelectBaseClock(A);
 			}
+			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_SCHED:
 			if(A->SHM->CPL.PROC)
@@ -1369,33 +1393,39 @@ void	Play(uARG *A, char ID)
 				else
 					A->SHM->S.Monitor=false;
 			}
+			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_RESET:
-				A->SHM->P.Cold=0;
+			A->SHM->P.Cold=0;
+			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_TSC:
 			{
 				A->SHM->P.ClockSrc=SRC_TSC;
 				SelectBaseClock(A);
 			}
+			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_BIOS:
 			{
 				A->SHM->P.ClockSrc=SRC_BIOS;
 				SelectBaseClock(A);
 			}
+			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_SPEC:
 			{
 				A->SHM->P.ClockSrc=SRC_SPEC;
 				SelectBaseClock(A);
 			}
+			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_ROM:
 			{
 				A->SHM->P.ClockSrc=SRC_ROM;
 				SelectBaseClock(A);
 			}
+			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 	}
 }
@@ -1539,34 +1569,34 @@ int main(int argc, char *argv[])
 
 		.Arch=
 		{
-			{ _GenuineIntel,         2,  ClockSpeed_GenuineIntel,         calloc(12 + 1, 1),           uCycle_GenuineIntel, Init_MSR_GenuineIntel },
-			{ _Core_Yonah,           2,  ClockSpeed_Core,                 "Core/Yonah",                uCycle_GenuineIntel, Init_MSR_GenuineIntel },
-			{ _Core_Conroe,          2,  ClockSpeed_Core2,                "Core2/Conroe",              uCycle_Core,         Init_MSR_Core         },
-			{ _Core_Kentsfield,      4,  ClockSpeed_Core2,                "Core2/Kentsfield",          uCycle_Core,         Init_MSR_Core         },
-			{ _Core_Yorkfield,       4,  ClockSpeed_Core2,                "Core2/Yorkfield",           uCycle_Core,         Init_MSR_Core         },
-			{ _Core_Dunnington,      6,  ClockSpeed_Core2,                "Xeon/Dunnington",           uCycle_Core,         Init_MSR_Core         },
-			{ _Atom_Bonnell,         2,  ClockSpeed_Atom,                 "Atom/Bonnell",              uCycle_Core,         Init_MSR_Core         },
-			{ _Atom_Silvermont,      8,  ClockSpeed_Atom,                 "Atom/Silvermont",           uCycle_Core,         Init_MSR_Core         },
-			{ _Atom_Lincroft,        1,  ClockSpeed_Atom,                 "Atom/Lincroft",             uCycle_Core,         Init_MSR_Core         },
-			{ _Atom_Clovertrail,     2,  ClockSpeed_Atom,                 "Atom/Clovertrail",          uCycle_Core,         Init_MSR_Core         },
-			{ _Atom_Saltwell,        2,  ClockSpeed_Atom,                 "Atom/Saltwell",             uCycle_Core,         Init_MSR_Core         },
-			{ _Silvermont_637,       4,  ClockSpeed_Silvermont,           "Silvermont",                uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _Silvermont_64D,       4,  ClockSpeed_Silvermont,           "Silvermont",                uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _Nehalem_Bloomfield,   4,  ClockSpeed_Nehalem_Bloomfield,   "Nehalem/Bloomfield",        uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _Nehalem_Lynnfield,    4,  ClockSpeed_Nehalem_Lynnfield,    "Nehalem/Lynnfield",         uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _Nehalem_MB,           2,  ClockSpeed_Nehalem_MB,           "Nehalem/Mobile",            uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _Nehalem_EX,           8,  ClockSpeed_Nehalem_EX,           "Nehalem/eXtreme.EP",        uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _Westmere,             2,  ClockSpeed_Westmere,             "Westmere",                  uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _Westmere_EP,          6,  ClockSpeed_Westmere_EP,          "Westmere/EP",               uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _Westmere_EX,         10,  ClockSpeed_Westmere_EX,          "Westmere/eXtreme",          uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _SandyBridge,          4,  ClockSpeed_SandyBridge,          "SandyBridge",               uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _SandyBridge_EP,       6,  ClockSpeed_SandyBridge_EP,       "SandyBridge/eXtreme.EP",    uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _IvyBridge,            4,  ClockSpeed_IvyBridge,            "IvyBridge",                 uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _IvyBridge_EP,         6,  ClockSpeed_IvyBridge_EP,         "IvyBridge/EP",              uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _Haswell_DT,           4,  ClockSpeed_Haswell_DT,           "Haswell/Desktop",           uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _Haswell_MB,           4,  ClockSpeed_Haswell_MB,           "Haswell/Mobile",            uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _Haswell_ULT,          2,  ClockSpeed_Haswell_ULT,          "Haswell/Ultra Low TDP",     uCycle_Nehalem,      Init_MSR_Nehalem      },
-			{ _Haswell_ULX,          2,  ClockSpeed_Haswell_ULX,          "Haswell/Ultra Low eXtreme", uCycle_Nehalem,      Init_MSR_Nehalem      },
+			{ _GenuineIntel,         2,  ClockSpeed_GenuineIntel,         calloc(12 + 1, 1),           uCycle_GenuineIntel, Init_MSR_GenuineIntel, Close_MSR_Only     },
+			{ _Core_Yonah,           2,  ClockSpeed_Core,                 "Core/Yonah",                uCycle_GenuineIntel, Init_MSR_GenuineIntel, Close_MSR_Only     },
+			{ _Core_Conroe,          2,  ClockSpeed_Core2,                "Core2/Conroe",              uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Core_Kentsfield,      4,  ClockSpeed_Core2,                "Core2/Kentsfield",          uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Core_Yorkfield,       4,  ClockSpeed_Core2,                "Core2/Yorkfield",           uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Core_Dunnington,      6,  ClockSpeed_Core2,                "Xeon/Dunnington",           uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Atom_Bonnell,         2,  ClockSpeed_Atom,                 "Atom/Bonnell",              uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Atom_Silvermont,      8,  ClockSpeed_Atom,                 "Atom/Silvermont",           uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Atom_Lincroft,        1,  ClockSpeed_Atom,                 "Atom/Lincroft",             uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Atom_Clovertrail,     2,  ClockSpeed_Atom,                 "Atom/Clovertrail",          uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Atom_Saltwell,        2,  ClockSpeed_Atom,                 "Atom/Saltwell",             uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Silvermont_637,       4,  ClockSpeed_Silvermont,           "Silvermont",                uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Silvermont_64D,       4,  ClockSpeed_Silvermont,           "Silvermont",                uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Nehalem_Bloomfield,   4,  ClockSpeed_Nehalem_Bloomfield,   "Nehalem/Bloomfield",        uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Nehalem_Lynnfield,    4,  ClockSpeed_Nehalem_Lynnfield,    "Nehalem/Lynnfield",         uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Nehalem_MB,           2,  ClockSpeed_Nehalem_MB,           "Nehalem/Mobile",            uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Nehalem_EX,           8,  ClockSpeed_Nehalem_EX,           "Nehalem/eXtreme.EP",        uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Westmere,             2,  ClockSpeed_Westmere,             "Westmere",                  uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Westmere_EP,          6,  ClockSpeed_Westmere_EP,          "Westmere/EP",               uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Westmere_EX,         10,  ClockSpeed_Westmere_EX,          "Westmere/eXtreme",          uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _SandyBridge,          4,  ClockSpeed_SandyBridge,          "SandyBridge",               uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _SandyBridge_EP,       6,  ClockSpeed_SandyBridge_EP,       "SandyBridge/eXtreme.EP",    uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _IvyBridge,            4,  ClockSpeed_IvyBridge,            "IvyBridge",                 uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _IvyBridge_EP,         6,  ClockSpeed_IvyBridge_EP,         "IvyBridge/EP",              uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Haswell_DT,           4,  ClockSpeed_Haswell_DT,           "Haswell/Desktop",           uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Haswell_MB,           4,  ClockSpeed_Haswell_MB,           "Haswell/Mobile",            uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Haswell_ULT,          2,  ClockSpeed_Haswell_ULT,          "Haswell/Ultra Low TDP",     uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Haswell_ULX,          2,  ClockSpeed_Haswell_ULX,          "Haswell/Ultra Low eXtreme", uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
 		},
 		.Loader={.Monitor=true, .Array=REGISTERS_LIST},
 		.LOOP=true,
@@ -1594,17 +1624,17 @@ int main(int argc, char *argv[])
 
 			__asm__ volatile
 			(
-				"push	%%rdx		;"
-				"xorq	%%rdx, %%rdx	;"
-				"mulq	%%rcx		;"
-				"addq	%%rbx, %%rax	;"
-				"pop	%%rcx		;"
-				"divq	%%rcx		;"
-				"cmpq	$0x0, %%rdx	;"
-				"jz	AlignToPage	;"
-				"inc	%%rax		;"
-				"AlignToPage:		;"
-				"mulq	%%rcx		;"
+				"push	%%rdx		\n\t"
+				"xorq	%%rdx, %%rdx	\n\t"
+				"mulq	%%rcx		\n\t"
+				"addq	%%rbx, %%rax	\n\t"
+				"pop	%%rcx		\n\t"
+				"divq	%%rcx		\n\t"
+				"cmpq	$0x0, %%rdx	\n\t"
+				"jz	AlignToPage	\n\t"
+				"inc	%%rax		\n\t"
+				"AlignToPage:		\n\t"
+				"mulq	%%rcx"
 				: "=a"	(ShmSize)
 				: "a"	(sizeof(tSHM.C[0])),
 				  "b"	(sizeof(tSHM)),
@@ -1620,7 +1650,10 @@ int main(int argc, char *argv[])
 			// Store the Server application signature.
 			strncpy(A.SHM->AppName, _APPNAME, TASK_COMM_LEN - 1);
 
+			atomic_init(&A.SHM->PlayID, ID_NULL);
+
 			A.SHM->CPL.MSR=false;
+			A.SHM->CPL.RESET=false;
 			A.SHM->CPL.BIOS=false,
 			A.SHM->CPL.IMC=false,
 			A.SHM->CPL.PROC=true;
@@ -1653,9 +1686,13 @@ int main(int argc, char *argv[])
 			A.Options[3].pointer=&A.SHM->P.IdleTime;
 			A.Options[4].pointer=&A.SHM->D.Monitor;
 			A.Options[5].pointer=&A.SHM->S.Attributes;
+			A.Options[6].pointer=&A.SHM->CPL.RESET;
 
 			if(ScanOptions(&A, argc, argv))
 			{
+				if(A.SHM->P.IdleTime < IDLE_COEF_MIN)	A.SHM->P.IdleTime=IDLE_COEF_MIN;
+				if(A.SHM->P.IdleTime > IDLE_COEF_MAX)	A.SHM->P.IdleTime=IDLE_COEF_MAX;
+
 				Sync_Init(&A.SHM->Sync);
 
 				sigemptyset(&A.Signal);
@@ -1686,7 +1723,6 @@ int main(int argc, char *argv[])
 							break;
 					} while(A.SHM->P.ArchID >=0);
 				}
-
 				if(!(A.SHM->P.CPU=A.SHM->P.Features.ThreadCount))
 				{
 					perror("Warning: cannot read the maximum number of Cores from CPUID");
@@ -1720,7 +1756,6 @@ int main(int argc, char *argv[])
 					strcat(remark, "specifications");
 					perror(remark);
 				}
-
 				A.SHM->P.OnLine=Create_Topology(&A);
 
 				if(A.SHM->P.Features.HTT_enabled)
@@ -1728,19 +1763,22 @@ int main(int argc, char *argv[])
 				else
 					A.SHM->P.PerCore=true;
 
-				// Open once the MSR gate.
-				if(!(A.SHM->CPL.MSR=A.Arch[A.SHM->P.ArchID].Init_MSR(&A)))
-					perror("Warning: cannot read the MSR registers\nCheck if the 'msr' kernel module is loaded");
-
-				// Read the Integrated Memory Controler information.
-				if((A.SHM->CPL.IMC=IMC_Read_Info(&A)) == false)
-					perror("Warning: cannot read the IMC controler");
-
-				SelectBaseClock(&A);
-
 				if(A.SHM->P.ArchID != -1)
 				{
 					unsigned int cpu=0;
+
+					A.SaveArea=calloc(A.SHM->P.CPU, sizeof(struct SAVEAREA));
+					uAPIC *uApic=calloc(A.SHM->P.CPU, sizeof(uAPIC));
+
+					// Open once the MSR gate.
+					if(!(A.SHM->CPL.MSR=A.Arch[A.SHM->P.ArchID].Init_MSR(&A)))
+						perror("Warning: cannot read the MSR registers\nCheck if the 'msr' kernel module is loaded");
+
+					// Read the Integrated Memory Controler information.
+					if((A.SHM->CPL.IMC=IMC_Read_Info(&A)) == false)
+						perror("Warning: cannot read the IMC controler");
+
+					SelectBaseClock(&A);
 
 					memcpy(&A.SHM->H.Signature, &A.Arch[A.SHM->P.ArchID].Signature, sizeof(struct SIGNATURE));
 					A.SHM->H.MaxOfCores=A.Arch[A.SHM->P.ArchID].MaxOfCores;
@@ -1762,15 +1800,8 @@ int main(int argc, char *argv[])
 						Version);
 					fflush(stdout);
 
-					uAPIC *uApic=calloc(A.SHM->P.CPU, sizeof(uAPIC));
-
-					// Initialize C-States.
-					for(cpu=0; cpu < A.SHM->P.CPU; cpu++)
-						if(A.SHM->C[cpu].T.Offline != true)
-							A.Arch[A.SHM->P.ArchID].uCycle(&A, cpu, 0);
-
 					while(A.LOOP)
-					{
+					{	// Fire [tasks schedule monitoring] & [MSR dump] threads.
 						bool fJoinSchedThread=false;
 						if(A.SHM->S.Monitor && A.SHM->CPL.PROC)
 							fJoinSchedThread=A.SHM->S.Monitor=(pthread_create(&A.TID_Schedule, NULL, uSchedule, &A) == 0);
@@ -1782,6 +1813,7 @@ int main(int argc, char *argv[])
 						A.SHM->P.Avg.Turbo=A.SHM->P.Avg.C0=A.SHM->P.Avg.C3=A.SHM->P.Avg.C6=0;
 						unsigned int maxFreq=0, maxTemp=A.SHM->C[0].TjMax.Target;
 
+						// Fire C-States threads.
 						for(cpu=0; cpu < A.SHM->P.CPU; cpu++)
 							if(A.SHM->C[cpu].T.Offline != true)
 							{
@@ -1789,6 +1821,7 @@ int main(int argc, char *argv[])
 								uApic[cpu].A=&A;
 								pthread_create(&uApic[cpu].TID, NULL, uCycle, &uApic[cpu]);
 							}
+						// Synchronize threads.
 						for(cpu=0; cpu < A.SHM->P.CPU; cpu++)
 							if(A.SHM->C[cpu].T.Offline != true)
 							{
@@ -1831,33 +1864,29 @@ int main(int argc, char *argv[])
 
 						Sync_Signal(1, &A.SHM->Sync);
 
+						char RequestID=atomic_load(&A.SHM->PlayID);
 						// Settle down N x 50000 microseconds as specified by the command argument.
 						long int idleRemaining;
 						if((idleRemaining=Sync_Wait(0, &A.SHM->Sync, A.SHM->P.IdleTime)))
 						{
-							if(A.SHM->PlayID != ID_NULL)
-							{
-								Play(&A, A.SHM->PlayID);
+							if(RequestID != ID_NULL)
+								Play(&A, RequestID);
 
-								A.SHM->PlayID=ID_DONE;
-
-								if(A.SHM->P.IdleTime < IDLE_COEF_MIN)	A.SHM->P.IdleTime=IDLE_COEF_MIN;
-								if(A.SHM->P.IdleTime > IDLE_COEF_MAX)	A.SHM->P.IdleTime=IDLE_COEF_MAX;
-							}
 							usleep(IDLE_BASE_USEC*idleRemaining);
 						}
+						else Play(&A, RequestID);
 					}
-					// Shutting down.
+					// Release the ressources.
+					A.SHM->CPL.MSR=A.Arch[A.SHM->P.ArchID].Close_MSR(&A);
+
 					free(uApic);
+					free(A.SaveArea);
 				}
 				else
 				{
 					perror(NULL);
 					rc=2;
 				}
-				// Release the ressources.
-				Close_MSR(&A);
-
 				if(fEmergencyThread == true)
 				{
 					pthread_kill(A.TID_SigHandler, SIGUSR1);
@@ -1884,7 +1913,6 @@ int main(int argc, char *argv[])
 		perror("Error: missing root privileges");
 		rc=2;
 	}
-
 	free(A.Arch[0].Architecture);
 
 	return(rc);

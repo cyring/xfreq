@@ -1,7 +1,7 @@
 /*
  * xfreq-gui.c by CyrIng
  *
- * Copyright (C) 2013-2014 CYRIL INGENIERIE
+ * Copyright (C) 2013-2015 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
@@ -42,14 +42,33 @@
 static  char    Version[] = AutoDate;
 
 
-unsigned long long
-	DumpRegister(unsigned long long value, char *pHexStr, char *pBinStr)
+unsigned long long int
+	DumpRegister(unsigned long long int DecVal, char *pHexStr, char *pBinStr)
 {
-	char hexStr[16+1]={0}, binStr[64+1]={0};
-	// Convert value as an ASCII UPPERCASE Hexadecimal.
-	sprintf(hexStr, REG_HEXVAL, value);
-	// Convert value as an ASCII Binary.
-	const char *BIN[0x10]=	{
+	const char HEX[0x10]=
+		{
+			'0',
+			'1',
+			'2',
+			'3',
+
+			'4',
+			'5',
+			'6',
+			'7',
+
+			'8',
+			'9',
+			'A',
+			'B',
+
+			'C',
+			'D',
+			'E',
+			'F',
+		};
+	const char *BIN[0x10]=
+		{
 			"0000",
 			"0001",
 			"0010",
@@ -69,24 +88,23 @@ unsigned long long
 			"1101",
 			"1110",
 			"1111",
-			};
-	unsigned int H=0, nibble=0;
-	for(H=0; H < strlen(hexStr); H++) {
-		nibble=(int) hexStr[H];
-		nibble=(nibble > (int) '9') ? 10 + nibble - (int) 'A' : nibble - (int) '0';
-		binStr[(H << 2)+0]=BIN[nibble][0];
-		binStr[(H << 2)+1]=BIN[nibble][1];
-		binStr[(H << 2)+2]=BIN[nibble][2];
-		binStr[(H << 2)+3]=BIN[nibble][3];
+		};
+	unsigned int I, H=0xf;
+	for(I=1; I <= 16; I++)
+	{
+		const unsigned int B=H<<2, nibble=DecVal & 0xf;
+		if(pHexStr != NULL)
+			pHexStr[H]=HEX[nibble];
+		if(pBinStr != NULL)
+		{
+			pBinStr[B  ]=BIN[nibble][0];
+			pBinStr[B+1]=BIN[nibble][1];
+			pBinStr[B+2]=BIN[nibble][2];
+			pBinStr[B+3]=BIN[nibble][3];
+		}
+		H--; DecVal=DecVal>>4;
 	}
-
-	// Terminate string and copy back to caller.
-	binStr[(H << 2)]='\0';
-	if(pHexStr != NULL)
-		strcpy(pHexStr, hexStr);
-	if(pBinStr != NULL)
-		strcpy(pBinStr, binStr);
-	return(value);
+	return(DecVal);
 }
 
 void	ClearMsg(uARG *A) {
@@ -2945,11 +2963,9 @@ void	Play(uARG *A, int G, char ID)
 			{
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 
-				A->SHM->PlayID=ID;
+				atomic_store(&A->SHM->PlayID, ID);
 
 				Sync_Signal(0, &A->SHM->Sync);
-
-				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
 	}
@@ -3198,18 +3214,20 @@ static void *uDraw(void *uArg)
 	while(A->LOOP)
 		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + 1)))
 		{
+			bool fResetCursor=(atomic_load(&A->SHM->PlayID) == ID_DONE);
 			int G=0;
 			for(G=MAIN; G < WIDGETS; G++)
 			{
 				if(!A->PAUSE[G])
-					fDraw(G, (A->SHM->PlayID == ID_DONE) ? true : false, true);
+					fDraw(G, (atomic_load(&A->SHM->PlayID) == ID_DONE) ? true : false, true);
 
 				if(!(A->L.UnMapBitmask & (1 << G)))
 					UpdateWidgetName(A, G);
+
+				if(fResetCursor)
+					XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 		}
-		else
-			Proc_Quit(A);
 	return(NULL);
 }
 
