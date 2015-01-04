@@ -3212,7 +3212,7 @@ static void *uDraw(void *uArg)
 
 	long int idleRemaining;
 	while(A->LOOP)
-		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + 1)))
+		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + IDLE_COEF_DEF + IDLE_COEF_MIN)))
 		{
 			bool fResetCursor=(atomic_load(&A->SHM->PlayID) == ID_DONE);
 			int G=0;
@@ -3228,6 +3228,8 @@ static void *uDraw(void *uArg)
 					XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 		}
+	else
+		Proc_Quit(A);
 	return(NULL);
 }
 

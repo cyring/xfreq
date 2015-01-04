@@ -27,8 +27,8 @@ clean-all:
 #
 $(APP_NAME)	: $(APP_NAME).o
 		@if [ ! -d $(BIN_PATH) ]; then mkdir $(BIN_PATH); fi
-		cc $(OBJ_PATH)/$(APP_NAME).o $(LIB4x86_FLAGS) -o $(BIN_PATH)/$(APP_NAME)
+		$(CC) $(OBJ_PATH)/$(APP_NAME).o $(LIB4x86_FLAGS) -o $(BIN_PATH)/$(APP_NAME)
 #
 $(APP_NAME).o	: $(APP_NAME).c
 		@if [ ! -d $(OBJ_PATH) ]; then mkdir $(OBJ_PATH); fi
-		cc -D$(KERNEL) $(CFLAGS) -c $(APP_NAME).c $(INC4x86_PATH) -o $(OBJ_PATH)/$(APP_NAME).o
+		$(CC) -D$(KERNEL) $(CFLAGS) -c $(APP_NAME).c $(INC4x86_PATH) -o $(OBJ_PATH)/$(APP_NAME).o

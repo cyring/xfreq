@@ -489,7 +489,7 @@ double	ClockSpeed_Core2()
 		return(100.00f);
 };
 
-// [Atom]
+// [Atom]. See Linux:tsc_msr.c
 double	ClockSpeed_Atom()
 {
 	int FD=0;
@@ -501,19 +501,19 @@ double	ClockSpeed_Atom()
 		switch(FSB.Bus_Speed)
 		{
 			case 0b111:
-				return(83.00f);
+				return(83.20f);
 				break;
 			case 0b101:
-				return(100.00f);
+				return(99.84f);
 				break;
 			case 0b001:
-				return(133.33f);
+				return(133.20f);
 				break;
 			case 0b011:
-				return(166.67f);
+				return(166.40f);
 				break;
 			default:
-				return(83.00f);
+				return(83.20f);
 				break;
 		}
 	}
@@ -736,7 +736,7 @@ void	Read_Features(FEATURES *features)
 		  "=c"	(CX)
                 : "a" (0x0)
 #if defined(FreeBSD)
-		: "ecx", "ebx"
+		: "rcx", "rbx"
 #endif
 	);
 	features->VendorID[0]=BX; features->VendorID[1]=(BX >> 8); features->VendorID[2]= (BX >> 16); features->VendorID[3]= (BX >> 24);
@@ -752,7 +752,7 @@ void	Read_Features(FEATURES *features)
 		  "=d"	(features->Std.DX)
                 : "a" (0x1)
 #if defined(FreeBSD)
-		: "ecx", "ebx"
+		: "rcx", "rbx"
 #endif
 	);
 	__asm__ volatile
@@ -765,7 +765,7 @@ void	Read_Features(FEATURES *features)
 		: "=a"	(features->ThreadCount)
                 : "a" (0x4)
 #if defined(FreeBSD)
-		: "ecx", "ebx"
+		: "rcx", "rbx"
 #endif
 	);
 	__asm__ volatile
@@ -777,7 +777,7 @@ void	Read_Features(FEATURES *features)
 		  "=d"	(features->Thermal_Power_Leaf.DX)
                 : "a" (0x6)
 #if defined(FreeBSD)
-		: "ecx", "ebx"
+		: "rcx", "rbx"
 #endif
 	);
 	__asm__ volatile
@@ -792,7 +792,7 @@ void	Read_Features(FEATURES *features)
 		  "=d"	(features->ExtFeature.DX)
                 : "a" (0x7)
 #if defined(FreeBSD)
-		: "ecx", "ebx"
+		: "rcx", "rbx"
 #endif
 	);
 	__asm__ volatile
@@ -804,7 +804,7 @@ void	Read_Features(FEATURES *features)
 		  "=d"	(features->Perf_Monitoring_Leaf.DX)
                 : "a" (0xa)
 #if defined(FreeBSD)
-		: "ecx", "ebx"
+		: "rcx", "rbx"
 #endif
 	);
 	__asm__ volatile
@@ -813,7 +813,7 @@ void	Read_Features(FEATURES *features)
 		: "=a"	(features->LargestExtFunc)
                 : "a" (0x80000000)
 #if defined(FreeBSD)
-		: "ecx", "ebx"
+		: "rcx", "rbx"
 #endif
 	);
 	if(features->LargestExtFunc >= 0x80000004 && features->LargestExtFunc <= 0x80000008)
@@ -826,7 +826,7 @@ void	Read_Features(FEATURES *features)
 			: "=d"	(features->InvariantTSC)
 			: "a" (0x80000007)
 #if defined(FreeBSD)
-			: "ecx", "ebx"
+			: "rcx", "rbx"
 #endif
 		);
 		__asm__ volatile
@@ -836,7 +836,7 @@ void	Read_Features(FEATURES *features)
 			  "=d"	(features->ExtFunc.DX)
 			: "a" (0x80000001)
 #if defined(FreeBSD)
-			: "ecx", "ebx"
+			: "rcx", "rbx"
 #endif
 		);
 		struct
@@ -859,7 +859,7 @@ void	Read_Features(FEATURES *features)
 				  "=d"	(Brand.DX)
 				: "a"	(0x80000002 + ix)
 #if defined(FreeBSD)
-				: "ecx", "ebx"
+				: "rcx", "rbx"
 #endif
 			);
 				for(jx=0; jx<4; jx++, px++)
@@ -909,7 +909,7 @@ static void *uReadAPIC(void *uApic)
 				:  "a"	(0xb),
 				   "c"	(InputLevel)
 #if defined(FreeBSD)
-				: "ecx", "ebx"
+				: "rcx", "rbx"
 #endif
 			);
 			// Exit from the loop if the BX register equals 0; or if the requested level exceeds the level of a Core.
@@ -1357,12 +1357,14 @@ void	Play(uARG *A, char ID)
 {
 	switch(ID)
 	{
+		case ID_NULL:
+			break;
 		case ID_DONE:
 			atomic_store(&A->SHM->PlayID, ID_NULL);
 			break;
 		case ID_QUIT:
 			A->LOOP=false;
-			atomic_store(&A->SHM->PlayID, ID_DONE);
+			atomic_store(&A->SHM->PlayID, ID_NULL);
 			break;
 		case ID_INCLOOP:
 			if(A->SHM->P.IdleTime < IDLE_COEF_MAX)
@@ -1869,12 +1871,11 @@ int main(int argc, char *argv[])
 						long int idleRemaining;
 						if((idleRemaining=Sync_Wait(0, &A.SHM->Sync, A.SHM->P.IdleTime)))
 						{
-							if(RequestID != ID_NULL)
-								Play(&A, RequestID);
+							Play(&A, RequestID);
 
 							usleep(IDLE_BASE_USEC*idleRemaining);
 						}
-						else Play(&A, RequestID);
+						else	Play(&A, RequestID);
 					}
 					// Release the ressources.
 					A.SHM->CPL.MSR=A.Arch[A.SHM->P.ArchID].Close_MSR(&A);

@@ -64,8 +64,8 @@ typedef	struct {
 #define	CPU_AP		"/dev/cpu/999/msr"
 #define	CPU_DEV		"/dev/cpu/%d/msr"
 
-#define	Read_MSR(FD, offset, msr)  pread(FD, msr, sizeof(*msr), offset)
-#define	Write_MSR(FD, offset, msr) pwrite(FD, msr, sizeof(*msr), offset)
+#define	Read_MSR(FD, msr, data)  pread(FD, data, sizeof(*data), msr)
+#define	Write_MSR(FD, msr, data) pwrite(FD, data, sizeof(*data), msr)
 #else // (FreeBSD) & Posix fix.
 #define	CPU_BP		"/dev/cpuctl0"
 #define	CPU_AP		"/dev/cpuctl999"

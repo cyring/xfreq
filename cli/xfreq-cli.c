@@ -52,7 +52,7 @@ static void *uRead(void *uArg)
 
 	long int idleRemaining;
 	while(A->LOOP)
-		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + 1)))
+		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + IDLE_COEF_DEF + IDLE_COEF_MIN)))
 		{
 			printf("\nCPU# Freq. Ratio x BCLK Temps\tTask scheduling\n");
 			int cpu=0;

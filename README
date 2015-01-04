@@ -172,6 +172,11 @@
  *
  * [HISTORY]
  *
+ * R 2.1.40-b: 01/04/2015
+ *        - Fixed threads synchronism timeout.
+ *        - Provided a global Makefile.
+ *        - Copied the frequency values ​​of the Atom from the Kernel source code.
+ *
  * R 2.1.40-a: 01/03/2015
  *        - Preserve the MSR Counters in a Save Area.
  *        - Apply an atomic variable to server requests.

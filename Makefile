@@ -1,3 +1,4 @@
+export CC
 APP_NAME=xfreq-intel xfreq-gui xfreq-cli
 #
 all :		$(APP_NAME)
