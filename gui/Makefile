@@ -6,7 +6,7 @@ SRC_PATH=.
 OBJ_PATH=./obj
 BIN_PATH=./bin
 INC4x86_PATH=-I ../api
-LIB4x86_FLAGS=-lX11 -lpthread -lrt
+LIB4x86_FLAGS=-lX11 -lpthread -lrt ../api/obj/xfreq-api.o
 #
 all :		$(APP_NAME)
 #

@@ -28,6 +28,9 @@
 			<Add option="-lpthread" />
 			<Add option="-lrt" />
 		</Linker>
+		<Unit filename="../api/xfreq-api.c">
+			<Option compilerVar="CC" />
+		</Unit>
 		<Unit filename="../api/xfreq-api.h" />
 		<Unit filename="xfreq-cli.c">
 			<Option compilerVar="CC" />

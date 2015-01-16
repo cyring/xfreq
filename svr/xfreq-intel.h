@@ -91,13 +91,13 @@ int	Write_MSR(int FD, int msr, unsigned long long int *data) \
 #define	cpu_set_t cpuset_t
 #define	pthread_setname_np pthread_set_name_np
 #endif
-
+/*
 #define	SMBIOS_PROCINFO_STRUCTURE	4
 #define	SMBIOS_PROCINFO_INSTANCE	0
 #define	SMBIOS_PROCINFO_EXTCLK		0x12
 #define	SMBIOS_PROCINFO_CORES		0x23
 #define	SMBIOS_PROCINFO_THREADS		0x25
-
+*/
 
 //	[GenuineIntel]
 #define	_GenuineIntel			{.ExtFamily=0x0, .Family=0x0, .ExtModel=0x0, .Model=0x0}
@@ -251,9 +251,24 @@ typedef struct
 
 typedef struct
 {
-	int		FD;
+	struct
+	{
+		int	Shm,
+			SmBIOS;
+	} FD;
+
 	SHM_STRUCT	*SHM;
 
+	SMBIOS_TREE	*SmBIOS;
+
+	struct
+	{
+		size_t	Shm,
+			SmBIOS;
+	} Size;
+
+	SMBIOS_TREE	Smb;
+	FEATURES	Features;
 	ARCH		Arch[ARCHITECTURES];
 const	DUMP_STRUCT	Loader;
 

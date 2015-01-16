@@ -23,8 +23,15 @@ typedef struct
 
 typedef struct
 {
-	int		FD;
+	struct
+	{
+		int	Shm,
+			SmBIOS;
+	} FD;
+
 	SHM_STRUCT	*SHM;
+	SMBIOS_TREE	*SmBIOS;
+
 	unsigned int	Room;
 
 	sigset_t	Signal;

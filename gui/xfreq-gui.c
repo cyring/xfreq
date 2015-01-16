@@ -36,6 +36,7 @@
 #endif
 
 #define	_APPNAME "XFreq-Gui"
+#include "xfreq-smbios.h"
 #include "xfreq-api.h"
 #include "xfreq-gui.h"
 
@@ -2149,6 +2150,59 @@ void	BuildLayout(uARG *A, int G)
 				free(buf[0]);
 				free(buf[1]);
 
+				if(A->SHM->CPL.SMBIOS == true)
+				{
+					const float tension[0B1000]={0.0f, 5.0f, 3.3f, 0.0f, 2.9f, 0.0f, 0.0f, 0.0f};
+					unsigned long long totalMemSize=0;
+					int                ix=0;
+					for(ix=0; ix < A->SHM->B->MemArray->Attrib->Number_Devices; ix++)
+						totalMemSize+=A->SHM->B->Memory[ix]->Attrib->Size;
+
+					strcat(items, SMBIOS_SECTION);
+
+					sprintf(str, SMBIOS4_FORMAT,
+						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Proc, A->SHM->B->Proc->Attrib->Version),
+						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Proc, A->SHM->B->Proc->Attrib->Socket),
+						A->SHM->B->Proc->Attrib->Voltage.Mode ? \
+							A->SHM->B->Proc->Attrib->Voltage.Tension / 10.0f \
+							: tension[A->SHM->B->Proc->Attrib->Voltage.Tension & 0B0111]);
+					strcat(items, str);
+
+					for(ix=0; ix < 3; ix++)
+					{
+						sprintf(str, SMBIOS7_FORMAT, \
+							SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Cache[ix], A->SHM->B->Cache[ix]->Attrib->Socket), \
+							A->SHM->B->Cache[ix]->Attrib->Installed_Size, ix < 2 ? "     " : "");
+						strcat(items, str);
+					}
+
+					sprintf(str, SMBIOS2_FORMAT,
+						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Product),
+						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Version),
+						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Manufacturer));
+					strcat(items, str);
+
+					sprintf(str, SMBIOS0_FORMAT,
+						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Bios, A->SHM->B->Bios->Attrib->Vendor),
+						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Bios, A->SHM->B->Bios->Attrib->Version),
+						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Bios, A->SHM->B->Bios->Attrib->Release_Date),
+						A->SHM->B->Bios->Attrib->Major_Release, A->SHM->B->Bios->Attrib->Minor_Release,
+						64 * (1 + A->SHM->B->Bios->Attrib->ROM_Size), A->SHM->B->Bios->Attrib->Address);
+					strcat(items, str);
+
+					sprintf(str, SMBIOS16_FORMAT,
+						totalMemSize, A->SHM->B->MemArray->Attrib->Maximum_Capacity / 1024);
+					strcat(items, str);
+
+					for(ix=0; ix < A->SHM->B->MemArray->Attrib->Number_Devices; ix++)
+					{
+						sprintf(str, SMBIOS17_FORMAT, \
+							SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Memory[ix], A->SHM->B->Memory[ix]->Attrib->Socket), \
+							SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Memory[ix], A->SHM->B->Memory[ix]->Attrib->Bank), \
+							A->SHM->B->Memory[ix]->Attrib->Size, A->SHM->B->Memory[ix]->Attrib->Speed);
+						strcat(items, str);
+					}
+				}
 				strcat(items, RAM_SECTION);
 				strcat(items, CHA_FORMAT);
 
@@ -3704,7 +3758,7 @@ static void *uEmergency(void *uArg)
 			{
 				char str[sizeof(SIG_EMERGENCY_FMT)];
 				sprintf(str, SIG_EMERGENCY_FMT, caught);
-				perror(str);
+				tracerr(str);
 				A->LOOP=false;
 			}
 				break;
@@ -3732,6 +3786,7 @@ int main(int argc, char *argv[])
 	pthread_setname_np(pthread_self(), "xfreq-gui-main");
 
 	uARG	A={
+			.FD={.Shm=0, .SmBIOS=0}, .SHM=MAP_FAILED, .SmBIOS=MAP_FAILED,
 			.display=NULL,
 			.screen=NULL,
 			.TID_Draw=0,
@@ -4101,9 +4156,9 @@ int main(int argc, char *argv[])
 				strcat(BootLog, "Warning: running as root.\n");
 
 			struct stat shmStat={0};
-			if((A.FD=shm_open(SHM_FILENAME, O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) == -1)
+			if((A.FD.Shm=shm_open(SHM_FILENAME, O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) == -1)
 				strcat(BootLog, "Error: opening the shared memory.\n");
-			else if((fstat(A.FD, &shmStat) != -1) && (A.SHM=mmap(0, shmStat.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, A.FD, 0)) == MAP_FAILED)
+			else if((fstat(A.FD.Shm, &shmStat) != -1) && (A.SHM=mmap(0, shmStat.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, A.FD.Shm, 0)) == MAP_FAILED)
 				strcat(BootLog, "Error: mapping the shared memory.\n");
 			else
 				A.Room=Sync_Open(&A.SHM->Sync);
@@ -4111,8 +4166,34 @@ int main(int argc, char *argv[])
 			if(!SPLASH_HIDDEN_FLAG)
 				StopSplash(&A);
 
-			if((A.FD != -1) && (A.Room != 0) && OpenWidgets(&A))
+			if((A.FD.Shm != -1) && (A.Room != 0) && OpenWidgets(&A))
 			{
+				struct stat smbStat={0};
+				if(((A.FD.SmBIOS=shm_open(SMB_FILENAME, O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) == -1)
+				|| (fstat(A.FD.SmBIOS, &smbStat) == -1)
+				|| ((A.SmBIOS=mmap(A.SHM->B, smbStat.st_size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_FIXED, A.FD.SmBIOS, 0)) == MAP_FAILED))
+					strcat(BootLog, "Error: opening the SmBIOS shared memory");
+#if defined(DEBUG)
+
+					printf(	"\n--- SHM Map ---\n"
+						"A.SHM[%p]\n" \
+						"A.SHM->P[%p]\n" \
+						"A.SHM->H[%p]\n" \
+						"A.SHM->D[%p]\n" \
+						"A.SHM->M[%p]\n" \
+						"A.SHM->S[%p]\n" \
+						"A.SHM->B[%p]\n" \
+						"A.SHM->C[%p]\n", \
+						A.SHM, \
+						&A.SHM->P, \
+						&A.SHM->H, \
+						&A.SHM->D, \
+						&A.SHM->M, \
+						&A.SHM->S, \
+						A.SHM->B, \
+						&A.SHM->C);
+					fflush(stdout);
+#endif
 				int G=0;
 				for(G=MAIN; G < WIDGETS; G++)
 				{
@@ -4143,23 +4224,28 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					perror("Error: cannot start the thread uDraw()");
+					tracerr("Error: cannot start the thread uDraw()");
 					rc=2;
 				}
+				if((A.SmBIOS != MAP_FAILED) && (munmap(A.SmBIOS, smbStat.st_size) == -1))
+					tracerr("Error: unmapping the SmBIOS shared memory");
+				if((A.FD.SmBIOS != -1) && (close(A.FD.SmBIOS) == -1))
+					tracerr("Error: closing the SmBIOS shared memory");
+
 				CloseWidgets(&A);
 			}
 			else
 			{
-				perror("Error: failure in starting the Widgets");
+				tracerr("Error: failure in starting the Widgets");
 				rc=2;
 			}
 			// Release the ressources.
 			if(A.Room)
 				Sync_Close(A.Room, &A.SHM->Sync);
 			if((A.SHM != MAP_FAILED) && (munmap(A.SHM, shmStat.st_size) == -1))
-				perror("Error: unmapping the shared memory");
-			if((A.FD != -1) && (close(A.FD) == -1))
-				perror("Error: closing the shared memory");
+				tracerr("Error: unmapping the shared memory");
+			if((A.FD.Shm != -1) && (close(A.FD.Shm) == -1))
+				tracerr("Error: closing the shared memory");
 			if(fEmergencyThread)
 			{
 				pthread_kill(A.TID_SigHandler, SIGUSR1);
@@ -4168,7 +4254,7 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			perror(NULL);
+/*			tracerr(NULL);	*/
 			rc=2;
 		}
 		CloseDisplay(&A);

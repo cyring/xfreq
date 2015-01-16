@@ -393,7 +393,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"LAHF/SAHF [%c]       SYSCALL [%c][%3s]  RDTSCP [%c]    IA64 [%c]    BM1/BM2 [%c/%c]\n"	\
 			"\n"
 
-#define	TOPOLOGY_SECTION "Processor Topology:                                       %-3ux CPU Online\n"		\
+#define	TOPOLOGY_SECTION "Processor topology:                                       %-3ux CPU Online\n"		\
 			"CPU#    APIC    Core  Thread   State\n"
 #define	TOPOLOGY_FORMAT	"%03u %8u%8u%8u   [%3s]\n"
 
@@ -410,6 +410,23 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"Memory Controler:\n"
 #define	CHA_FORMAT	"Channel   tCL   tRCD  tRP   tRAS  tRRD  tRFC  tWR   tRTPr tWTPr tFAW  B2B\n"
 #define	CAS_FORMAT	"   #%1i   |%4d%6d%6d%6d%6d%6d%6d%6d%6d%6d%6d\n"
+
+#define	SMBIOS_SECTION	"\n"											\
+			"System Management BIOS:\n"
+#define	SMBIOS4_FORMAT	"Processor [%s]\n"									\
+			"        |- socket %s\n"								\
+			"        |- tension %.1f V\n"
+#define	SMBIOS7_FORMAT	"        |- %s [%4lld]%s\n"
+#define	SMBIOS2_FORMAT	"    Board [%s]\n"									\
+			"        |- version %s\n"								\
+			"        |- manufactured by %s\n"
+#define	SMBIOS0_FORMAT	"    BIOS  [%s]\n"									\
+			"        |- version %s\n"								\
+			"        |- released date %s\n"								\
+			"        |- revision %lld.%lld\n"							\
+			"        |- ROM Size %lld KB at 0x%04llX\n"
+#define	SMBIOS16_FORMAT	"    RAM   [%lld/%lld MB]\n"
+#define	SMBIOS17_FORMAT	"        |- %s:%s  %lld MB @ %lld MHz\n"
 
 #define	SYSINFO_SECTION	"System Information"
 //                       ## 12345 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234]
@@ -569,8 +586,16 @@ typedef	struct
 
 typedef struct
 {
-	int		FD;
+	struct
+	{
+		int	Shm,
+			SmBIOS;
+	} FD;
+
 	SHM_STRUCT	*SHM;
+
+	SMBIOS_TREE	*SmBIOS;
+
 	unsigned int	Room;
 
 	Display		*display;

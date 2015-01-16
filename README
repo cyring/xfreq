@@ -4,7 +4,7 @@
  *
  * [PURPOSE]
  *
- * XFreq provides some Widgets to display the frequency (incl. turbo), the temperature, C-States and other features of the Intel Core i7, i5 processors.
+ * XFreq provides some Widgets to display the frequency (including turbo boost), the temperature, C-States and other features of the Intel Core i7, i5 processors.
  * It also works with Core 2 architectures.
  *
  * Copyright (C) 2013-2015 CYRIL INGENIERIE
@@ -18,11 +18,21 @@
  *
  * 1- download the source code into a working directory
  *
- * xfreq.c
- *
- * xfreq.h
- *
  * Makefile
+ * api/Makefile
+ * api/xfreq-api.c
+ * api/xfreq-api.h
+ * api/xfreq-smbios.c
+ * api/xfreq-smbios.h
+ * cli/Makefile
+ * cli/xfreq-cli.c
+ * cli/xfreq-cli.h
+ * gui/Makefile
+ * gui/xfreq-gui.c
+ * gui/xfreq-gui.h
+ * svr/Makefile
+ * svr/xfreq-intel.c
+ * svr/xfreq-intel.h
  *
  *
  * 2- compile the source code
@@ -32,15 +42,26 @@
  *
  * 3- the following output will be displayed
  *
- * +-------------------------------------------------------------------------------------+
- * | Compiling : Done.                                                                   |
- * | Linking   : Done.                                                                   |
- * | Ready     : ./bin/xfreq                                                             |
- * | --- Prerequisites ---                                                               |
- * | 1- Super User privileges                                                            |
- * | 2- Insert or modprobe the Kernel modules : dmi_sysfs (optional) and msr (mandatory) |
- * | 3- Allow root access to the X Server (with the xhost + command for instance)        |
- * +-------------------------------------------------------------------------------------+
+ * make -C api
+ * make[1]: Entering directory './api'
+ * cc -D`uname -s` -Wall -x c -c xfreq-api.c -I . -o ./obj/xfreq-api.o
+ * cc -D`uname -s` -Wall -x c -c xfreq-smbios.c -I . -o ./obj/xfreq-smbios.o
+ * make[1]: Leaving directory './api'
+ * make -C svr
+ * make[1]: Entering directory './svr'
+ * cc -D`uname -s` -Wall -pthread -x c -c xfreq-intel.c -I ../api -o ./obj/xfreq-intel.o
+ * cc ./obj/xfreq-intel.o -lpthread -lrt ../api/obj/xfreq-api.o  ../api/obj/xfreq-smbios.o -o ./bin/xfreq-intel
+ * make[1]: Leaving directory './svr'
+ * make -C gui
+ * make[1]: Entering directory './gui'
+ * cc -D`uname -s` -Wall -pthread -x c -c xfreq-gui.c -I ../api -o ./obj/xfreq-gui.o
+ * cc ./obj/xfreq-gui.o -lX11 -lpthread -lrt ../api/obj/xfreq-api.o -o ./bin/xfreq-gui
+ * make[1]: Leaving directory './gui'
+ * make -C cli
+ * make[1]: Entering directory './cli'
+ * cc -D`uname -s` -Wall -pthread -x c -c xfreq-cli.c -I ../api -o ./obj/xfreq-cli.o
+ * cc ./obj/xfreq-cli.o -lpthread -lrt ../api/obj/xfreq-api.o -o ./bin/xfreq-cli
+ * make[1]: Leaving directory './cli'
  *
  *
  * 4- depending of your packages distribution, the libraries required to compile the source code are the following
@@ -68,21 +89,16 @@
  * +---------------------------+-----------+--------------------------------------+
  *
  *
- * 2- if already logged into an X session as a regular user, you may have to disable the X ACL using one of this two solutions.
+ * 2- as root, start the XFreq server.
  *
- * 'xhost +'
- * or
- * './bin/xfreq -a N'
+ * ./svr/bin/xfreq-intel
  *
  *
- * 3- then as root start XFreq
+ * 3- as a regular, start one of the XFreq clients (GUI, console)
  *
- * ./bin/xfreq
+ * ./gui/bin/xfreq-gui
  *
- *
- * Note:
- *   some DE, such as KDE, provides their all-in-one launcher which simplify the previous steps (2 & 3)
- *   try 'kdesu ./bin/xfreq'
+ * ./cli/bin/xfreq-cli
  *
  *
  *
@@ -100,15 +116,12 @@
  *
  *
  *
- * [ISSUE]
- *
- * + The live CD is too big (more than 500 MB).
- *     So I packed other benchmark tools inside ;-)
+ * [ISSUES]
  *
  * + The temperature thresholds MSR does not return any value.
  *     Need to investigate ACPI.
  *
- * + V1 freeze after a long run. Probably due to a semaphore lock overload. So far limited to Core2
+ * + V1 freeze after a long run. Probably due to a semaphore lock overload. So far limited to Core2 : Solved
  *
  * + Fast-Strings reported as not available in CPUID but enabled in MSR.
  *
@@ -126,9 +139,9 @@
  * + power energy performance counters
  *
  * + kernel module : to reduce cpu usage near to 0.01% : In Progress.
- *     using mmap to transfer the complete RO data structure to userland.
+ *     using mmap to transfer the complete RO data structure to userland : Done.
  *     compute the best idle sleep time.
- *     change from "pull" to "push" with a "data is ready" event.
+ *     change from "pull" to "push" with a "data is ready" event : Done.
  *
  * + memory fetch : to remove dependancies with the dmi_sysfs & msr Linux modules.
  *     using a R/O mmap to "/dev/mem".
@@ -165,12 +178,15 @@
  * + provide some configure and install scripts, especially an ArchLinux PKGBUILD : Done.
  * + split the code between GUI and hardware parts : Done.
  * + release candidate : Done.
- * + The threads asynchronism is a mess, one needs to follow the guidelines
+ * + The threads asynchronism is a mess, one needs to follow the guidelines : Done.
  *   defined in http://www.cs.kent.edu/~ruttan/sysprog/lectures/multi-thread/multi-thread.html
- *   Done. Changed to Atomic Variables
+ *   --> Code changed to Atomic Variables
  *
  *
  * [HISTORY]
+ *
+ * R 2.1.42: 01/16/2015
+ *        - Integrated SmBIOS using a fixed shared memory.
  *
  * R 2.1.41-b: 01/04/2015
  *        - Fixed threads synchronism timeout.

@@ -14,17 +14,15 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <stdbool.h>
 #include <fcntl.h>
 #include <libgen.h>
-#include <unistd.h>
 #include <string.h>
 #include <signal.h>
 #include <errno.h>
 #include <pthread.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <stdatomic.h>
 
 #if defined(FreeBSD)
 #include <sys/types.h>
@@ -37,6 +35,7 @@
 #endif
 
 #define	_APPNAME "XFreq-Intel"
+#include "xfreq-smbios.h"
 #include "xfreq-api.h"
 #include "xfreq-intel.h"
 
@@ -159,16 +158,16 @@ bool	Init_MSR_Core(void *uArg)
 				// - Set the global counter bits
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
 				A->SaveArea[cpu].GlobalPerfCounter=A->SHM->C[cpu].GlobalPerfCounter;
-				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1 != 0)
+/*				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1 != 0)
 				{
 					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #1 is already activated", cpu);
-					perror(warning);
+					tracerr(warning);
 				}
 				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR2 != 0)
 				{
 					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #2 is already activated", cpu);
-					perror(warning);
-				}
+					tracerr(warning);
+				}	*/
 				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1=1;
 				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR2=1;
 				rc=((retval=Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
@@ -198,19 +197,19 @@ bool	Init_MSR_Core(void *uArg)
 				if(Overflow.Overflow_CTR1)
 				{
 					sprintf(warning, "Remark CPU#%02d: UCC Counter #1 is overflowed", cpu);
-					perror(warning);
+					tracerr(warning);
 					OvfControl.Clear_Ovf_CTR1=1;
 				}
 				if(Overflow.Overflow_CTR2)
 				{
 					sprintf(warning, "Remark CPU#%02d: URC Counter #1 is overflowed", cpu);
-					perror(warning);
+					tracerr(warning);
 					OvfControl.Clear_Ovf_CTR2=1;
 				}
 				if(Overflow.Overflow_CTR1|Overflow.Overflow_CTR2)
 				{
 					sprintf(warning, "Remark CPU#%02d: Resetting Counters", cpu);
-					perror(warning);
+					tracerr(warning);
 					rc=((retval=Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_OVF_CTRL, (GLOBAL_PERF_OVF_CTRL *) &OvfControl)) != -1);
 				}
 				// Initialize C-States.
@@ -220,7 +219,7 @@ bool	Init_MSR_Core(void *uArg)
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, MSR_TEMPERATURE_TARGET, (TJMAX *) &A->SHM->C[cpu].TjMax)) != -1);
 				if(A->SHM->C[cpu].TjMax.Target == 0)
 				{
-					perror("Warning: Thermal Junction Max unavailable");
+					tracerr("Warning: Thermal Junction Max unavailable");
 					A->SHM->C[cpu].TjMax.Target=100;
 				}
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->SHM->C[cpu].ThermIntr)) != -1);
@@ -228,7 +227,7 @@ bool	Init_MSR_Core(void *uArg)
 			else	// Fallback to an arbitrary & commom value.
 			{
 				sprintf(warning, "Remark CPU#%02d: Thermal Junction Max defaults to 100C", cpu);
-				perror(warning);
+				tracerr(warning);
 				A->SHM->C[cpu].TjMax.Target=100;
 			}
 		}
@@ -277,16 +276,16 @@ bool	Init_MSR_Nehalem(void *uArg)
 				// - Set the global counter bits
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
 				A->SaveArea[cpu].GlobalPerfCounter=A->SHM->C[cpu].GlobalPerfCounter;
-				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1 != 0)
+/*				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1 != 0)
 				{
 					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #1 is already activated", cpu);
-					perror(warning);
+					tracerr(warning);
 				}
 				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR2 != 0)
 				{
 					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #2 is already activated", cpu);
-					perror(warning);
-				}
+					tracerr(warning);
+				}	*/
 				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1=1;
 				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR2=1;
 				rc=((retval=Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
@@ -316,19 +315,19 @@ bool	Init_MSR_Nehalem(void *uArg)
 				if(Overflow.Overflow_CTR1)
 				{
 					sprintf(warning, "Remark CPU#%02d: UCC Counter #1 is overflowed", cpu);
-					perror(warning);
+					tracerr(warning);
 					OvfControl.Clear_Ovf_CTR1=1;
 				}
 				if(Overflow.Overflow_CTR2)
 				{
 					sprintf(warning, "Remark CPU#%02d: URC Counter #1 is overflowed", cpu);
-					perror(warning);
+					tracerr(warning);
 					OvfControl.Clear_Ovf_CTR2=1;
 				}
 				if(Overflow.Overflow_CTR1|Overflow.Overflow_CTR2)
 				{
 					sprintf(warning, "Remark CPU#%02d: Resetting Counters", cpu);
-					perror(warning);
+					tracerr(warning);
 					rc=((retval=Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_OVF_CTRL, (GLOBAL_PERF_OVF_CTRL *) &OvfControl)) != -1);
 				}
 				// Initialize C-States.
@@ -338,7 +337,7 @@ bool	Init_MSR_Nehalem(void *uArg)
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, MSR_TEMPERATURE_TARGET, (TJMAX *) &A->SHM->C[cpu].TjMax)) != -1);
 				if(A->SHM->C[cpu].TjMax.Target == 0)
 				{
-					perror("Warning: Thermal Junction Max unavailable");
+					tracerr("Warning: Thermal Junction Max unavailable");
 					A->SHM->C[cpu].TjMax.Target=100;
 				}
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_THERM_INTERRUPT, (THERM_INTERRUPT *) &A->SHM->C[cpu].ThermIntr)) != -1);
@@ -346,7 +345,7 @@ bool	Init_MSR_Nehalem(void *uArg)
 			else	// Fallback to an arbitrary & commom value.
 			{
 				sprintf(warning, "Remark CPU#%02d: Thermal Junction Max defaults to 100C", cpu);
-				perror(warning);
+				tracerr(warning);
 				A->SHM->C[cpu].TjMax.Target=100;
 			}
 		}
@@ -641,23 +640,6 @@ double	ClockSpeed_Haswell_DT()
 #define	ClockSpeed_Haswell_ULT	ClockSpeed_Haswell_DT
 #define	ClockSpeed_Haswell_ULX	ClockSpeed_Haswell_DT
 
-// Function to read data from the SMBIOS.
-int	Read_SMBIOS(int structure, int instance, off_t offset, void *buf, size_t nbyte)
-{
-	ssize_t	retval=0;
-	char	pathname[]="/sys/firmware/dmi/entries/999-99/raw";
-	int	tmpFD=0, rc=-1;
-
-	sprintf(pathname, "/sys/firmware/dmi/entries/%d-%d/raw", structure, instance);
-	if( (tmpFD=open(pathname, O_RDONLY)) != -1 )
-	{
-		retval=pread(tmpFD, buf, nbyte, offset);
-		close(tmpFD);
-		rc=(retval != nbyte) ? -1 : 0;
-	}
-	return(rc);
-}
-
 // Estimate the Bus Clock Frequency from the TSC.
 double	Compute_ExtClock(int Coef)
 {
@@ -666,19 +648,6 @@ double	Compute_ExtClock(int Coef)
 	usleep(IDLE_BASE_USEC * Coef);
 	TSC[1]=RDTSC();
 	return((double) (TSC[1] - TSC[0]) / (IDLE_BASE_USEC * Coef));
-}
-
-// Read the Bus Clock Frequency from the BIOS.
-int	Get_ExternalClock()
-{
-	int	BCLK=0;
-
-	if( Read_SMBIOS(SMBIOS_PROCINFO_STRUCTURE,
-			SMBIOS_PROCINFO_INSTANCE,
-			SMBIOS_PROCINFO_EXTCLK, &BCLK, 1) != -1)
-		return(BCLK);
-	else
-		return(0);
 }
 
 // Read the Base Clock in ROM memory.
@@ -696,32 +665,6 @@ int	Read_ROM_BCLK(off_t addr)
 		close(fd);
 	}
 	return(bclk);
-}
-
-// Read the number of logical Cores activated in the BIOS.
-int	Get_ThreadCount()
-{
-	short int ThreadCount=0;
-
-	if( Read_SMBIOS(SMBIOS_PROCINFO_STRUCTURE,
-			SMBIOS_PROCINFO_INSTANCE,
-			SMBIOS_PROCINFO_THREADS, &ThreadCount, 1) != -1)
-		return(ThreadCount);
-	else
-		return(0);
-}
-
-// Read the number of physicial Cores activated in the BIOS.
-int	Get_CoreCount()
-{
-	short int CoreCount=0;
-
-	if( Read_SMBIOS(SMBIOS_PROCINFO_STRUCTURE,
-			SMBIOS_PROCINFO_INSTANCE,
-			SMBIOS_PROCINFO_CORES, &CoreCount, 1) != -1)
-		return(CoreCount);
-	else
-		return(0);
 }
 
 // Retreive the Processor features through a call to the CPUID instruction.
@@ -977,6 +920,7 @@ unsigned int Create_Topology(uARG *A)
 	return(CountEnabledCPU);
 }
 
+
 // Retreive the Integrated Memory Controler settings: the number of channels & their associated RAM timings.
 #if defined(FreeBSD)
 unsigned int inw(int fd, unsigned int addr)
@@ -1097,8 +1041,9 @@ void	SelectBaseClock(uARG *A)
 				A->SHM->P.ClockSrc=SRC_TSC;
 				break;
 			}
-		case SRC_BIOS:	// Read the Bus Clock Frequency in the SMBIOS (DMI).
-			if((A->SHM->CPL.BIOS=(A->SHM->P.ClockSpeed=Get_ExternalClock()) != 0)) {
+		case SRC_BIOS:	// Read the Bus Clock Frequency in SmBIOS (DMI).
+			if(A->SHM->CPL.SMBIOS) {
+				A->SHM->P.ClockSpeed=A->SHM->B->Proc->Attrib->Clock;
 				A->SHM->P.ClockSrc=SRC_BIOS;
 				break;
 			}
@@ -1274,7 +1219,7 @@ static void *uSchedule(void *uArg)
 		fclose(fSD);
 	}
 	else
-		perror("Warning: cannot open file '/proc/sched_debug'");
+		tracerr("Warning: cannot open file '/proc/sched_debug'");
 
 	return(NULL);
 }
@@ -1543,7 +1488,7 @@ static void *uEmergency(void *uArg)
 			{
 				char str[sizeof(SIG_EMERGENCY_FMT)];
 				sprintf(str, SIG_EMERGENCY_FMT, caught);
-				perror(str);
+				tracerr(str);
 				Play(A, ID_QUIT);
 			}
 				break;
@@ -1567,7 +1512,7 @@ int main(int argc, char *argv[])
 
 	uARG	A=
 	{
-		.FD=0, .SHM=NULL,
+		.FD={.Shm=0, .SmBIOS=0}, .SHM=MAP_FAILED, .SmBIOS=MAP_FAILED,
 
 		.Arch=
 		{
@@ -1607,60 +1552,44 @@ int main(int argc, char *argv[])
 		.TID_Read=0,
 		.TID_Schedule=0,
 	};
-	FEATURES Features;
-	size_t	ShmSize=0;
 	uid_t	UID=geteuid();
 	bool	ROOT=(UID == 0),	// Check root access.
-		fEmergencyThread=false;
+		fEmergencyThread=false,
+		fSmBIOS=false;
 	int	rc=0;
 
 	if(ROOT == true)
-	{	// Read the CPU Features.
-		strcpy(A.Arch[0].Architecture, "Genuine");
-		memset(&Features, 0, sizeof(FEATURES));
-		Read_Features(&Features);
+	{
+		// Read the SMBIOS tree and return its size
+		memset(&A.Smb, 0, sizeof(SMBIOS_TREE));
+		if((fSmBIOS=Init_SMBIOS(&A.Smb)) == false)
+			tracerr("Warning: cannot read the SmBIOS tree\nCheck if 'dmi' kernel module is loaded");
 
-		if(Features.Std.BX.MaxThread > 0)
+		// Read the CPU Features.
+		memset(&A.Features, 0, sizeof(FEATURES));
+		Read_Features(&A.Features);
+
+		if(A.Features.Std.BX.MaxThread > 0)
 		{
-			SHM_STRUCT tSHM;
-
-			__asm__ volatile
-			(
-				"push	%%rdx		\n\t"
-				"xorq	%%rdx, %%rdx	\n\t"
-				"mulq	%%rcx		\n\t"
-				"addq	%%rbx, %%rax	\n\t"
-				"pop	%%rcx		\n\t"
-				"divq	%%rcx		\n\t"
-				"cmpq	$0x0, %%rdx	\n\t"
-				"jz	AlignToPage	\n\t"
-				"inc	%%rax		\n\t"
-				"AlignToPage:		\n\t"
-				"mulq	%%rcx"
-				: "=a"	(ShmSize)
-				: "a"	(sizeof(tSHM.C[0])),
-				  "b"	(sizeof(tSHM)),
-				  "c"	(Features.Std.BX.MaxThread),
-				  "d"	(PAGE_SIZE)
-			);
+			size_t ShmCpuSize=sizeof(CPU_STRUCT) * A.Features.Std.BX.MaxThread;
+			A.Size.Shm=sizeof(SHM_STRUCT) + ShmCpuSize;
+			A.Size.Shm=PAGE_SIZE * ((A.Size.Shm / PAGE_SIZE) + ((A.Size.Shm % PAGE_SIZE) ? 1 : 0));
 		}
 		umask(!S_IRUSR|!S_IWUSR|!S_IRGRP|!S_IWGRP|!S_IROTH|!S_IWOTH);
-		if(((A.FD=shm_open(SHM_FILENAME, O_CREAT|O_TRUNC|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) != -1)
-		&& (ftruncate(A.FD, ShmSize) != -1)
-		&& ((A.SHM=mmap(0, ShmSize, PROT_READ|PROT_WRITE, MAP_SHARED, A.FD, 0)) != MAP_FAILED))
+
+		if(((A.FD.Shm=shm_open(SHM_FILENAME, O_CREAT|O_TRUNC|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) != -1)
+		&& (ftruncate(A.FD.Shm, A.Size.Shm) != -1)
+		&& ((A.SHM=mmap(0, A.Size.Shm, PROT_READ|PROT_WRITE, MAP_SHARED, A.FD.Shm, 0)) != MAP_FAILED))
 		{
-			// Store the Server application signature.
-			strncpy(A.SHM->AppName, _APPNAME, TASK_COMM_LEN - 1);
-
-			atomic_init(&A.SHM->PlayID, ID_NULL);
-
 			A.SHM->CPL.MSR=false;
 			A.SHM->CPL.RESET=false;
-			A.SHM->CPL.BIOS=false,
-			A.SHM->CPL.IMC=false,
+			A.SHM->CPL.SMBIOS=false;
+			A.SHM->CPL.IMC=false;
 			A.SHM->CPL.PROC=true;
 
 			// Fill the shared memory with default values.
+			A.SHM->B=NULL;
+
 			memset(&A.SHM->P, 0, sizeof(PROCESSOR));
 			A.SHM->P.ArchID=ARCHITECTURES;
 			A.SHM->P.PlatformInfo.MinimumRatio=7;
@@ -1673,7 +1602,8 @@ int main(int argc, char *argv[])
 
 			memcpy(&A.SHM->D, &A.Loader, sizeof(DUMP_STRUCT));
 
-			memcpy(&A.SHM->P.Features, &Features, sizeof(FEATURES));
+			strcpy(A.Arch[0].Architecture, "Genuine");
+			memcpy(&A.SHM->P.Features, &A.Features, sizeof(FEATURES));
 			strcpy(A.Arch[0].Architecture, A.SHM->P.Features.VendorID);
 
 			memset(&A.SHM->S, 0, sizeof(SCHEDULE));
@@ -1681,6 +1611,9 @@ int main(int argc, char *argv[])
 			A.SHM->S.Attributes=SORT_FIELD_NONE;
 
 			memset(&A.SHM->M, 0, sizeof(IMC_INFO));
+
+			// Store the Server application signature.
+			strncpy(A.SHM->AppName, _APPNAME, TASK_COMM_LEN - 1);
 
 			A.Options[0].pointer=&A.SHM->P.ArchID;
 			A.Options[1].pointer=&A.SHM->P.ClockSrc;
@@ -1696,6 +1629,7 @@ int main(int argc, char *argv[])
 				if(A.SHM->P.IdleTime > IDLE_COEF_MAX)	A.SHM->P.IdleTime=IDLE_COEF_MAX;
 
 				Sync_Init(&A.SHM->Sync);
+				atomic_init(&A.SHM->PlayID, ID_NULL);
 
 				sigemptyset(&A.Signal);
 				sigaddset(&A.Signal, SIGINT);	// [CTRL] + [C]
@@ -1710,7 +1644,23 @@ int main(int argc, char *argv[])
 				&& !pthread_create(&A.TID_SigHandler, NULL, uEmergency, &A))
 					fEmergencyThread=true;
 				else
-					perror("Remark: cannot start the signal handler");
+					tracerr("Remark: cannot start the signal handler");
+
+				// Copy & Map the SMBIOS tree
+				if(fSmBIOS) {	// @ a SHM fixed offset address.
+					A.SHM->B=(SMBIOS_TREE *) A.SHM;
+					A.SHM->B+=A.Size.Shm;
+					A.Size.SmBIOS=PAGE_SIZE * ((A.Smb.Node.MemSum / PAGE_SIZE) + ((A.Smb.Node.MemSum % PAGE_SIZE) ? 1 : 0));
+
+					if(((A.FD.SmBIOS=shm_open(SMB_FILENAME, O_CREAT|O_TRUNC|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) != -1)
+					&& (ftruncate(A.FD.SmBIOS, A.Size.SmBIOS) != -1)
+					&& ((A.SmBIOS=mmap(A.SHM->B, A.Size.SmBIOS, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_FIXED, A.FD.SmBIOS, 0)) != MAP_FAILED))
+						A.SHM->CPL.SMBIOS=Copy_SmbTree(&A.Smb, A.SHM->B);
+					else
+						tracerr("Error: creating the SmBIOS shared memory");
+
+					fSmBIOS=!Close_SMBIOS(&A.Smb);
+				}
 
 				// Find or force the Architecture specifications.
 				if((A.SHM->P.ArchID < 0) || (A.SHM->P.ArchID >= ARCHITECTURES))
@@ -1727,17 +1677,21 @@ int main(int argc, char *argv[])
 				}
 				if(!(A.SHM->P.CPU=A.SHM->P.Features.ThreadCount))
 				{
-					perror("Warning: cannot read the maximum number of Cores from CPUID");
-
+					tracerr("Warning: cannot read the maximum number of Cores from CPUID");
+					// Read the number of Cores activated in the BIOS.
 					if(A.SHM->P.Features.Std.DX.HTT)
 					{
-						if(!(A.SHM->CPL.BIOS=(A.SHM->P.CPU=Get_ThreadCount()) != 0))
-							perror("Warning: cannot read the maximum number of Threads from BIOS DMI\nCheck if 'dmi' kernel module is loaded");
+						if(A.SHM->CPL.SMBIOS == true)
+							A.SHM->P.CPU=A.SHM->B->Proc->Attrib->ThreadCount;
+						else
+							tracerr("Warning: cannot read the maximum number of Threads from BIOS");
 					}
 					else
 					{
-						if(!(A.SHM->CPL.BIOS=(A.SHM->P.CPU=Get_CoreCount()) != 0))
-							perror("Warning: cannot read the maximum number of Cores BIOS DMI\nCheck if 'dmi' kernel module is loaded");
+						if(A.SHM->CPL.SMBIOS == true)
+							A.SHM->P.CPU=A.SHM->B->Proc->Attrib->CoreCount;
+						else
+							tracerr("Warning: cannot read the maximum number of Cores BIOS");
 					}
 				}
 				if(!A.SHM->P.CPU)
@@ -1756,7 +1710,7 @@ int main(int argc, char *argv[])
 						strcat(remark, A.Arch[0].Architecture);
 					}
 					strcat(remark, "specifications");
-					perror(remark);
+					tracerr(remark);
 				}
 				A.SHM->P.OnLine=Create_Topology(&A);
 
@@ -1774,11 +1728,11 @@ int main(int argc, char *argv[])
 
 					// Open once the MSR gate.
 					if(!(A.SHM->CPL.MSR=A.Arch[A.SHM->P.ArchID].Init_MSR(&A)))
-						perror("Warning: cannot read the MSR registers\nCheck if the 'msr' kernel module is loaded");
+						tracerr("Warning: cannot read the MSR registers\nCheck if the 'msr' kernel module is loaded");
 
 					// Read the Integrated Memory Controler information.
 					if((A.SHM->CPL.IMC=IMC_Read_Info(&A)) == false)
-						perror("Warning: cannot read the IMC controler");
+						tracerr("Warning: cannot read the IMC controler");
 
 					SelectBaseClock(&A);
 
@@ -1800,6 +1754,26 @@ int main(int argc, char *argv[])
 						A.SHM->H.Signature.Model,
 						A.SHM->H.Architecture,
 						Version);
+#if defined(DEBUG)
+
+					printf(	"\n--- SHM Map ---\n"
+						"A.SHM[%p]\n" \
+						"A.SHM->P[%p]\n" \
+						"A.SHM->H[%p]\n" \
+						"A.SHM->D[%p]\n" \
+						"A.SHM->M[%p]\n" \
+						"A.SHM->S[%p]\n" \
+						"A.SHM->B[%p]\n" \
+						"A.SHM->C[%p]\n", \
+						A.SHM, \
+						&A.SHM->P, \
+						&A.SHM->H, \
+						&A.SHM->D, \
+						&A.SHM->M, \
+						&A.SHM->S, \
+						A.SHM->B, \
+						&A.SHM->C);
+#endif
 					fflush(stdout);
 
 					while(A.LOOP)
@@ -1885,7 +1859,7 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					perror(NULL);
+/*					tracerr(NULL);	*/
 					rc=2;
 				}
 				if(fEmergencyThread == true)
@@ -1898,20 +1872,30 @@ int main(int argc, char *argv[])
 			else
 				rc=1;
 
-			if(munmap(A.SHM, ShmSize) == -1)
-				perror("Error: unmapping the shared memory");
+			if(fSmBIOS)
+				if(Close_SMBIOS(&A.Smb) == false)
+					tracerr("Error: closing the SmBIOS tree");
+			if(A.SmBIOS != MAP_FAILED)
+			{
+				if(munmap(A.SmBIOS, A.Size.SmBIOS) == -1)
+					tracerr("Error: unmapping the SmBIOS shared memory");
+				if(shm_unlink(SMB_FILENAME) == -1)
+					tracerr("Error: unlinking the SmBIOS shared memory");
+			}
+			if(munmap(A.SHM, A.Size.Shm) == -1)
+				tracerr("Error: unmapping the shared memory");
 			if(shm_unlink(SHM_FILENAME) == -1)
-				perror("Error: unlinking the shared memory");
+				tracerr("Error: unlinking the shared memory");
 		}
 		else
 		{
-			perror("Error: creating the shared memory");
+			tracerr("Error: creating the shared memory");
 			rc=2;
 		}
 	}
 	else
 	{
-		perror("Error: missing root privileges");
+		tracerr("Error: missing root privileges");
 		rc=2;
 	}
 	free(A.Arch[0].Architecture);

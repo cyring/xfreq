@@ -27,6 +27,7 @@
 #endif
 
 #define	_APPNAME "XFreq-Client"
+#include "xfreq-smbios.h"
 #include "xfreq-api.h"
 #include "xfreq-cli.h"
 
@@ -54,7 +55,10 @@ static void *uRead(void *uArg)
 	while(A->LOOP)
 		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + IDLE_COEF_DEF + IDLE_COEF_MIN)))
 		{
-			printf("\nCPU# Freq. Ratio x BCLK Temps\tTask scheduling\n");
+			if(A->SHM->CPL.SMBIOS == true)
+				printf("\nCPU# Freq. Ratio x [%lld] Temps\tTask scheduling\n", A->SHM->B->Proc->Attrib->Clock);
+			else
+				printf("\nCPU# Freq. Ratio x [%.0f] Temps\tTask scheduling\n", A->SHM->P.ClockSpeed);
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
 				if(A->SHM->C[cpu].T.Offline != true)
@@ -178,7 +182,7 @@ static void *uEmergency(void *uArg)
 			{
 				char str[sizeof(SIG_EMERGENCY_FMT)];
 				sprintf(str, SIG_EMERGENCY_FMT, caught);
-				perror(str);
+				tracerr(str);
 				Play(A, ID_QUIT);
 			}
 				break;
@@ -200,7 +204,7 @@ int main(int argc, char *argv[])
 	pthread_setname_np(pthread_self(), "xfreq-cli-main");
 
 	uARG	A={
-			.FD=0, .SHM=NULL,
+			.FD={.Shm=0, .SmBIOS=0}, .SHM=MAP_FAILED, .SmBIOS=MAP_FAILED,
 			.TID_SigHandler=0,
 			.TID_Read=0,
 			.LOOP=true,
@@ -237,17 +241,40 @@ int main(int argc, char *argv[])
 		&& !pthread_create(&A.TID_SigHandler, NULL, uEmergency, &A))
 			fEmergencyThread=true;
 		else
-			perror("Remark: cannot start the signal handler");
+			tracerr("Remark: cannot start the signal handler");
 
 		if(ROOT)
-			perror("Warning: running as root");
+			tracerr("Warning: running as root");
 
-		struct stat shmStat={0};
-		if(((A.FD=shm_open(SHM_FILENAME, O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) != -1)
-		&& ((fstat(A.FD, &shmStat) != -1)
-		&& ((A.SHM=mmap(0, shmStat.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, A.FD, 0)) != MAP_FAILED))
+		struct stat shmStat={0}, smbStat={0};
+		if(((A.FD.Shm=shm_open(SHM_FILENAME, O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) != -1)
+		&& ((fstat(A.FD.Shm, &shmStat) != -1)
+		&& ((A.SHM=mmap(0, shmStat.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, A.FD.Shm, 0)) != MAP_FAILED))
 		&& ((A.Room=Sync_Open(&A.SHM->Sync)) != 0))
 		{
+			if(((A.FD.SmBIOS=shm_open(SMB_FILENAME, O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) == -1)
+			|| ((fstat(A.FD.Shm, &smbStat) == -1))
+			|| ((A.SmBIOS=mmap(A.SHM->B, smbStat.st_size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_FIXED, A.FD.SmBIOS, 0)) == MAP_FAILED))
+				tracerr("Error: opening the SmBIOS shared memory");
+#if defined(DEBUG)
+					printf(	"\n--- SHM Map ---\n"
+						"A.SHM[%p]\n" \
+						"A.SHM->P[%p]\n" \
+						"A.SHM->H[%p]\n" \
+						"A.SHM->D[%p]\n" \
+						"A.SHM->M[%p]\n" \
+						"A.SHM->S[%p]\n" \
+						"A.SHM->B[%p]\n" \
+						"A.SHM->C[%p]\n", \
+						A.SHM, \
+						&A.SHM->P, \
+						&A.SHM->H, \
+						&A.SHM->D, \
+						&A.SHM->M, \
+						&A.SHM->S, \
+						A.SHM->B, \
+						&A.SHM->C);
+#endif
 			if(!pthread_create(&A.TID_Read, NULL, uRead, &A))
 			{
 				printf("\n%s Ready with [%s]\n\n", _APPNAME, A.SHM->AppName);
@@ -269,22 +296,24 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				perror("Error: cannot start the thread uRead()");
+				tracerr("Error: cannot start the thread uRead()");
 				rc=2;
 			}
+			if((A.SmBIOS != MAP_FAILED) && (munmap(A.SmBIOS, smbStat.st_size) == -1))
+				tracerr("Error: unmapping the SmBIOS shared memory");
 		}
 		else
 		{
-			perror("Error: opening the shared memory");
+			tracerr("Error: opening the shared memory");
 			rc=2;
 		}
 		// Release the ressources.
 		if(A.Room)
 			Sync_Close(A.Room, &A.SHM->Sync);
 		if((A.SHM != MAP_FAILED) && (munmap(A.SHM, shmStat.st_size) == -1))
-			perror("Error: unmapping the shared memory");
-		if((A.FD != -1) && (close(A.FD) == -1))
-			perror("Error: closing the shared memory");
+			tracerr("Error: unmapping the shared memory");
+		if((A.FD.Shm != -1) && (close(A.FD.Shm) == -1))
+			tracerr("Error: closing the shared memory");
 
 		if(fEmergencyThread)
 		{
