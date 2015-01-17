@@ -29,6 +29,9 @@
 			<Add option="-lX11 -lpthread -lrt" />
 			<Add directory="/usr/local/lib" />
 		</Linker>
+		<Unit filename="../api/xfreq-api.c">
+			<Option compilerVar="CC" />
+		</Unit>
 		<Unit filename="../api/xfreq-api.h" />
 		<Unit filename="xfreq-gui.c">
 			<Option compilerVar="CC" />
