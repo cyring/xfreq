@@ -5,7 +5,7 @@ SRC_PATH=.
 OBJ_PATH=./obj
 INC4x86_PATH=-I .
 #
-all :		xfreq-api.o xfreq-smbios.o
+all :		xfreq-smbios.o xfreq-api.o
 #
 help :
 		@echo 'make [all]     : Compile and link files in' $(OBJ_PATH)/
