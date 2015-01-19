@@ -789,7 +789,7 @@ void	Read_Features(FEATURES *features)
 				unsigned char Chr[4];
 			} AX, BX, CX, DX;
 		} Brand;
-		char tmpString[48+1]/*={0x20}*/;
+		char tmpString[48+1];
 		int ix=0, jx=0, px=0;
 		for(ix=0; ix<3; ix++)
 		{
@@ -1859,7 +1859,6 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-/*					tracerr(NULL);	*/
 					rc=2;
 				}
 				if(fEmergencyThread == true)

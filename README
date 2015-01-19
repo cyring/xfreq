@@ -37,7 +37,7 @@
  *
  * 2- compile the source code
  *
- * make
+ * make -j 1
  *
  *
  * 3- the following output will be displayed
@@ -121,11 +121,7 @@
  * + The temperature thresholds MSR does not return any value.
  *     Need to investigate ACPI.
  *
- * + V1 freeze after a long run. Probably due to a semaphore lock overload. So far limited to Core2 : Solved
- *
  * + Fast-Strings reported as not available in CPUID but enabled in MSR.
- *
- * + Ponctual memory leak related to XrmDatabase is reported by Valgrind : Solved.
  *
  * + The RAM timings are wrong when running with FreeBSD.
  *
@@ -164,12 +160,9 @@
  * + some button-switchs & sliders to enable/disable/set the PKG/Core features in the System Info Widget.
  * + full transparency & opacity.
  * + integrate XCB, wayland ?
- * + handle skins : Done. Colors only.
- * + provide a processor usage history : Done.
  * + gradiant coloring.
  * + screenshot key.
  * + resize footer separator w/ MDI.
- * + discrete temperature graphic: per CPU : Done.
  *
  *
  *  Source code
@@ -185,13 +178,17 @@
  *
  * [HISTORY]
  *
+ * R 2.1.42-a: 01/19/2015
+ *        - Fixed boolean command line arguments.
+ *        - Limit to one job the build process.
+ *
  * R 2.1.42: 01/16/2015
  *        - Integrated SmBIOS using a fixed shared memory.
  *
  * R 2.1.41-b: 01/04/2015
  *        - Fixed threads synchronism timeout.
  *        - Provided a global Makefile.
- *        - Copied the frequency values ​​of the Atom from the Kernel source code.
+ *        - Copied the frequency values​​ of the Atom from the Kernel source code.
  *
  * R 2.1.41-a: 01/03/2015
  *        - Preserve the MSR Counters in a Save Area.

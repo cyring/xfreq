@@ -1758,7 +1758,6 @@ int	OpenWidgets(uARG *A)
 
 			if(A->L.Play.noDecorations && (A->atom[1] != None))
 				XChangeProperty(A->display, A->W[G].window, A->atom[1], A->atom[1], 32, PropModeReplace, (unsigned char *) &wmProp, 5);
-
 			if(A->L.Play.alwaysOnTop)
 				XChangeProperty(A->display, A->W[G].window, A->atom[2], XA_ATOM, 32, PropModeReplace, (unsigned char *) &A->atom[3], 1);
 			if(A->L.Play.skipTaskbar)
@@ -4066,6 +4065,7 @@ int main(int argc, char *argv[])
 					.flashCursor=true,
 					.alwaysOnTop=false,
 					.noDecorations=false,
+					.skipTaskbar=false,
 				},
 				.WB={
 					.Scroll=0,
@@ -4101,15 +4101,15 @@ int main(int argc, char *argv[])
 				{"-b", "%x",  &A.L.globalBackground,   "Background color (Hex) {RGB}\n" \
 								       "\t\t  argument is coded with primary colors 0xRRGGBB",                 NULL                                       },
 				{"-f", "%x",  &A.L.globalForeground,   "Foreground color (Hex) {RGB}",                                         NULL                                       },
-				{"-l", "%u",  &A.L.Play.fillGraphics,  "Fill or not the graphics (Bool) [0/1]",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_GRAPHICS    },
-				{"-z", "%u",  &A.L.Play.freqHertz,     "Show the Core frequency (Bool) [0/1]",                                 XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
-				{"-y", "%u",  &A.L.Play.cycleValues,   "Show the Core Cycles (Bool) [0/1]",                                    XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
-				{"-r", "%u",  &A.L.Play.ratioValues,   "Show the Core Ratio (Bool) [0/1]",                                     XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
-				{"-p", "%u",  &A.L.Play.cStatePercent, "Show the Core C-State percentage (Bool) [0/1]",                        XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
-				{"-w", "%u",  &A.L.Play.wallboard,     "Scroll the Processor brand wallboard (Bool) [0/1]",                    XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
-				{"-o", "%u",  &A.L.Play.alwaysOnTop,   "Keep the Widgets always on top of the screen (Bool) [0/1]",            NULL                                       },
-				{"-n", "%u",  &A.L.Play.noDecorations, "Remove the Window Manager decorations (Bool) [0/1]",                   NULL                                       },
-				{"-N", "%u",  &A.L.Play.skipTaskbar,   "Remove the Widgets title name from the WM taskbar (Bool) [0/1]",       NULL                                       },
+				{"-l", "%hhu",&A.L.Play.fillGraphics,  "Fill or not the graphics (Bool) [0/1]",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_GRAPHICS    },
+				{"-z", "%hhu",&A.L.Play.freqHertz,     "Show the Core frequency (Bool) [0/1]",                                 XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
+				{"-y", "%hhu",&A.L.Play.cycleValues,   "Show the Core Cycles (Bool) [0/1]",                                    XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
+				{"-r", "%hhu",&A.L.Play.ratioValues,   "Show the Core Ratio (Bool) [0/1]",                                     XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
+				{"-p", "%hhu",&A.L.Play.cStatePercent, "Show the Core C-State percentage (Bool) [0/1]",                        XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
+				{"-w", "%hhu",&A.L.Play.wallboard,     "Scroll the Processor brand wallboard (Bool) [0/1]",                    XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
+				{"-o", "%hhu",&A.L.Play.alwaysOnTop,   "Keep the Widgets always on top of the screen (Bool) [0/1]",            NULL                                       },
+				{"-n", "%hhu",&A.L.Play.noDecorations, "Remove the Window Manager decorations (Bool) [0/1]",                   NULL                                       },
+				{"-N", "%hhu",&A.L.Play.skipTaskbar,   "Remove the Widgets title name from the WM taskbar (Bool) [0/1]",       NULL                                       },
 				{"-i", "%hx", &A.Splash.attributes,    "Splash screen attributes 0x{H}{NNN} (Hex)\n" \
 				                                       "\t\t  where {H} bit:13 hides Splash and {NNN} (usec) defers start-up", NULL                                       },
 			},
@@ -4254,7 +4254,6 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-/*			tracerr(NULL);	*/
 			rc=2;
 		}
 		CloseDisplay(&A);

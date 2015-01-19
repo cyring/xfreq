@@ -13,7 +13,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "42"
+#define _NIGHTLY "42-a"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #define	ToStr(_inst)	_ToStr(_inst)

@@ -91,13 +91,6 @@ int	Write_MSR(int FD, int msr, unsigned long long int *data) \
 #define	cpu_set_t cpuset_t
 #define	pthread_setname_np pthread_set_name_np
 #endif
-/*
-#define	SMBIOS_PROCINFO_STRUCTURE	4
-#define	SMBIOS_PROCINFO_INSTANCE	0
-#define	SMBIOS_PROCINFO_EXTCLK		0x12
-#define	SMBIOS_PROCINFO_CORES		0x23
-#define	SMBIOS_PROCINFO_THREADS		0x25
-*/
 
 //	[GenuineIntel]
 #define	_GenuineIntel			{.ExtFamily=0x0, .Family=0x0, .ExtModel=0x0, .Model=0x0}
@@ -234,19 +227,19 @@ typedef struct
 
 #define	OPTIONS_LIST												\
 {														\
-	{"-c", "%d", NULL,	"Pick up an architecture # (Char)\n"						\
+	{"-c", "%d",   NULL,	"Pick up an architecture # (Int)\n"						\
 				"\t\t  refer to the '-A' option"                                       },	\
-	{"-S", "%u", NULL,	"Clock source (Int)\n"								\
+	{"-S", "%u",   NULL,	"Clock source (Int)\n"								\
 				"\t\t  argument is one of the [0]TSC [1]BIOS [2]SPEC [3]ROM [4]USER"   },	\
-	{"-M", "%x", NULL, 	"ROM address of the Base Clock (Hex)\n"						\
+	{"-M", "%x",   NULL, 	"ROM address of the Base Clock (Hex)\n"						\
 				"\t\t  argument is the BCLK memory address to read from"               },	\
-	{"-s", "%u", NULL,	"Idle time multiplier (Int)\n"							\
+	{"-s", "%u",   NULL,	"Idle time multiplier (Int)\n"							\
 				"\t\t  argument is a coefficient multiplied by 50000 usec"             },	\
-	{"-d", "%x", NULL,	"Registers dump enablement (Bool)"			               },	\
-	{"-t", "%x", NULL,	"Task scheduling monitoring sorted by 0x{R}0{N} (Hex)\n"			\
+	{"-d", "%hhu", NULL,	"Registers dump enablement (Bool)"			               },	\
+	{"-t", "%x",   NULL,	"Task scheduling monitoring sorted by 0x{R}0{N} (Hex)\n"			\
 				"\t\t  where {R} bit:8 is set to reverse sorting\n"				\
 				"\t\t  and {N} is one '/proc/sched_debug' field# from [0x1] to [0xb]"  },	\
-	{"-z", "%x", NULL,	"Reset the MSR counters (Bool)"			                       },	\
+	{"-z", "%hhu", NULL,	"Reset the MSR counters (Bool)"			                       },	\
 }
 
 typedef struct
