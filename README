@@ -178,6 +178,9 @@
  *
  * [HISTORY]
  *
+ * R 2.1.42-b: 01/20/2015
+ *        - Now trace errors if compiled with DEBUG.
+ *
  * R 2.1.42-a: 01/19/2015
  *        - Fixed boolean command line arguments.
  *        - Limit to one job the build process.

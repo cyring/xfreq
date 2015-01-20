@@ -13,13 +13,17 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "42-a"
+#define _NIGHTLY "42-b"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #define	ToStr(_inst)	_ToStr(_inst)
 #define	_ToStr(_inst)	#_inst
 
-#define	tracerr(anystr)	fprintf(stderr, "%s\n", anystr);
+#if defined(DEBUG)
+	#define	tracerr(anystr)	fprintf(stderr, "%s\n", anystr);
+#else
+	#define	tracerr(anystr)
+#endif
 
 #if defined(Linux)
 #define MAX(M, m)	((M) > (m) ? (M) : (m))
