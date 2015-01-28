@@ -405,7 +405,7 @@ void	DrawAllButtons(uARG *A, int G)
 	struct WButton *wButton=NULL;
 	for(wButton=A->W[G].wButton[HEAD]; wButton != NULL; wButton=wButton->Chain)
 	{
-		if((wButton->WBState.Func != NULL) && (wButton->WBState.Func(A, wButton) == true))
+		if((wButton->WBState.Func != NULL) && (wButton->WBState.Func(A, wButton) == TRUE))
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_FOCUS].RGB);
 		else
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
@@ -452,11 +452,11 @@ void	WidgetButtonPress(uARG *A, int G, XEvent *E)
 			// Flash the buttons.
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PULSE].RGB);
 			wButton->DrawFunc(A, wButton);
-			fDraw(G, false, true);
+			fDraw(G, FALSE, TRUE);
 			usleep(WBUTTON_PULSE_US);
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			wButton->DrawFunc(A, wButton);
-			fDraw(G, false, true);
+			fDraw(G, FALSE, TRUE);
 
 			// Execute its callback.
 			wButton->CallBack(A, wButton);
@@ -564,13 +564,13 @@ void	MoveWidget(uARG *A, XEvent *E)
 				if(_IS_MDI_ && E->xbutton.subwindow) {
 					for(A->T.S=LAST_WIDGET; A->T.S >= FIRST_WIDGET; A->T.S--)
 						if( E->xbutton.subwindow == A->W[A->T.S].window) {
-							A->T.Locked=true;
+							A->T.Locked=TRUE;
 							break;
 						}
 				} else {
 					for(A->T.S=LAST_WIDGET; A->T.S >= MAIN; A->T.S--)
 						if( E->xbutton.window == A->W[A->T.S].window) {
-							A->T.Locked=true;
+							A->T.Locked=TRUE;
 							break;
 						}
 				}
@@ -595,7 +595,7 @@ void	MoveWidget(uARG *A, XEvent *E)
 				else
 					XDefineCursor(A->display, A->W[A->T.S].window, A->MouseCursor[MC_DEFAULT]);
 				A->T.S=0;
-				A->T.Locked=false;
+				A->T.Locked=FALSE;
 			}
 			break;
 		case MotionNotify:
@@ -687,7 +687,7 @@ static void *uSplash(void *uArg)
 		{
 			case ClientMessage:
 				if(E.xclient.send_event)
-					A->LOOP=false;
+					A->LOOP=FALSE;
 				break;
 			case Expose:
 				if(!E.xexpose.count)
@@ -817,7 +817,7 @@ void	StopSplash(uARG *A)
 	XDestroyWindow(A->display, A->Splash.window);
 
 	A->TID_Draw=0;
-	A->LOOP=true;
+	A->LOOP=TRUE;
 }
 
 // Release the X-Window resources.
@@ -845,7 +845,7 @@ void	CloseDisplay(uARG *A)
 // Initialize a new X-Window display.
 int	OpenDisplay(uARG *A)
 {
-	int noerr=true;
+	int noerr=TRUE;
 	if((A->display=XOpenDisplay(NULL)) && (A->screen=DefaultScreenOfDisplay(A->display)) )
 	{
 		switch(A->xACL)
@@ -865,7 +865,7 @@ int	OpenDisplay(uARG *A)
 			strcpy(A->fontName, "Fixed");
 
 		if((A->xfont=XLoadQueryFont(A->display, A->fontName)) == NULL)
-			noerr=false;
+			noerr=FALSE;
 		if(noerr)
 		{
 			A->MouseCursor[MC_DEFAULT]=XCreateFontCursor(A->display, XC_left_ptr);
@@ -873,7 +873,7 @@ int	OpenDisplay(uARG *A)
 			A->MouseCursor[MC_WAIT]=XCreateFontCursor(A->display, XC_watch);
 		}
 	}
-	else	noerr=false;
+	else	noerr=FALSE;
 	return(noerr);
 }
 
@@ -933,7 +933,7 @@ void	GeometriesToLayout(uARG *A)
 // Create the Widgets.
 int	OpenWidgets(uARG *A)
 {
-	int noerr=true;
+	int noerr=TRUE;
 	char str[sizeof(HDSIZE)]={0};
 
 	// Allocate memory for chart elements.
@@ -1299,7 +1299,7 @@ int	OpenWidgets(uARG *A)
 
 						unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
 
-						A->L.Play.showTemp=calloc(A->SHM->P.CPU, sizeof(bool));
+						A->L.Play.showTemp=calloc(A->SHM->P.CPU, sizeof(Bool32));
 						A->L.Temps=calloc(A->SHM->P.CPU, sizeof(struct NXSEGMENT));
 
 						WBSTATE WBState={Button_State, NULL};
@@ -1309,7 +1309,7 @@ int	OpenWidgets(uARG *A)
 						for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
 						{
 							if(A->SHM->C[cpu].T.Thread_ID == 0)
-								A->L.Play.showTemp[cpu]=true;
+								A->L.Play.showTemp[cpu]=TRUE;
 
 							A->L.Temps[cpu].N=TEMPS_TEXT_WIDTH;
 							A->L.Temps[cpu].Segment=calloc(A->L.Temps[cpu].N, sizeof(XSegment));
@@ -1608,9 +1608,9 @@ int	OpenWidgets(uARG *A)
 				}
 				ReSizeMoveWidget(A, G);
 			}
-			else	noerr=false;
+			else	noerr=FALSE;
 		}
-		else	noerr=false;
+		else	noerr=FALSE;
 	}
 	if(noerr && _IS_MDI_)
 	{
@@ -1765,7 +1765,7 @@ int	OpenWidgets(uARG *A)
 
 			XSelectInput(A->display, A->W[G].window, EventProfile);
 		}
-		else	noerr=false;
+		else	noerr=FALSE;
 	return(noerr);
 }
 
@@ -1951,7 +1951,7 @@ void	BuildLayout(uARG *A, int G)
 			XDrawString(A->display, A->W[G].pixmap.B, A->W[G].gc,
 					One_Char_Width(G),
 					One_Char_Height(G) + (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT + 1)),
-					"~", 1 );
+					CSTATES_FOOTER, strlen(CSTATES_FOOTER) );
 
 			// Draw the Core identifiers.
 			int cpu=0;
@@ -1964,7 +1964,7 @@ void	BuildLayout(uARG *A, int G)
 						One_Char_Height(G),
 						str, strlen(str) );
 
-				if(A->SHM->C[cpu].T.Offline == true)	// Is the Core disabled ?
+				if(A->SHM->C[cpu].T.Offline == TRUE)	// Is the Core disabled ?
 				{
 					XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 					XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
@@ -2115,7 +2115,7 @@ void	BuildLayout(uARG *A, int G)
 				int cpu=0;
 				for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
 				{
-					if(A->SHM->C[cpu].T.Offline != true)
+					if(A->SHM->C[cpu].T.Offline != TRUE)
 						sprintf(str, TOPOLOGY_FORMAT,
 							cpu,
 							A->SHM->C[cpu].T.APIC_ID,
@@ -2128,7 +2128,7 @@ void	BuildLayout(uARG *A, int G)
 							enabled(0));
 					strcat(buf[0], str);
 
-					if(A->SHM->C[cpu].T.Offline != true)
+					if(A->SHM->C[cpu].T.Offline != TRUE)
 						sprintf(str, PERF_FORMAT,
 							cpu,
 							A->SHM->C[cpu].FixedPerfCounter.EN0_OS,
@@ -2149,7 +2149,7 @@ void	BuildLayout(uARG *A, int G)
 				free(buf[0]);
 				free(buf[1]);
 
-				if(A->SHM->CPL.SMBIOS == true)
+				if(A->SHM->CPL.SMBIOS == TRUE)
 				{
 					const float tension[0B1000]={0.0f, 5.0f, 3.3f, 0.0f, 2.9f, 0.0f, 0.0f, 0.0f};
 					unsigned long long totalMemSize=0;
@@ -2160,8 +2160,8 @@ void	BuildLayout(uARG *A, int G)
 					strcat(items, SMBIOS_SECTION);
 
 					sprintf(str, SMBIOS4_FORMAT,
-						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Proc, A->SHM->B->Proc->Attrib->Version),
-						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Proc, A->SHM->B->Proc->Attrib->Socket),
+						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Proc, A->SHM->B->Proc->Attrib->Version),
+						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Proc, A->SHM->B->Proc->Attrib->Socket),
 						A->SHM->B->Proc->Attrib->Voltage.Mode ? \
 							A->SHM->B->Proc->Attrib->Voltage.Tension / 10.0f \
 							: tension[A->SHM->B->Proc->Attrib->Voltage.Tension & 0B0111]);
@@ -2170,21 +2170,21 @@ void	BuildLayout(uARG *A, int G)
 					for(ix=0; ix < 3; ix++)
 					{
 						sprintf(str, SMBIOS7_FORMAT, \
-							SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Cache[ix], A->SHM->B->Cache[ix]->Attrib->Socket), \
+							Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Cache[ix], A->SHM->B->Cache[ix]->Attrib->Socket), \
 							A->SHM->B->Cache[ix]->Attrib->Installed_Size, ix < 2 ? "     " : "");
 						strcat(items, str);
 					}
 
 					sprintf(str, SMBIOS2_FORMAT,
-						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Product),
-						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Version),
-						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Manufacturer));
+						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Product),
+						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Version),
+						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Manufacturer));
 					strcat(items, str);
 
 					sprintf(str, SMBIOS0_FORMAT,
-						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Bios, A->SHM->B->Bios->Attrib->Vendor),
-						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Bios, A->SHM->B->Bios->Attrib->Version),
-						SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Bios, A->SHM->B->Bios->Attrib->Release_Date),
+						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Bios, A->SHM->B->Bios->Attrib->Vendor),
+						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Bios, A->SHM->B->Bios->Attrib->Version),
+						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Bios, A->SHM->B->Bios->Attrib->Release_Date),
 						A->SHM->B->Bios->Attrib->Major_Release, A->SHM->B->Bios->Attrib->Minor_Release,
 						64 * (1 + A->SHM->B->Bios->Attrib->ROM_Size), A->SHM->B->Bios->Attrib->Address);
 					strcat(items, str);
@@ -2196,8 +2196,8 @@ void	BuildLayout(uARG *A, int G)
 					for(ix=0; ix < A->SHM->B->MemArray->Attrib->Number_Devices; ix++)
 					{
 						sprintf(str, SMBIOS17_FORMAT, \
-							SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Memory[ix], A->SHM->B->Memory[ix]->Attrib->Socket), \
-							SMB_Find_String((struct STRUCTINFO*) A->SHM->B->Memory[ix], A->SHM->B->Memory[ix]->Attrib->Bank), \
+							Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Memory[ix], A->SHM->B->Memory[ix]->Attrib->Socket), \
+							Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Memory[ix], A->SHM->B->Memory[ix]->Attrib->Bank), \
 							A->SHM->B->Memory[ix]->Attrib->Size, A->SHM->B->Memory[ix]->Attrib->Speed);
 						strcat(items, str);
 					}
@@ -2326,7 +2326,7 @@ void	DrawLayout(uARG *A, int G)
 			char str[TASK_COMM_LEN]={0};
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
-				if(A->SHM->C[cpu].T.Offline != true)
+				if(A->SHM->C[cpu].T.Offline != TRUE)
 				{
 					// Select a color based ratio.
 					const struct {
@@ -2430,7 +2430,7 @@ void	DrawLayout(uARG *A, int G)
 								{
 									XSetForeground(	A->display, A->W[G].gc,
 											(depth == 0) ? A->L.Colors[COLOR_PULSE].RGB
-											: (A->SHM->C[cpu].Task[depth].state == 'R') ?
+											: !strcasecmp(A->SHM->C[cpu].Task[depth].state, "R") ?
 												A->L.Colors[COLOR_GRAPH1].RGB
 												: A->L.Colors[COLOR_LABEL].RGB);
 									XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
@@ -2478,11 +2478,11 @@ void	DrawLayout(uARG *A, int G)
 			break;
 		case CSTATES:
 		{
-			char str[32]={0};
+			char str[64]={0};
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
-				if(A->SHM->C[cpu].T.Offline != true)
+				if(A->SHM->C[cpu].T.Offline != TRUE)
 				{
 					// Prepare the C0 chart.
 					A->L.Usage.C0[cpu].x=Half_Char_Width(G) + ((cpu * CSTATES_TEXT_SPACING) * One_Half_Char_Width(G));
@@ -2506,7 +2506,7 @@ void	DrawLayout(uARG *A, int G)
 					A->L.Usage.C6[cpu].height=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->SHM->C[cpu].State.C6;
 				}			// Display the C-State averages.
-			sprintf(str, CSTATES_PERCENT,	100.f * A->SHM->P.Avg.Turbo,
+			sprintf(str, CSTATES_AVERAGE,	100.f * A->SHM->P.Avg.Turbo,
 							100.f * A->SHM->P.Avg.C0,
 							100.f * A->SHM->P.Avg.C3,
 							100.f * A->SHM->P.Avg.C6);
@@ -2525,7 +2525,7 @@ void	DrawLayout(uARG *A, int G)
 
 			if(A->L.Play.cStatePercent)
 				for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
-					if(A->SHM->C[cpu].T.Offline != true)
+					if(A->SHM->C[cpu].T.Offline != TRUE)
 					{
 						XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 						sprintf(str, CORE_NUM, cpu);
@@ -2541,7 +2541,7 @@ void	DrawLayout(uARG *A, int G)
 										100.f * A->SHM->C[cpu].State.C6);
 
 						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-								Twice_Half_Char_Width(G),
+								One_Char_Width(G) << 2,
 								One_Char_Height(G) * (cpu + 1 + 1),
 								str, strlen(str) );
 					}
@@ -2553,7 +2553,7 @@ void	DrawLayout(uARG *A, int G)
 			// Display the Core temperature.
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
-				if(A->SHM->C[cpu].T.Offline != true)
+				if(A->SHM->C[cpu].T.Offline != TRUE)
 				{
 					// Update & draw the temperature histogram per logical core.
 					int i=0;
@@ -2572,11 +2572,11 @@ void	DrawLayout(uARG *A, int G)
 					U->y2=(A->W[G].height * A->SHM->C[cpu].ThermStat.DTS) / A->SHM->C[cpu].TjMax.Target;
 
 					XSetForeground(A->display, A->W[G].gc,	A->L.Colors[COLOR_GRAPH1].RGB
-										| (0xf00000 * cpu)
-										| (0x00f000 * A->SHM->C[cpu].T.APIC_ID)
-										| (0x0000f0 * A->SHM->C[cpu].T.Core_ID)
-										| (0x000700 * A->SHM->C[cpu].T.Thread_ID));
-					if(A->L.Play.showTemp[cpu] == true)
+										| fROL32(0x28104080, cpu)
+										| fROR32(0x01010011, A->SHM->C[cpu].T.APIC_ID)
+										| fROL32(0x80808080, A->SHM->C[cpu].T.Core_ID)
+										| fROR32(0x01010100, A->SHM->C[cpu].T.Thread_ID));
+					if(A->L.Play.showTemp[cpu] == TRUE)
 						XDrawSegments(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Temps[cpu].Segment, A->L.Temps[cpu].N);
 
 					sprintf(str, TEMPERATURE, A->SHM->C[cpu].TjMax.Target - A->SHM->C[cpu].ThermStat.DTS);
@@ -2687,11 +2687,11 @@ void	DrawLayout(uARG *A, int G)
 			char *items=calloc(Rows, DUMP_TEXT_WIDTH);
 			for(row=0; row < Rows; row++)
 			{
-				char binStr[DUMP_BIN64_STR]={0};
+				char binStr[DUMP_BIN64_STR + 1]={0};
 				DumpRegister(A->SHM->D.Array[row].Value, NULL, binStr);
 
 				char mask[DUMP_PRE_TEXT]={0}, str[DUMP_PRE_TEXT]={0};
-				sprintf(mask, REG_FORMAT, row,
+				sprintf(mask, REG_FORMAT_BOL, row,
 							A->SHM->D.Array[row].Addr,
 							A->SHM->D.Array[row].Name,
 							DUMP_REG_ALIGN - strlen(A->SHM->D.Array[row].Name));
@@ -2705,7 +2705,8 @@ void	DrawLayout(uARG *A, int G)
 					strcat(items, " ");
 				};
 				strncat(items, &binStr[H << 2], 4);
-				strcat(items, "]\n");
+				sprintf(str, REG_FORMAT_EOL, A->SHM->D.Array[row].Core);
+				strcat(items, str);
 			}
 			if(A->L.Page[G].Pageable)
 			{	// Clear the scrolling area.
@@ -2741,7 +2742,7 @@ void	DrawLayout(uARG *A, int G)
 // Update the Widget name with the Top Core frequency, temperature, c-states.
 void	UpdateWidgetName(uARG *A, int G)
 {
-	char str[32]={0};
+	char str[64]={0};
 	switch(G) {
 		case MAIN:
 			if(_IS_MDI_)
@@ -2785,48 +2786,48 @@ void	UpdateWidgetName(uARG *A, int G)
 }
 
 // Implementation of CallBack functions.
-bool	SCHED_State(uARG *A, WBUTTON *wButton)
+Bool32	SCHED_State(uARG *A, WBUTTON *wButton)
 {
 	return(A->SHM->S.Monitor);
 }
 
-bool	TSC_State(uARG *A, WBUTTON *wButton)
+Bool32	TSC_State(uARG *A, WBUTTON *wButton)
 {
 	return(A->SHM->P.ClockSrc == SRC_TSC);
 }
 
-bool	BIOS_State(uARG *A, WBUTTON *wButton)
+Bool32	BIOS_State(uARG *A, WBUTTON *wButton)
 {
 	return(A->SHM->P.ClockSrc == SRC_BIOS);
 }
 
-bool	SPEC_State(uARG *A, WBUTTON *wButton)
+Bool32	SPEC_State(uARG *A, WBUTTON *wButton)
 {
 	return(A->SHM->P.ClockSrc == SRC_SPEC);
 }
 
-bool	ROM_State(uARG *A, WBUTTON *wButton)
+Bool32	ROM_State(uARG *A, WBUTTON *wButton)
 {
 	return(A->SHM->P.ClockSrc == SRC_ROM);
 }
 
-bool	Button_State(uARG *A, WBUTTON *wButton)
+Bool32	Button_State(uARG *A, WBUTTON *wButton)
 {
 	return( (*(wButton->WBState.Key)) );
 }
 
-void	Play(uARG *A, int G, char ID)
+void	Play(uARG *A, int G, char ID, XCHG_MAP *XChange)
 {
 	switch(ID)
 	{
 		case ID_NORTH:
 			if(A->L.Page[G].Pageable)
 			{
-				bool CallFlush=false;
+				Bool32 CallFlush=FALSE;
 				if(GetVScrolling(G) > 0)
 				{
 					SetVScrolling(G, GetVScrolling(G) - SCROLLED_ROWS_PER_ONCE);
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				if(CallFlush)
 					FlushLayout(A, G);
@@ -2835,11 +2836,11 @@ void	Play(uARG *A, int G, char ID)
 		case ID_SOUTH:
 			if(A->L.Page[G].Pageable)
 			{
-				bool CallFlush=false;
+				Bool32 CallFlush=FALSE;
 				if(GetVScrolling(G) < (GetVListing(G) - GetVViewport(G)))
 				{
 					SetVScrolling(G, GetVScrolling(G) + SCROLLED_ROWS_PER_ONCE);
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				if(CallFlush)
 					FlushLayout(A, G);
@@ -2848,11 +2849,11 @@ void	Play(uARG *A, int G, char ID)
 		case ID_EAST:
 			if(A->L.Page[G].Pageable)
 			{
-				bool CallFlush=false;
+				Bool32 CallFlush=FALSE;
 				if(GetHScrolling(G) < (GetHListing(G) - GetHViewport(G)))
 				{
 					SetHScrolling(G, GetHScrolling(G) + SCROLLED_COLS_PER_ONCE);
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				if(CallFlush)
 					FlushLayout(A, G);
@@ -2861,11 +2862,11 @@ void	Play(uARG *A, int G, char ID)
 		case ID_WEST:
 			if(A->L.Page[G].Pageable)
 			{
-				bool CallFlush=false;
+				Bool32 CallFlush=FALSE;
 				if(GetHScrolling(G) > 0)
 				{
 					SetHScrolling(G, GetHScrolling(G) - SCROLLED_COLS_PER_ONCE);
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				if(CallFlush)
 					FlushLayout(A, G);
@@ -2874,16 +2875,16 @@ void	Play(uARG *A, int G, char ID)
 		case ID_PGUP:
 			if(A->L.Page[G].Pageable)
 			{
-				bool CallFlush=false;
+				Bool32 CallFlush=FALSE;
 				if(GetVScrolling(G) > SCROLLED_ROWS_PER_PAGE)
 				{
 					SetVScrolling(G, GetVScrolling(G) - SCROLLED_ROWS_PER_PAGE);
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				else if(GetVScrolling(G) > 0)
 				{
 					SetVScrolling(G, 0);
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				if(CallFlush)
 					FlushLayout(A, G);
@@ -2892,16 +2893,16 @@ void	Play(uARG *A, int G, char ID)
 		case ID_PGDW:
 			if(A->L.Page[G].Pageable)
 			{
-				bool CallFlush=false;
+				Bool32 CallFlush=FALSE;
 				if(GetVScrolling(G) < (GetVListing(G) - GetVViewport(G) - SCROLLED_ROWS_PER_PAGE))
 				{
 					SetVScrolling(G, GetVScrolling(G) + SCROLLED_ROWS_PER_PAGE);
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				else if(GetVScrolling(G) < (GetVListing(G) - GetVViewport(G)))
 				{
 					SetVScrolling(G, GetVListing(G) - GetVViewport(G));
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				if(CallFlush)
 					FlushLayout(A, G);
@@ -2910,11 +2911,11 @@ void	Play(uARG *A, int G, char ID)
 		case ID_PGHOME:
 			if(A->L.Page[G].Pageable)
 			{
-				bool CallFlush=false;
+				Bool32 CallFlush=FALSE;
 				if(GetHScrolling(G) > 0)
 				{
 					SetHScrolling(G, 0);
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				if(CallFlush)
 					FlushLayout(A, G);
@@ -2923,11 +2924,11 @@ void	Play(uARG *A, int G, char ID)
 		case ID_PGEND:
 			if(A->L.Page[G].Pageable)
 			{
-				bool CallFlush=false;
+				Bool32 CallFlush=FALSE;
 				if(GetHScrolling(G) < (GetHListing(G) - GetHViewport(G)))
 				{
 					SetHScrolling(G, GetHListing(G) - GetHViewport(G));
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				if(CallFlush)
 					FlushLayout(A, G);
@@ -2936,16 +2937,16 @@ void	Play(uARG *A, int G, char ID)
 		case ID_CTRLHOME:
 			if(A->L.Page[G].Pageable)
 			{
-				bool CallFlush=false;
+				Bool32 CallFlush=FALSE;
 				if(GetHScrolling(G) > 0)
 				{
 					SetHScrolling(G, 0);
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				if(GetVScrolling(G) > 0)
 				{
 					SetVScrolling(G, 0);
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				if(CallFlush)
 					FlushLayout(A, G);
@@ -2954,16 +2955,16 @@ void	Play(uARG *A, int G, char ID)
 		case ID_CTRLEND:
 			if(A->L.Page[G].Pageable)
 			{
-				bool CallFlush=false;
+				Bool32 CallFlush=FALSE;
 				if(GetHScrolling(G) < (GetHListing(G) - GetHViewport(G)))
 				{
 					SetHScrolling(G, GetHListing(G) - GetHViewport(G));
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				if(GetVScrolling(G) < (GetVListing(G) - GetVViewport(G)))
 				{
 					SetVScrolling(G, GetVListing(G) - GetVViewport(G));
-					CallFlush=true;
+					CallFlush=TRUE;
 				}
 				if(CallFlush)
 					FlushLayout(A, G);
@@ -2977,35 +2978,50 @@ void	Play(uARG *A, int G, char ID)
 			break;
 		case ID_STOP:
 			{
-				A->PAUSE[G]=true;
+				A->PAUSE[G]=TRUE;
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 			}
 			break;
 		case ID_RESUME:
 			{
-				A->PAUSE[G]=false;
+				A->PAUSE[G]=FALSE;
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
 			}
 			break;
 		case ID_CHART:
-			A->L.Play.fillGraphics=!A->L.Play.fillGraphics;
+			{
+				A->L.Play.fillGraphics=!A->L.Play.fillGraphics;
+			}
 			break;
 		case ID_FREQ:
-			A->L.Play.freqHertz=!A->L.Play.freqHertz;
+			{
+				A->L.Play.freqHertz=!A->L.Play.freqHertz;
+			}
 			break;
 		case ID_CYCLE:
-			A->L.Play.cycleValues=!A->L.Play.cycleValues;
+			{
+				A->L.Play.cycleValues=!A->L.Play.cycleValues;
+			}
 			break;
 		case ID_RATIO:
-			A->L.Play.ratioValues=!A->L.Play.ratioValues;
+			{
+				A->L.Play.ratioValues=!A->L.Play.ratioValues;
+			}
 			break;
 		case ID_CSTATE:
-			A->L.Play.cStatePercent=!A->L.Play.cStatePercent;
+			{
+				A->L.Play.cStatePercent=!A->L.Play.cStatePercent;
+			}
 			break;
 		case ID_WALLBOARD:
-			A->L.Play.wallboard=!A->L.Play.wallboard;
+			{
+				A->L.Play.wallboard=!A->L.Play.wallboard;
+			}
 			break;
 
+		case ID_DUMPMSR:
+		case ID_READMSR:
+		case ID_WRITEMSR:
 		case ID_INCLOOP:
 		case ID_DECLOOP:
 		case ID_SCHED:
@@ -3016,7 +3032,16 @@ void	Play(uARG *A, int G, char ID)
 			{
 				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_WAIT]);
 
-				atomic_store(&A->SHM->PlayID, ID);
+				if(XChange != NULL)
+				{	// Append the Server request ID to the given parameters.
+					XChange->Map.ID=ID;
+					atomic_store(&A->SHM->Sync.Play, XChange->Map64);
+				}
+				else
+				{	// No parameters supplied.
+					XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID}};
+					atomic_store(&A->SHM->Sync.Play, XChange.Map64);
+				}
 
 				Sync_Signal(0, &A->SHM->Sync);
 			}
@@ -3048,7 +3073,7 @@ char	*FQN_Settings(const char *fName)
 	return(NULL);
 }
 
-bool	SaveSettings(uARG *A)
+Bool32	SaveSettings(uARG *A)
 {
 	char storePath[4096]={0};
 
@@ -3126,16 +3151,16 @@ bool	SaveSettings(uARG *A)
 		}
 		for(i=0; i < COLOR_COUNT; i++)
 		{
-			sprintf(strVal, "%s.%s: 0x%x", A->L.Colors[i].xrmClass, A->L.Colors[i].xrmKey, A->L.Colors[i].RGB);
+			sprintf(strVal, "%s.%s: 0x%lx", A->L.Colors[i].xrmClass, A->L.Colors[i].xrmKey, A->L.Colors[i].RGB);
 			XrmPutLineResource(&xdb, strVal);
 		}
 		XrmPutFileDatabase(xdb, storePath);
 		XrmDestroyDatabase(xdb);
 
-		return(true);
+		return(TRUE);
 	}
 	else
-		return(false);
+		return(FALSE);
 }
 
 // Instructions set.
@@ -3147,10 +3172,11 @@ void	Proc_Menu(uARG *A)
 void	Proc_Help(uARG *A)
 {
 	char stringNL[16]={0};
-	int C=0;
-	for(C=0; C < COMMANDS_COUNT; C++)
+
+	int cmd=0;
+	for(cmd=1; cmd < COMMANDS_COUNT; cmd++)
 	{
-		sprintf(stringNL, "%s\n", A->Commands[C].Inst);
+		sprintf(stringNL, "%s\n", A->Commands[cmd].Inst);
 		Output(A, stringNL);
 	}
 }
@@ -3163,67 +3189,161 @@ void	Proc_Release(uARG *A)
 void	Proc_Quit(uARG *A)
 {
 	Output(A, "Shutting down ...\n");
-	A->LOOP=false;
+	A->LOOP=FALSE;
 }
 
 void	Proc_Restart(uARG *A)
 {
 	Output(A, "Restarting ...\n");
-	A->RESTART=true;
-	A->LOOP=false;
+	A->RESTART=TRUE;
+	A->LOOP=FALSE;
 }
 
-void	Get_Color(uARG *A, int C)
+void	Proc_History(uARG *A)
 {
-	int i=0;
-	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[C].Inst)], A->Commands[C].Spec, &i) == 1) && (i < COLOR_COUNT))
+	char *items=calloc(HISTORY_DEPTH, KEYINPUT_DEPTH), *str=malloc(KEYINPUT_DEPTH);
+	int idx=0;
+	while(idx < A->L.Input.Top)
+	{
+		sprintf(str, "[%2d] ", idx);
+		strcat(items, str);
+		memcpy(str, A->L.Input.History[idx].KeyBuffer, A->L.Input.History[idx].KeyLength);
+		str[A->L.Input.History[idx].KeyLength]='\n';
+		str[A->L.Input.History[idx].KeyLength+1]='\0';
+		strcat(items, str);
+		idx++;
+	}
+	Output(A, items);
+	free(str);
+	free(items);
+}
+
+void	Get_Color(uARG *A, int cmd)
+{
+	int idx=0;
+
+	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &idx) == 1) && (idx < COLOR_COUNT))
 	{
 		char stringNL[16]={0};
-		sprintf(stringNL, "0x%x\n", A->L.Colors[i].RGB);
+
+		sprintf(stringNL, "0x%lx\n", A->L.Colors[idx].RGB);
 		Output(A, stringNL);
 	}
 	else
-		Output(A, "Invalid color index\n");
+		Output(A, "Usage: get color p1 Where: p1=color index (Int)\n");
 }
 
-void	Set_Color(uARG *A, int C)
+void	Set_Color(uARG *A, int cmd)
 {
-	unsigned long RGB;
-	int i=0;
-	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[C].Inst)], A->Commands[C].Spec, &i, &RGB) == 2) && (i < COLOR_COUNT))
+	unsigned long int RGB=0;
+	int idx=0;
+
+	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &idx, &RGB) == 2) && (idx < COLOR_COUNT))
 	{
-		A->L.Colors[i].RGB=RGB;
+		A->L.Colors[idx].RGB=RGB;
 	}
 	else
-		Output(A, "Invalid color index\n");
+		Output(A, "Usage: set color p1 p2 Where: p1=RGB color (Hex), p2=color index (Int)\n");
 }
 
-void	Set_Font(uARG *A, int C)
+void	Set_Font(uARG *A, int cmd)
 {
-	if(sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[C].Inst)], A->Commands[C].Spec, A->fontName) != 1)
-		Output(A, "Missing font name\n");
+	if(sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, A->fontName) != 1)
+		Output(A, "Usage: set font p1 Where: p1=font name (String)\n");
+}
+
+void	Svr_Dump_Msr(uARG *A, int cmd)
+{
+	XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_NULL}};
+
+	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &XChange.Map.Addr, &XChange.Map.Core, &XChange.Map.Arg) == 3)
+	&& (XChange.Map.Core < A->SHM->P.CPU) && (XChange.Map.Core >= 0) && (XChange.Map.Arg < DUMP_ARRAY_DIMENSION) && (XChange.Map.Arg >=0))
+	{
+		Play(A, MAIN, ID_DUMPMSR, &XChange);
+	}
+	else
+		Output(A, "Usage: dump msr p1 p2 p3 Where: p1=address (Hex), p2=Core# (Int), p3=index (Int)\n");
+}
+
+void	Svr_Read_Msr(uARG *A, int cmd)
+{
+	XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_NULL}};
+
+	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &XChange.Map.Addr, &XChange.Map.Core) == 2)
+	&& (XChange.Map.Core < A->SHM->P.CPU) && (XChange.Map.Core >= 0))
+	{
+		Play(A, MAIN, ID_READMSR, &XChange);
+	}
+	else
+		Output(A, "Usage: read msr p1 p2 Where: p1=address (Hex), p2=Core# (Int)\n");
+}
+
+void	Svr_Print_Msr(uARG *A)
+{
+	unsigned long long int decVal=atomic_load(&A->SHM->Sync.Data);
+
+	char hexStr[DUMP_HEX16_STR], binStr[DUMP_BIN64_STR],
+		fullStr[20 + 1 + 1 + DUMP_HEX16_STR + 7 + 1 + 1 + 1 + DUMP_BIN64_STR + 15 + 1 + 1];
+
+	DumpRegister(decVal, hexStr, binStr);
+
+	sprintf(fullStr, "%llu (", decVal);
+
+	int H=0;
+	for(H=0; H < 7; H++)
+	{
+		strncat(fullStr, &hexStr[H << 1], 2);
+		strcat(fullStr, " ");
+	}
+	strncat(fullStr, &hexStr[H << 1], 2);
+	strcat(fullStr, ")\n[");
+
+	for(H=0; H < 15; H++)
+	{
+		strncat(fullStr, &binStr[H << 2], 4);
+		strcat(fullStr, " ");
+	};
+	strncat(fullStr, &binStr[H << 2], 4);
+	strcat(fullStr, "]\n");
+
+	Output(A, fullStr);
+}
+
+void	Svr_Write_Msr(uARG *A, int cmd)
+{
+	XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_NULL}};
+	unsigned long long int data=0;
+
+	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &XChange.Map.Addr, &XChange.Map.Core, &data) == 3)
+	&& (XChange.Map.Core < A->SHM->P.CPU) && (XChange.Map.Core >= 0))
+	{
+		atomic_store(&A->SHM->Sync.Data, data);
+		Play(A, MAIN, ID_WRITEMSR, &XChange);
+	}
+	else
+		Output(A, "Usage: write msr p1 p2 p3 Where: p1=address (Hex), p2=Core# (Int), p3=value (Hex)\n");
 }
 
 // Process the commands language.
-bool	ExecCommand(uARG *A)
+Bool32	ExecCommand(uARG *A)
 {
-	int C=0;
-	for(C=0; C < COMMANDS_COUNT; C++)
-		if(!strncmp(A->L.Input.KeyBuffer, A->Commands[C].Inst, strlen(A->Commands[C].Inst)))
+	int cmd=0;
+	for(cmd=0; cmd < COMMANDS_COUNT; cmd++)
+		if(strncmp(A->L.Input.KeyBuffer, A->Commands[cmd].Inst, strlen(A->Commands[cmd].Inst)) == 0)
 			break;
 
-	if(C < COMMANDS_COUNT)
+	if(cmd < COMMANDS_COUNT)
 	{
-		A->Commands[C].Proc(A, C);
-		return(true);
+		A->Commands[cmd].Proc(A, cmd);
+		return(TRUE);
 	}
 	else
-		return(false);
+		return(FALSE);
 }
 
 void	CallBackButton(uARG *A, WBUTTON *wButton)
 {
-	Play(A, wButton->Target, wButton->ID);
+	Play(A, wButton->Target, wButton->ID, NULL);
 }
 
 void	CallBackTemps(uARG *A, WBUTTON *wButton)
@@ -3239,13 +3359,13 @@ void	CallBackSave(uARG *A, WBUTTON *wButton)
 		Output(A, "Settings successfully saved.\n");
 	else
 		Output(A, "Failed to save settings.\n");
-	fDraw(MAIN, true, false);
+	fDraw(MAIN, TRUE, FALSE);
 }
 
 void	CallBackQuit(uARG *A, WBUTTON *wButton)
 {
 	Proc_Quit(A);
-	fDraw(MAIN, true, false);
+	fDraw(MAIN, TRUE, FALSE);
 }
 void	CallBackMinimizeWidget(uARG *A, WBUTTON *wButton)
 {
@@ -3267,18 +3387,25 @@ static void *uDraw(void *uArg)
 	while(A->LOOP)
 		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + IDLE_COEF_DEF + IDLE_COEF_MIN)))
 		{
-			bool fResetCursor=(atomic_load(&A->SHM->PlayID) == ID_DONE);
+			XCHG_MAP XChange={.Map64=atomic_load(&A->SHM->Sync.Play)};
 			int G=0;
 			for(G=MAIN; G < WIDGETS; G++)
 			{
 				if(!A->PAUSE[G])
-					fDraw(G, (atomic_load(&A->SHM->PlayID) == ID_DONE) ? true : false, true);
+					fDraw(G, (XChange.Map.ID == ID_DONE) ? TRUE : FALSE, TRUE);
 
 				if(!(A->L.UnMapBitmask & (1 << G)))
 					UpdateWidgetName(A, G);
 
-				if(fResetCursor)
+				if(XChange.Map.ID == ID_DONE)
+				{
+					if(G == MAIN)
+					{
+						Svr_Print_Msr(A);
+						fDraw(MAIN, TRUE, FALSE);
+					}
 					XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
+				}
 			}
 		}
 	else
@@ -3312,7 +3439,7 @@ static void *uLoop(uARG *A)
 				if(E.xclient.data.l[0] == A->atom[0])
 				{
 					Proc_Quit(A);
-					fDraw(MAIN, true, false);
+					fDraw(MAIN, TRUE, FALSE);
 				}
 				break;
 			case KeyPress:
@@ -3335,23 +3462,24 @@ static void *uLoop(uARG *A)
 					{
 						memcpy(&A->L.Input.KeyBuffer[A->L.Input.KeyLength], xkBuffer, xkLength);
 						A->L.Input.KeyLength+=xkLength;
-						fDraw(MAIN, false, true);
+						fDraw(MAIN, FALSE, TRUE);
 					}
 				switch(KeySymPressed)
 				{
+					case XK_Escape:
 					case XK_Delete:
 					case XK_KP_Delete:
 						if(A->L.Input.KeyLength > 0)
 						{
 							A->L.Input.KeyLength=0;
-							fDraw(MAIN, false, true);
+							fDraw(MAIN, FALSE, TRUE);
 						}
 						break;
 					case XK_BackSpace:
 						if(A->L.Input.KeyLength > 0)
 						{
 							A->L.Input.KeyLength--;
-							fDraw(MAIN, false, true);
+							fDraw(MAIN, FALSE, TRUE);
 						}
 						break;
 					case XK_Return:
@@ -3361,107 +3489,156 @@ static void *uLoop(uARG *A)
 							A->L.Input.KeyBuffer[A->L.Input.KeyLength]='\0';
 							Output(A, A->L.Input.KeyBuffer);
 							Output(A, "\n");
+
 							if(!ExecCommand(A))
-								Output(A, "SYNTAX ERROR\n");
+								Output(A, "Syntax Error\n");
+							else
+							{
+								A->L.Input.History[A->L.Input.Recent].KeyLength=A->L.Input.KeyLength;
+								memcpy(A->L.Input.History[A->L.Input.Recent].KeyBuffer,
+									A->L.Input.KeyBuffer,
+									A->L.Input.History[A->L.Input.Recent].KeyLength);
+
+								A->L.Input.Browse=A->L.Input.Recent;
+
+								if(A->L.Input.Top < (HISTORY_DEPTH - 1))
+									A->L.Input.Top++;
+
+								A->L.Input.Recent=(A->L.Input.Recent < A->L.Input.Top) ? A->L.Input.Recent + 1 : 0;
+							}
 							A->L.Input.KeyLength=0;
-							fDraw(MAIN, true, false);
+							fDraw(MAIN, TRUE, FALSE);
 						}
 						break;
-					case XK_Escape:
+					case XK_Tab:
+						if(A->L.Input.KeyLength > 0)
+						{
+							int cmd=0;
+							for(cmd=0; cmd < COMMANDS_COUNT; cmd++)
+								if(strncmp(A->L.Input.KeyBuffer, A->Commands[cmd].Inst, A->L.Input.KeyLength) == 0) {
+									Output(A, A->Commands[cmd].Inst);
+									Output(A, "\n");
+								}
+							fDraw(MAIN, TRUE, FALSE);
+						}
 					case XK_Pause:
 						if(G != MAIN)
-							Play(A, G, ID_PAUSE);
+							Play(A, G, ID_PAUSE, NULL);
 						break;
 					case XK_l:
 					case XK_L:
 						// Draw the Widget once.
 						if(E.xkey.state & ControlMask)
-							fDraw(G, false, true);
+							fDraw(G, FALSE, TRUE);
 						break;
 					case XK_p:
 					case XK_P:
 						if(E.xkey.state & ControlMask)
-							Play(A, G, ID_CSTATE);
+							Play(A, G, ID_CSTATE, NULL);
 						break;
 					case XK_q:
 					case XK_Q:
 						if(E.xkey.state & ControlMask)
 						{
 							Proc_Quit(A);
-							fDraw(MAIN, true, false);
+							fDraw(MAIN, TRUE, FALSE);
 						}
 						break;
 					case XK_r:
 					case XK_R:
 						if(E.xkey.state & ControlMask)
-							Play(A, G, ID_RATIO);
+							Play(A, G, ID_RATIO, NULL);
 						break;
 					case XK_t:
 					case XK_T:
 						if(E.xkey.state & ControlMask)
-							Play(A, G, ID_SCHED);
+							Play(A, G, ID_SCHED, NULL);
 						break;
 					case XK_w:
 					case XK_W:
 						if(E.xkey.state & ControlMask)
-							Play(A, G, ID_WALLBOARD);
+							Play(A, G, ID_WALLBOARD, NULL);
 						break;
 					case XK_y:
 					case XK_Y:
 						if(E.xkey.state & ControlMask)
-							Play(A, G, ID_CYCLE);
+							Play(A, G, ID_CYCLE, NULL);
 						break;
 					case XK_z:
 					case XK_Z:
 						if(E.xkey.state & ControlMask)
-							Play(A, G, ID_FREQ);
+							Play(A, G, ID_FREQ, NULL);
 						break;
 					case XK_Up:
 					case XK_KP_Up:
-						Play(A, G, ID_NORTH);
+						if(E.xkey.state & ShiftMask)
+							Play(A, G, ID_NORTH, NULL);
+						else if((G == MAIN))
+						{
+							A->L.Input.KeyLength=A->L.Input.History[A->L.Input.Browse].KeyLength;
+							memcpy(A->L.Input.KeyBuffer, A->L.Input.History[A->L.Input.Browse].KeyBuffer, A->L.Input.KeyLength);
+
+							A->L.Input.Browse=(A->L.Input.Browse < A->L.Input.Top) ? A->L.Input.Browse + 1 : 0;
+
+							fDraw(MAIN, FALSE, TRUE);
+						}
 						break;
 					case XK_Down:
 					case XK_KP_Down:
-						Play(A, G, ID_SOUTH);
+						if(E.xkey.state & ShiftMask)
+							Play(A, G, ID_SOUTH, NULL);
+						else if((G == MAIN))
+						{
+							A->L.Input.KeyLength=A->L.Input.History[A->L.Input.Browse].KeyLength;
+							memcpy(A->L.Input.KeyBuffer, A->L.Input.History[A->L.Input.Browse].KeyBuffer, A->L.Input.KeyLength);
+
+							A->L.Input.Browse=(A->L.Input.Browse > 0) ? A->L.Input.Browse - 1 : A->L.Input.Top;
+
+							fDraw(MAIN, FALSE, TRUE);
+						}
 						break;
 					case XK_Right:
 					case XK_KP_Right:
-						Play(A, G, ID_EAST);
+						if(E.xkey.state & ShiftMask)
+							Play(A, G, ID_EAST, NULL);
 						break;
 					case XK_Left:
 					case XK_KP_Left:
-						Play(A, G, ID_WEST);
+						if(E.xkey.state & ShiftMask)
+							Play(A, G, ID_WEST, NULL);
 						break;
 					case XK_Page_Up:
 					case XK_KP_Page_Up:
-						Play(A, G, ID_PGUP);
+						if(E.xkey.state & ShiftMask)
+							Play(A, G, ID_PGUP, NULL);
 						break;
 					case XK_Page_Down:
 					case XK_KP_Page_Down:
-						Play(A, G, ID_PGDW);
+						if(E.xkey.state & ShiftMask)
+							Play(A, G, ID_PGDW, NULL);
 						break;
 					case XK_Home:
 						if(E.xkey.state & ControlMask)
-							Play(A, G, ID_CTRLHOME);
+							Play(A, G, ID_CTRLHOME, NULL);
 						else
-							Play(A, G, ID_PGHOME);
+							Play(A, G, ID_PGHOME, NULL);
 						break;
 					case XK_End:
 						if(E.xkey.state & ControlMask)
-							Play(A, G, ID_CTRLEND);
+							Play(A, G, ID_CTRLEND, NULL);
 						else
-							Play(A, G, ID_PGEND);
+							Play(A, G, ID_PGEND, NULL);
 						break;
 					case XK_KP_Add:
-						Play(A, G, ID_DECLOOP);
+						Play(A, G, ID_DECLOOP, NULL);
 						break;
 					case XK_KP_Subtract:
-						Play(A, G, ID_INCLOOP);
+						Play(A, G, ID_INCLOOP, NULL);
 						break;
 					case XK_F1:
 					{
 						Proc_Menu(A);
-						fDraw(MAIN, true, false);
+						fDraw(MAIN, TRUE, FALSE);
 					}
 						break;
 					case XK_F2:
@@ -3508,7 +3685,7 @@ static void *uLoop(uARG *A)
 								if( E.xbutton.subwindow == A->W[T].window)
 									break;
 						}
-						Play(A, T, ID_NORTH);
+						Play(A, T, ID_NORTH, NULL);
 						break;
 					}
 					case Button5:
@@ -3520,7 +3697,7 @@ static void *uLoop(uARG *A)
 								if( E.xbutton.subwindow == A->W[T].window)
 									break;
 						}
-						Play(A, T, ID_SOUTH);
+						Play(A, T, ID_SOUTH, NULL);
 						break;
 					}
 				}
@@ -3553,24 +3730,24 @@ static void *uLoop(uARG *A)
 				XSetWindowBorder(A->display, A->W[G].window, A->W[G].foreground);
 				break;
 			case DestroyNotify:
-				A->LOOP=false;
+				A->LOOP=FALSE;
 				break;
 			case UnmapNotify:
 			{
 				if(G != MAIN)
-					A->PAUSE[G]=true;
+					A->PAUSE[G]=TRUE;
 
 				IconifyWidget(A, G, &E);
-				fDraw(MAIN, true, false);
+				fDraw(MAIN, TRUE, FALSE);
 			}
 				break;
 			case MapNotify:
 			{
 				if(G != MAIN)
-					A->PAUSE[G]=false;
+					A->PAUSE[G]=FALSE;
 
 				IconifyWidget(A, G, &E);
-				fDraw(MAIN, true, false);
+				fDraw(MAIN, TRUE, FALSE);
 			}
 				break;
 /*			case VisibilityNotify:
@@ -3598,7 +3775,7 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 	XrmValue xvalue={0, NULL};
 	char xrmKey[32]={0};
 	int i=0, j=0, G=0;
-	bool noerr=true;
+	Bool32 noerr=TRUE;
 
 	// Is the option '-C' specified ?
 	if((argc >= 3) && !strcmp(argv[1], A->Options[0].argument))
@@ -3626,7 +3803,7 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 		{
 			sprintf(xrmKey, "%s.%s", A->L.Colors[i].xrmClass, A->L.Colors[i].xrmKey);
 			if(XrmGetResource(xdb, xrmKey, NULL, &xtype, &xvalue))
-				sscanf(xvalue.addr, "%x", &A->L.Colors[i].RGB);
+				sscanf(xvalue.addr, "%lx", &A->L.Colors[i].RGB);
 		}
 	}
 	//  Parse the command line options which may override settings.
@@ -3642,7 +3819,7 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 				}
 			if(i == OPTIONS_COUNT)
 			{
-				noerr=false;
+				noerr=FALSE;
 				break;
 			}
 		}
@@ -3650,7 +3827,7 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 		{
 			if(!xdb)
 			{
-				bool noGeometries=(A->Geometries == NULL);
+				Bool32 noGeometries=(A->Geometries == NULL);
 				if(noGeometries)
 					A->Geometries=calloc(WIDGETS, GEOMETRY_SIZE + 1);
 
@@ -3706,12 +3883,12 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 		}
 	}
 	else
-		noerr=false;
+		noerr=FALSE;
 
 	if(xdb != NULL)
 		XrmDestroyDatabase(xdb);
 
-	if(noerr == false) {
+	if(noerr == FALSE) {
 		char	*program=strdup(argv[0]),
 			*progName=basename(program);
 
@@ -3758,14 +3935,14 @@ static void *uEmergency(void *uArg)
 				char str[sizeof(SIG_EMERGENCY_FMT)];
 				sprintf(str, SIG_EMERGENCY_FMT, caught);
 				tracerr(str);
-				A->LOOP=false;
+				A->LOOP=FALSE;
 			}
 				break;
 			case SIGCONT:
 			{
 				int G=0;
 				for(G=FIRST_WIDGET; G <= LAST_WIDGET; G++)
-					Play(A, G, ID_RESUME);
+					Play(A, G, ID_RESUME, NULL);
 			}
 				break;
 			case SIGUSR2:
@@ -3773,7 +3950,7 @@ static void *uEmergency(void *uArg)
 			{
 				int G=0;
 				for(G=FIRST_WIDGET; G <= LAST_WIDGET; G++)
-					Play(A, G, ID_STOP);
+					Play(A, G, ID_STOP, NULL);
 			}
 		}
 	return(NULL);
@@ -3929,7 +4106,7 @@ int main(int argc, char *argv[])
 				},
 			},
 			.T={
-				.Locked=false,
+				.Locked=FALSE,
 				.S=0,
 				.dx=0,
 				.dy=0,
@@ -3971,7 +4148,7 @@ int main(int argc, char *argv[])
 				.Page={
 					// MAIN
 					{
-						.Pageable=true,
+						.Pageable=TRUE,
 						.Geometry={.cols=GEOMETRY_MAIN_COLS, .rows=GEOMETRY_MAIN_ROWS},
 						.Visible={.cols=0, .rows=0},
 						.Listing={.cols=0, .rows=1},
@@ -3985,7 +4162,7 @@ int main(int argc, char *argv[])
 					},
 					// CORES
 					{
-						.Pageable=false,
+						.Pageable=FALSE,
 						.Geometry={.cols=GEOMETRY_CORES_COLS, .rows=GEOMETRY_CORES_ROWS},
 						.Visible={.cols=0, .rows=0},
 						.Listing={.cols=0, .rows=0},
@@ -3999,7 +4176,7 @@ int main(int argc, char *argv[])
 					},
 					// CSTATES
 					{
-						.Pageable=false,
+						.Pageable=FALSE,
 						.Geometry={.cols=GEOMETRY_CSTATES_COLS, .rows=GEOMETRY_CSTATES_ROWS},
 						.Visible={.cols=0, .rows=0},
 						.Listing={.cols=0, .rows=0},
@@ -4013,7 +4190,7 @@ int main(int argc, char *argv[])
 					},
 					// TEMPS
 					{
-						.Pageable=false,
+						.Pageable=FALSE,
 						.Geometry={.cols=GEOMETRY_TEMPS_COLS, .rows=GEOMETRY_TEMPS_ROWS},
 						.Visible={.cols=0, .rows=0},
 						.Listing={.cols=0, .rows=0},
@@ -4027,7 +4204,7 @@ int main(int argc, char *argv[])
 					},
 					// SYSINFO
 					{
-						.Pageable=true,
+						.Pageable=TRUE,
 						.Geometry={.cols=GEOMETRY_SYSINFO_COLS, .rows=GEOMETRY_SYSINFO_ROWS},
 						.Visible={.cols=0, .rows=0},
 						.Listing={.cols=0, .rows=1},
@@ -4041,7 +4218,7 @@ int main(int argc, char *argv[])
 					},
 					// DUMP
 					{
-						.Pageable=true,
+						.Pageable=FALSE,
 						.Geometry={.cols=GEOMETRY_DUMP_COLS, .rows=GEOMETRY_DUMP_ROWS},
 						.Visible={.cols=0, .rows=0},
 						.Listing={.cols=0, .rows=1},
@@ -4055,17 +4232,17 @@ int main(int argc, char *argv[])
 					},
 				},
 				.Play={
-					.fillGraphics=true,
-					.freqHertz=true,
-					.cycleValues=false,
-					.ratioValues=true,
-					.showSchedule=false,
-					.cStatePercent=false,
-					.wallboard=false,
-					.flashCursor=true,
-					.alwaysOnTop=false,
-					.noDecorations=false,
-					.skipTaskbar=false,
+					.fillGraphics=TRUE,
+					.freqHertz=TRUE,
+					.cycleValues=FALSE,
+					.ratioValues=TRUE,
+					.showSchedule=FALSE,
+					.cStatePercent=FALSE,
+					.wallboard=FALSE,
+					.flashCursor=TRUE,
+					.alwaysOnTop=FALSE,
+					.noDecorations=FALSE,
+					.skipTaskbar=FALSE,
 				},
 				.WB={
 					.Scroll=0,
@@ -4078,12 +4255,12 @@ int main(int argc, char *argv[])
 				.TextCursor={	{.x=+0, .y=+0},
 						{.x=+4, .y=-4},
 						{.x=+4, .y=+4} },
-				.Input={.KeyBuffer="", .KeyLength=0,},
+				.Input={.KeyBuffer=calloc(KEYINPUT_DEPTH, 1), .KeyLength=0, .Top=0},
 				.Output=NULL,
 			},
-			.LOOP=true,
-			.RESTART=false,
-			.PAUSE={false},
+			.LOOP=TRUE,
+			.RESTART=FALSE,
+			.PAUSE={FALSE},
 			.configFile=NULL,
 			.Options=
 			{
@@ -4101,24 +4278,30 @@ int main(int argc, char *argv[])
 				{"-b", "%x",  &A.L.globalBackground,   "Background color (Hex) {RGB}\n" \
 								       "\t\t  argument is coded with primary colors 0xRRGGBB",                 NULL                                       },
 				{"-f", "%x",  &A.L.globalForeground,   "Foreground color (Hex) {RGB}",                                         NULL                                       },
-				{"-l", "%hhu",&A.L.Play.fillGraphics,  "Fill or not the graphics (Bool) [0/1]",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_GRAPHICS    },
-				{"-z", "%hhu",&A.L.Play.freqHertz,     "Show the Core frequency (Bool) [0/1]",                                 XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
-				{"-y", "%hhu",&A.L.Play.cycleValues,   "Show the Core Cycles (Bool) [0/1]",                                    XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
-				{"-r", "%hhu",&A.L.Play.ratioValues,   "Show the Core Ratio (Bool) [0/1]",                                     XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
-				{"-p", "%hhu",&A.L.Play.cStatePercent, "Show the Core C-State percentage (Bool) [0/1]",                        XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
-				{"-w", "%hhu",&A.L.Play.wallboard,     "Scroll the Processor brand wallboard (Bool) [0/1]",                    XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
-				{"-o", "%hhu",&A.L.Play.alwaysOnTop,   "Keep the Widgets always on top of the screen (Bool) [0/1]",            NULL                                       },
-				{"-n", "%hhu",&A.L.Play.noDecorations, "Remove the Window Manager decorations (Bool) [0/1]",                   NULL                                       },
-				{"-N", "%hhu",&A.L.Play.skipTaskbar,   "Remove the Widgets title name from the WM taskbar (Bool) [0/1]",       NULL                                       },
+				{"-l", "%u",  &A.L.Play.fillGraphics,  "Fill or not the graphics (Bool) [0/1]",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_GRAPHICS    },
+				{"-z", "%u",  &A.L.Play.freqHertz,     "Show the Core frequency (Bool) [0/1]",                                 XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
+				{"-y", "%u",  &A.L.Play.cycleValues,   "Show the Core Cycles (Bool) [0/1]",                                    XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
+				{"-r", "%u",  &A.L.Play.ratioValues,   "Show the Core Ratio (Bool) [0/1]",                                     XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
+				{"-p", "%u",  &A.L.Play.cStatePercent, "Show the Core C-State percentage (Bool) [0/1]",                        XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
+				{"-w", "%u",  &A.L.Play.wallboard,     "Scroll the Processor brand wallboard (Bool) [0/1]",                    XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
+				{"-o", "%u",  &A.L.Play.alwaysOnTop,   "Keep the Widgets always on top of the screen (Bool) [0/1]",            NULL                                       },
+				{"-n", "%u",  &A.L.Play.noDecorations, "Remove the Window Manager decorations (Bool) [0/1]",                   NULL                                       },
+				{"-N", "%u",  &A.L.Play.skipTaskbar,   "Remove the Widgets title name from the WM taskbar (Bool) [0/1]",       NULL                                       },
 				{"-i", "%hx", &A.Splash.attributes,    "Splash screen attributes 0x{H}{NNN} (Hex)\n" \
 				                                       "\t\t  where {H} bit:13 hides Splash and {NNN} (usec) defers start-up", NULL                                       },
 			},
 			.Commands=COMMAND_LIST
 		};
+	for(A.L.Input.Recent=HISTORY_DEPTH - 1; A.L.Input.Recent >= 0; A.L.Input.Recent--)
+	{
+		A.L.Input.History[A.L.Input.Recent].KeyBuffer=calloc(KEYINPUT_DEPTH, 1);
+		A.L.Input.History[A.L.Input.Recent].KeyLength=0;
+	}
+	A.L.Input.Recent=A.L.Input.Browse=0;
+
 	uid_t	UID=geteuid();
-	bool	ROOT=(UID == 0),	// Check root access.
-		fEmergencyThread=false;
-	char	BootLog[1024]={0};
+	Bool32	ROOT=(UID == 0),	// Check root access.
+		fEmergencyThread=FALSE;
 	int	rc=0;
 
 	XrmInitialize();
@@ -4126,11 +4309,13 @@ int main(int argc, char *argv[])
 	{
 	    do
 	    {
-	    	A.LOOP=true;
-		A.RESTART=false;
+	    	A.LOOP=TRUE;
+		A.RESTART=FALSE;
 		// Initialize & run the Widget.
 		if(XInitThreads() && OpenDisplay(&A))
 		{
+			char *BootLog=calloc(1024, 1);
+
 			sigemptyset(&A.Signal);
 			sigaddset(&A.Signal, SIGINT);	// [CTRL] + [C]
 			sigaddset(&A.Signal, SIGQUIT);
@@ -4142,7 +4327,7 @@ int main(int argc, char *argv[])
 
 			if(!pthread_sigmask(SIG_BLOCK, &A.Signal, NULL)
 			&& !pthread_create(&A.TID_SigHandler, NULL, uEmergency, &A))
-				fEmergencyThread=true;
+				fEmergencyThread=TRUE;
 			else
 				strcat(BootLog, "Remark: cannot start the signal handler.\n");
 
@@ -4202,7 +4387,7 @@ int main(int argc, char *argv[])
 					if(!(A.L.UnMapBitmask & (1 << G)))
 						XMapWindow(A.display, A.W[G].window);
 					else
-						A.PAUSE[G]=true;
+						A.PAUSE[G]=TRUE;
 				}
 				if(!pthread_create(&A.TID_Draw, NULL, uDraw, &A))
 				{
@@ -4251,6 +4436,7 @@ int main(int argc, char *argv[])
 				pthread_kill(A.TID_SigHandler, SIGUSR1);
 				pthread_join(A.TID_SigHandler, NULL);
 			}
+			free(BootLog);
 		}
 		else
 		{
@@ -4264,7 +4450,11 @@ int main(int argc, char *argv[])
 	{
 		rc=1;
 	}
-
+	for(A.L.Input.Recent=HISTORY_DEPTH - 1; A.L.Input.Recent >= 0; A.L.Input.Recent--)
+		if(A.L.Input.History[A.L.Input.Recent].KeyBuffer != NULL)
+			free(A.L.Input.History[A.L.Input.Recent].KeyBuffer);
+	if(A.L.Input.KeyBuffer != NULL)
+		free(A.L.Input.KeyBuffer);
 	if(A.Geometries != NULL)
 		free(A.Geometries);
 	if(A.fontName != NULL)

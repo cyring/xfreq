@@ -7,7 +7,6 @@
 
 
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 
@@ -341,7 +340,7 @@ void MEM_FreeAll_Devices(struct MEMDEV **memory, struct MEMARRAY *memArray)
 	}
 }
 
-bool Init_SMBIOS(SMBIOS_TREE *Smb)
+Bool32 Init_SMBIOS(SMBIOS_TREE *Smb)
 {
 	if(Smb != NULL)
 	{
@@ -370,16 +369,16 @@ bool Init_SMBIOS(SMBIOS_TREE *Smb)
 			for(stick=0; stick <  Smb->MemArray->Attrib->Number_Devices; stick++)
 				Smb->Node.MemSum+=Smb->Memory[stick]->Node.MemSum;
 /* End of sum */
-			return(true);
+			return(TRUE);
 		}
 		else
-			return(false);
+			return(FALSE);
 	}
 	else
-		return(false);
+		return(FALSE);
 }
 
-bool Close_SMBIOS(SMBIOS_TREE *Smb)
+Bool32 Close_SMBIOS(SMBIOS_TREE *Smb)
 {
 	if(Smb != NULL)
 	{	// Release the SMBIOS tree.
@@ -391,10 +390,10 @@ bool Close_SMBIOS(SMBIOS_TREE *Smb)
 		BIOS_Free_Structure((struct STRUCTINFO*) Smb->Proc);
 		BIOS_Free_Structure((struct STRUCTINFO*) Smb->Board);
 		BIOS_Free_Structure((struct STRUCTINFO*) Smb->Bios);
-		return(true);
+		return(TRUE);
 	}
 	else
-		return(false);
+		return(FALSE);
 }
 
 PADDR Copy_SmbString(PADDR pSrc, PADDR pAddr)
@@ -495,7 +494,7 @@ PADDR Copy_SmbStruct(PADDR pSrc, PADDR pAddr)
 	return(retAddr);
 }
 
-bool Copy_SmbTree(SMBIOS_TREE *SmbSrc, SMBIOS_TREE *SmbDest)
+Bool32 Copy_SmbTree(SMBIOS_TREE *SmbSrc, SMBIOS_TREE *SmbDest)
 {
 	if((SmbSrc != NULL) && (SmbDest != NULL))
 	{
@@ -558,5 +557,5 @@ bool Copy_SmbTree(SMBIOS_TREE *SmbSrc, SMBIOS_TREE *SmbDest)
 		return(SmbDest->Node.MemSum == SmbSrc->Node.MemSum);
 	}
 	else
-		return(false);
+		return(FALSE);
 }

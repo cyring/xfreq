@@ -27,6 +27,8 @@
 #endif
 
 #define	_APPNAME "XFreq-Client"
+
+#include "xfreq-types.h"
 #include "xfreq-smbios.h"
 #include "xfreq-api.h"
 #include "xfreq-cli.h"
@@ -40,7 +42,7 @@ void	Play(uARG *A, char ID)
 	{
 		case ID_QUIT:
 			{
-			A->LOOP=false;
+			A->LOOP=FALSE;
 			}
 			break;
 	}
@@ -55,14 +57,14 @@ static void *uRead(void *uArg)
 	while(A->LOOP)
 		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + IDLE_COEF_DEF + IDLE_COEF_MIN)))
 		{
-			if(A->SHM->CPL.SMBIOS == true)
+			if(A->SHM->CPL.SMBIOS == TRUE)
 				printf("\nCPU# Freq. Ratio x [%lld] Temps\tTask scheduling\n", A->SHM->B->Proc->Attrib->Clock);
 			else
 				printf("\nCPU# Freq. Ratio x [%.0f] Temps\tTask scheduling\n", A->SHM->P.ClockSpeed);
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
-				if(A->SHM->C[cpu].T.Offline != true)
-					printf(	"%3d %7.2f%6.2f %6.2f %3d\t%15s(%5d) %15s(%5d)\n",
+				if(A->SHM->C[cpu].T.Offline != TRUE)
+					printf(	"%3d %7.2f%6.2f %6.2f %3d\t%15s(%5ld) %15s(%5ld)\n",
 						cpu,
 						A->SHM->C[cpu].RelativeFreq,
 						A->SHM->C[cpu].RelativeRatio,
@@ -112,7 +114,7 @@ char	*FQN_Settings(const char *fName)
 int	ScanOptions(uARG *A, int argc, char *argv[])
 {
 	int i=0, j=0;
-	bool noerr=true;
+	Bool32 noerr=TRUE;
 
 	//  Parse the command line options which may override settings.
 	if( (argc - ((argc >> 1) << 1)) )
@@ -127,15 +129,15 @@ int	ScanOptions(uARG *A, int argc, char *argv[])
 				}
 			if(i == OPTIONS_COUNT)
 			{
-				noerr=false;
+				noerr=FALSE;
 				break;
 			}
 		}
 	}
 	else
-		noerr=false;
+		noerr=FALSE;
 
-	if(noerr == false)
+	if(noerr == FALSE)
 	{
 		char	*program=strdup(argv[0]),
 			*progName=basename(program);
@@ -207,23 +209,26 @@ int main(int argc, char *argv[])
 			.FD={.Shm=0, .SmBIOS=0}, .SHM=MAP_FAILED, .SmBIOS=MAP_FAILED,
 			.TID_SigHandler=0,
 			.TID_Read=0,
-			.LOOP=true,
+			.LOOP=TRUE,
 			.Options=
 			{
-				{"-S", "%u", NULL,	"Clock source (Int)\n" \
-							"\t\t  argument is one of the [0]TSC [1]BIOS [2]SPEC [3]ROM [4]USER"   },
-				{"-M", "%x", NULL,	"ROM address of the Base Clock (Hex)\n"\
-							"\t\t  argument is the BCLK memory address to read from"               },
-				{"-s", "%u", NULL,	"Idle time multiplier (Int)\n" \
-							"\t\t  argument is a coefficient multiplied by 50000 usec"             },
-				{"-t", "%x", NULL,	"Task scheduling monitoring sorted by 0x{R}0{N} (Hex)\n" \
-							"\t\t  where {R} bit:8 is set to reverse sorting\n" \
-							"\t\t  and {N} is one '/proc/sched_debug' field# from [0x1] to [0xb]"  },
-			},
+				{"-S", "%u", NULL,	"Clock source (Int)\n"							\
+							"\t\t  argument is one of the [0]TSC [1]BIOS [2]SPEC [3]ROM [4]USER"	},
+				{"-M", "%x", NULL,	"ROM address of the Base Clock (Hex)\n"					\
+							"\t\t  argument is the BCLK memory address to read from"		},
+				{"-s", "%u", NULL,	"Idle time multiplier (Int)\n"						\
+							"\t\t  argument is a coefficient multiplied by 50000 usec"		},
+				{"-t", "%x", NULL,	"Task scheduling monitoring sorted by 0x{R}0{N} (Hex)\n"		\
+							"\t\t  where {R} bit:8 is set to reverse sorting\n"			\
+							"\t\t  and {N} is one '/proc/sched_debug' field# from [0x1] to [0xb]"	},
+				{"-B", "%s", NULL,	"Print the SmBIOS tree (Bool) [0/1]"					},
+				{"-l", "%s", NULL,	"Log to a file (String)\n"						\
+							"\t\t  argument is the log file path"					},
+			}
 		};
 	uid_t	UID=geteuid();
-	bool	ROOT=(UID == 0),	// Check root access.
-		fEmergencyThread=false;
+	Bool32	ROOT=(UID == 0),	// Check root access.
+		fEmergencyThread=FALSE;
 	int	rc=0;
 
 	if(ScanOptions(&A, argc, argv))
@@ -239,7 +244,7 @@ int main(int argc, char *argv[])
 
 		if(!pthread_sigmask(SIG_BLOCK, &A.Signal, NULL)
 		&& !pthread_create(&A.TID_SigHandler, NULL, uEmergency, &A))
-			fEmergencyThread=true;
+			fEmergencyThread=TRUE;
 		else
 			tracerr("Remark: cannot start the signal handler");
 

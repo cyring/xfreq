@@ -11,6 +11,34 @@
 #include "xfreq-smbios.h"
 #include "xfreq-api.h"
 
+unsigned int fROL32(unsigned int r32, unsigned short int m16)
+{
+	__asm__	volatile
+	(
+		"mov	%0, %%eax	\n\t"
+		"movw	%1, %%cx	\n\t"
+		"rol	%%cl,%%eax	\n\t"
+		"mov	%%eax, %0"
+		: "=m" (r32), "=m" (m16)
+                : "m" (r32)
+	);
+	return(r32);
+}
+
+unsigned int fROR32(unsigned int r32, unsigned short int m16)
+{
+	__asm__	volatile
+	(
+		"mov	%0, %%eax	\n\t"
+		"movw	%1, %%cx	\n\t"
+		"ror	%%cl, %%eax	\n\t"
+		"mov	%%eax, %0"
+		: "=m" (r32), "=m" (m16)
+                : "m" (r32)
+	);
+	return(r32);
+}
+
 void	abstimespec(useconds_t usec, struct timespec *tsec)
 {
 	tsec->tv_sec=usec / 1000000L;
@@ -37,8 +65,11 @@ int	addtimespec(struct timespec *asec, const struct timespec *tsec)
 
 void	Sync_Init(SYNCHRONIZATION *sync)
 {
+	XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_NULL}};
 	atomic_init(&sync->IF, 0x0);
 	atomic_init(&sync->Rooms, 0x1);
+	atomic_init(&sync->Play, XChange.Map64);
+	atomic_init(&sync->Data, 0);
 }
 
 void	Sync_Destroy(SYNCHRONIZATION *sync)
@@ -88,7 +119,7 @@ void	Sync_Signal(unsigned int room, SYNCHRONIZATION *sync)
 	atomic_fetch_or(&sync->IF, (!room) ? 0x1 : 0xfffffffffffffffe);
 }
 
-char *SMB_Find_String(struct STRUCTINFO *smb, int ID)
+char *Smb_Find_String(struct STRUCTINFO *smb, int ID)
 {
 	struct STRING *pstr=NULL;
 

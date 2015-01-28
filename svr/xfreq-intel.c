@@ -14,7 +14,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <fcntl.h>
 #include <libgen.h>
 #include <string.h>
@@ -43,13 +42,13 @@ static  char    Version[] = AutoDate;
 
 
 //	Initialize MSR based on Architecture. Open one MSR handle per Core.
-bool	Init_MSR_GenuineIntel(void *uArg)
+Bool32	Init_MSR_GenuineIntel(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
 
 	ssize_t	retval=0;
 	int	tmpFD=open(CPU_BP, O_RDONLY);
-	bool	rc=true;
+	Bool32	rc=TRUE;
 	// Read the minimum, maximum & the turbo ratios from Core number 0
 	if(tmpFD != -1)
 	{
@@ -59,7 +58,7 @@ bool	Init_MSR_GenuineIntel(void *uArg)
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
 		// MSR_PLATFORM_INFO may be available in this Intel Architecture ?
-		if((rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1)) == true)
+		if((rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1)) == TRUE)
 		{	//  Then, we get the Min & Max non Turbo Ratios which might inverted.
 			A->SHM->P.Boost[0]=MIN(A->SHM->P.PlatformInfo.MinimumRatio, A->SHM->P.PlatformInfo.MaxNonTurboRatio);
 			A->SHM->P.Boost[1]=MAX(A->SHM->P.PlatformInfo.MinimumRatio, A->SHM->P.PlatformInfo.MaxNonTurboRatio);
@@ -68,7 +67,7 @@ bool	Init_MSR_GenuineIntel(void *uArg)
 			//	IA32_PLATFORM_ID[MaxBusRatio] , IA32_PERF_STATUS[MaxBusRatio] , IA32_PERF_STATUS[CurrentRatio]
 			A->SHM->P.Boost[0]=A->SHM->P.Boost[1]=(A->SHM->P.PlatformId.MaxBusRatio) ? A->SHM->P.PlatformId.MaxBusRatio:(A->SHM->P.PerfStatus.MaxBusRatio) ? A->SHM->P.PerfStatus.MaxBusRatio:A->SHM->P.PerfStatus.CurrentRatio;
 		// MSR_TURBO_RATIO_LIMIT may also be available ?
-		if((rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->SHM->P.Turbo)) != -1)) == true)
+		if((rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->SHM->P.Turbo)) != -1)) == TRUE)
 		{
 			A->SHM->P.Boost[2]=A->SHM->P.Turbo.MaxRatio_8C;
 			A->SHM->P.Boost[3]=A->SHM->P.Turbo.MaxRatio_7C;
@@ -84,12 +83,12 @@ bool	Init_MSR_GenuineIntel(void *uArg)
 
 		close(tmpFD);
 	}
-	else rc=false;
+	else rc=FALSE;
 
 	char	pathname[]=CPU_AP;
 	int	cpu=0;
 	for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
-		if(A->SHM->C[cpu].T.Offline != true)
+		if(A->SHM->C[cpu].T.Offline != TRUE)
 		{
 			sprintf(pathname, CPU_DEV, cpu);
 			if( (rc=((A->SHM->C[cpu].FD=open(pathname, O_RDWR)) != -1)) )
@@ -104,13 +103,13 @@ bool	Init_MSR_GenuineIntel(void *uArg)
 	return(rc);
 }
 
-bool	Init_MSR_Core(void *uArg)
+Bool32	Init_MSR_Core(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
 
 	ssize_t	retval=0;
 	int	tmpFD=open(CPU_BP, O_RDONLY);
-	bool	rc=true;
+	Bool32	rc=TRUE;
 	// Read the minimum, maximum & the turbo ratios from Core number 0
 	if(tmpFD != -1)
 	{
@@ -120,7 +119,7 @@ bool	Init_MSR_Core(void *uArg)
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
 		// MSR_PLATFORM_INFO may be available with Core2 ?
-		if((rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1)) == true)
+		if((rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1)) == TRUE)
 		{
 			A->SHM->P.Boost[0]=MIN(A->SHM->P.PlatformInfo.MinimumRatio, A->SHM->P.PlatformInfo.MaxNonTurboRatio);
 			A->SHM->P.Boost[1]=MAX(A->SHM->P.PlatformInfo.MinimumRatio, A->SHM->P.PlatformInfo.MaxNonTurboRatio);
@@ -128,7 +127,7 @@ bool	Init_MSR_Core(void *uArg)
 		else
 			A->SHM->P.Boost[0]=A->SHM->P.Boost[1]=(A->SHM->P.PlatformId.MaxBusRatio) ? A->SHM->P.PlatformId.MaxBusRatio:(A->SHM->P.PerfStatus.MaxBusRatio) ? A->SHM->P.PerfStatus.MaxBusRatio:A->SHM->P.PerfStatus.CurrentRatio;
 		// MSR_TURBO_RATIO_LIMIT may also be available with Core2 ?
-		if((rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->SHM->P.Turbo)) != -1)) == true)
+		if((rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->SHM->P.Turbo)) != -1)) == TRUE)
 		{
 			A->SHM->P.Boost[2]=A->SHM->P.Turbo.MaxRatio_8C;
 			A->SHM->P.Boost[3]=A->SHM->P.Turbo.MaxRatio_7C;
@@ -144,12 +143,12 @@ bool	Init_MSR_Core(void *uArg)
 
 		close(tmpFD);
 	}
-	else rc=false;
+	else rc=FALSE;
 
 	char	pathname[]=CPU_AP, warning[64];
 	int	cpu=0;
 	for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
-		if(A->SHM->C[cpu].T.Offline != true)
+		if(A->SHM->C[cpu].T.Offline != TRUE)
 		{
 			sprintf(pathname, CPU_DEV, cpu);
 			if( (rc=((A->SHM->C[cpu].FD=open(pathname, O_RDWR)) != -1)) )
@@ -158,7 +157,8 @@ bool	Init_MSR_Core(void *uArg)
 				// - Set the global counter bits
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
 				A->SaveArea[cpu].GlobalPerfCounter=A->SHM->C[cpu].GlobalPerfCounter;
-/*				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1 != 0)
+#if defined(DEBUG)
+				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1 != 0)
 				{
 					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #1 is already activated", cpu);
 					tracerr(warning);
@@ -167,7 +167,8 @@ bool	Init_MSR_Core(void *uArg)
 				{
 					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #2 is already activated", cpu);
 					tracerr(warning);
-				}	*/
+				}
+#endif
 				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1=1;
 				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR2=1;
 				rc=((retval=Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
@@ -234,13 +235,13 @@ bool	Init_MSR_Core(void *uArg)
 	return(rc);
 }
 
-bool	Init_MSR_Nehalem(void *uArg)
+Bool32	Init_MSR_Nehalem(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
 
 	ssize_t	retval=0;
 	int	tmpFD=open(CPU_BP, O_RDONLY);
-	bool	rc=true;
+	Bool32	rc=TRUE;
 	// Read the minimum, maximum & the turbo ratios from Core number 0
 	if(tmpFD != -1)
 	{
@@ -262,12 +263,12 @@ bool	Init_MSR_Nehalem(void *uArg)
 		A->SHM->P.Boost[8]=A->SHM->P.Turbo.MaxRatio_2C;
 		A->SHM->P.Boost[9]=A->SHM->P.Turbo.MaxRatio_1C;
 	}
-	else rc=false;
+	else rc=FALSE;
 
 	char	pathname[]=CPU_AP, warning[64];
 	int	cpu=0;
 	for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
-		if(A->SHM->C[cpu].T.Offline != true)
+		if(A->SHM->C[cpu].T.Offline != TRUE)
 		{
 			sprintf(pathname, CPU_DEV, cpu);
 			if( (rc=((A->SHM->C[cpu].FD=open(pathname, O_RDWR)) != -1)) )
@@ -276,7 +277,8 @@ bool	Init_MSR_Nehalem(void *uArg)
 				// - Set the global counter bits
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
 				A->SaveArea[cpu].GlobalPerfCounter=A->SHM->C[cpu].GlobalPerfCounter;
-/*				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1 != 0)
+#if defined(DEBUG)
+				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1 != 0)
 				{
 					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #1 is already activated", cpu);
 					tracerr(warning);
@@ -285,7 +287,8 @@ bool	Init_MSR_Nehalem(void *uArg)
 				{
 					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #2 is already activated", cpu);
 					tracerr(warning);
-				}	*/
+				}
+#endif
 				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1=1;
 				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR2=1;
 				rc=((retval=Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
@@ -353,31 +356,31 @@ bool	Init_MSR_Nehalem(void *uArg)
 }
 
 // Close all MSR handles.
-bool	Close_MSR_Only(void *uArg)
+Bool32	Close_MSR_Only(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
 
 	int	cpu=0;
 	for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
-		if(A->SHM->C[cpu].T.Offline != true)
+		if(A->SHM->C[cpu].T.Offline != TRUE)
 		{
 			// Release the MSR handle associated to the Core.
 			if(A->SHM->C[cpu].FD != -1)
 				close(A->SHM->C[cpu].FD);
 		}
-	return(false);
+	return(FALSE);
 }
 
-bool	Close_MSR_Counters(void *uArg)
+Bool32	Close_MSR_Counters(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
 
 	int	cpu=0;
 	for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
-		if(A->SHM->C[cpu].T.Offline != true)
+		if(A->SHM->C[cpu].T.Offline != TRUE)
 		{
 			// Reset the fixed and the global counters.
-			if(A->SHM->CPL.RESET == true)
+			if(A->SHM->CPL.RESET == TRUE)
 			{
 				A->SaveArea[cpu].FixedPerfCounter.EN1_Usr=0;
 				A->SaveArea[cpu].FixedPerfCounter.EN2_Usr=0;
@@ -394,7 +397,7 @@ bool	Close_MSR_Counters(void *uArg)
 			if(A->SHM->C[cpu].FD != -1)
 				close(A->SHM->C[cpu].FD);
 		}
-	return(false);
+	return(FALSE);
 }
 
 // Read the Time Stamp Counter.
@@ -789,7 +792,7 @@ void	Read_Features(FEATURES *features)
 				unsigned char Chr[4];
 			} AX, BX, CX, DX;
 		} Brand;
-		char tmpString[48+1];
+		char tmpString[48];
 		int ix=0, jx=0, px=0;
 		for(ix=0; ix<3; ix++)
 		{
@@ -868,8 +871,8 @@ static void *uReadAPIC(void *uApic)
 						SMT_Select_Mask= ~((-1) << SMT_Mask_Width );
 						A->SHM->C[cpu].T.Thread_ID=ExtTopology.DX.x2APIC_ID & SMT_Select_Mask;
 
-						if((A->SHM->C[cpu].T.Thread_ID > 0) && (A->SHM->P.Features.HTT_enabled == false))
-							A->SHM->P.Features.HTT_enabled=true;
+						if((A->SHM->C[cpu].T.Thread_ID > 0) && (A->SHM->P.Features.HTT_enabled == FALSE))
+							A->SHM->P.Features.HTT_enabled=TRUE;
 						}
 						break;
 					case LEVEL_CORE:
@@ -886,12 +889,12 @@ static void *uReadAPIC(void *uApic)
 		while(!NoMoreLevels);
 
 		A->SHM->C[cpu].T.APIC_ID=ExtTopology.DX.x2APIC_ID;
-		A->SHM->C[cpu].T.Offline=false;
+		A->SHM->C[cpu].T.Offline=FALSE;
 	}
 	else
 	{
 		A->SHM->C[cpu].T.APIC_ID=-1;
-		A->SHM->C[cpu].T.Offline=true;
+		A->SHM->C[cpu].T.Offline=TRUE;
 	}
 	return(NULL);
 }
@@ -912,7 +915,7 @@ unsigned int Create_Topology(uARG *A)
 	{
 		pthread_join(uApic[cpu].TID, NULL);
 
-		if(A->SHM->C[cpu].T.Offline != true)
+		if(A->SHM->C[cpu].T.Offline != TRUE)
 			CountEnabledCPU++;
 	}
 	free(uApic);
@@ -941,7 +944,7 @@ void outl(int fd, unsigned int addr, unsigned int val)
 	int rc=ioctl(fd, IODEV_PIO, &out);
 }
 
-bool	IMC_Read_Info(uARG *A)
+Bool32	IMC_Read_Info(uARG *A)
 {
 	int fd=open("/dev/io", O_RDWR);
 	if(fd != -1)
@@ -978,15 +981,15 @@ bool	IMC_Read_Info(uARG *A)
 			A->SHM->M.Channel[cha].Timing.B2B  =(RANK_TIMING_B & 0x1f0000) >> 16;
 		}
 		close(fd);
-		return(true);
+		return(TRUE);
 	}
 	else
-		return(false);
+		return(FALSE);
 }
 
 #else	//Linux
 
-bool	IMC_Read_Info(uARG *A)
+Bool32	IMC_Read_Info(uARG *A)
 {
 	if(!iopl(3))
 	{
@@ -1022,10 +1025,10 @@ bool	IMC_Read_Info(uARG *A)
 			A->SHM->M.Channel[cha].Timing.B2B  =(RANK_TIMING_B & 0x1f0000) >> 16;
 		}
 		iopl(0);
-		return(true);
+		return(TRUE);
 	}
 	else
-		return(false);
+		return(FALSE);
 }
 #endif
 
@@ -1067,9 +1070,9 @@ void	SelectBaseClock(uARG *A)
 }
 
 // Monitor the kernel tasks scheduling.
-bool IsGreaterRuntime(RUNTIME *rt1, RUNTIME *rt2)
+Bool32 IsGreaterRuntime(RUNTIME *rt1, RUNTIME *rt2)
 {
-	return(	( (rt1->nsec_high > rt2->nsec_high) || ((rt1->nsec_high == rt2->nsec_high) && ((rt1->nsec_low > rt2->nsec_low))) ) ? true : false);
+	return(	( (rt1->nsec_high > rt2->nsec_high) || ((rt1->nsec_high == rt2->nsec_high) && ((rt1->nsec_low > rt2->nsec_low))) ) ? TRUE : FALSE);
 }
 
 static void *uSchedule(void *uArg)
@@ -1079,16 +1082,30 @@ static void *uSchedule(void *uArg)
 
 	FILE	*fSD=NULL;
 
-	if((A->SHM->CPL.PROC=((fSD=fopen("/proc/sched_debug", "r")) != NULL)) == true)
+	if((A->SHM->CPL.PROC=((fSD=fopen("/proc/sched_debug", "r")) != NULL)) == TRUE)
 	{
-		bool Reverse=(A->SHM->S.Attributes & 0x100) >> 8;
+		Bool32 Reverse=(A->SHM->S.Attributes & 0x100) >> 8;
 		short int SortField=A->SHM->S.Attributes & 0xf;
 
-		struct TASK_STRUCT oTask={0};
+		struct TASK_STRUCT oTask=
+		{
+			.state={0},
+			.comm={0},
+			.pid=0,
+			.vruntime={0},
+			.nvcsw=0,
+			.prio=0,
+			.exec_vruntime={0},
+			.sum_exec_runtime={0},
+			.sum_sleep_runtime={0},
+			.node=0,
+			.group_path={0}
+		};
+
 		const struct TASK_STRUCT rTask=
 		{
-			.state=0x7f,
-			.comm={0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x0},
+			.state={0x7f},
+			.comm={0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x0},
 			.pid=(unsigned short) -1,
 			.vruntime={(unsigned) -1, (unsigned) -1},
 			.nvcsw=(unsigned) -1,
@@ -1131,7 +1148,7 @@ static void *uSchedule(void *uArg)
 									if((buffer[0] != '\n') && !feof(fSD))
 									{
 										sscanf(	buffer, TASK_STRUCT_FORMAT,
-											&oTask.state,
+											oTask.state,
 											oTask.comm,
 											&oTask.pid,
 											&oTask.vruntime.nsec_high,
@@ -1152,15 +1169,15 @@ static void *uSchedule(void *uArg)
 										else	// Insertion Sort.
 											for(depth=1; depth < TASK_PIPE_DEPTH; depth++)
 											{
-												bool isFlag=false;
+												Bool32 isFlag=FALSE;
 
 												switch(SortField)
 												{
 												case SORT_FIELD_NONE:
-													isFlag=true;
+													isFlag=TRUE;
 												break;
 												case SORT_FIELD_STATE:
-													isFlag=(oTask.state > A->SHM->C[cpu].Task[depth].state);
+													isFlag=(strcasecmp(oTask.state, A->SHM->C[cpu].Task[depth].state) > 0);
 												break;
 												case SORT_FIELD_COMM:
 													isFlag=(strcasecmp(oTask.comm, A->SHM->C[cpu].Task[depth].comm) > 0);
@@ -1232,7 +1249,7 @@ static void *uDump(void *uArg)
 	int i=0;
 	for(i=0; i < DUMP_ARRAY_DIMENSION; i++)
 		if(A->SHM->D.Array[i].Addr)
-			Read_MSR(A->SHM->C[0].FD, A->SHM->D.Array[i].Addr, (unsigned long long int *) &A->SHM->D.Array[i].Value);
+			Read_MSR(A->SHM->C[A->SHM->D.Array[i].Core].FD, A->SHM->D.Array[i].Addr, (unsigned long long int *) &A->SHM->D.Array[i].Value);
 
 	return(NULL);
 }
@@ -1298,81 +1315,134 @@ static void *uCycle(void *uApic)
 }
 
 // Implementation of the callback functions.
-void	Play(uARG *A, char ID)
+void	Play(uARG *A, XCHG_MAP *XChange)
 {
-	switch(ID)
+	switch(XChange->Map.ID)
 	{
 		case ID_NULL:
 			break;
 		case ID_DONE:
-			atomic_store(&A->SHM->PlayID, ID_NULL);
+			{
+				XChange->Map.ID=ID_NULL;
+			}
 			break;
 		case ID_QUIT:
-			A->LOOP=false;
-			atomic_store(&A->SHM->PlayID, ID_NULL);
+			{
+				A->LOOP=FALSE;
+				XChange->Map.ID=ID_NULL;
+			}
+			break;
+		case ID_DUMPMSR:
+			{
+				if((XChange->Map.Core < A->SHM->P.CPU) && (XChange->Map.Core >= 0) && (XChange->Map.Arg < DUMP_ARRAY_DIMENSION) && (XChange->Map.Arg >=0))
+				{
+					int finder=0;
+					for(finder=0; finder < DUMP_ARRAY_DIMENSION; finder++)
+						if(A->Loader.Array[finder].Addr == XChange->Map.Addr)
+							break;
+					if(finder < DUMP_ARRAY_DIMENSION)
+						strncpy(A->SHM->D.Array[XChange->Map.Arg].Name, A->Loader.Array[finder].Name, DUMP_REG_ALIGN);
+					else
+						sprintf(A->SHM->D.Array[XChange->Map.Arg].Name, "MSR_0x%05X", XChange->Map.Addr);
+
+					A->SHM->D.Array[XChange->Map.Arg].Value=0;
+					A->SHM->D.Array[XChange->Map.Arg].Addr=XChange->Map.Addr;
+					A->SHM->D.Array[XChange->Map.Arg].Core=XChange->Map.Core;
+				}
+				XChange->Map.ID=ID_DONE;
+			}
+			break;
+		case ID_READMSR:
+			{
+				unsigned long long int data=0;
+				if((XChange->Map.Core < A->SHM->P.CPU) && (XChange->Map.Core >= 0))
+				{
+					Read_MSR(A->SHM->C[XChange->Map.Core].FD, XChange->Map.Addr, &data);
+				}
+				atomic_store(&A->SHM->Sync.Data, data);
+				XChange->Map.ID=ID_DONE;
+			}
+			break;
+		case ID_WRITEMSR:
+			{
+				if((XChange->Map.Core < A->SHM->P.CPU) && (XChange->Map.Core >= 0))
+				{
+					unsigned long long int data=atomic_load(&A->SHM->Sync.Data);
+					Write_MSR(A->SHM->C[XChange->Map.Core].FD, XChange->Map.Addr, &data);
+				}
+				XChange->Map.ID=ID_DONE;
+			}
 			break;
 		case ID_INCLOOP:
-			if(A->SHM->P.IdleTime < IDLE_COEF_MAX)
 			{
-				A->SHM->P.IdleTime++;
-				SelectBaseClock(A);
+				if(A->SHM->P.IdleTime < IDLE_COEF_MAX)
+				{
+					A->SHM->P.IdleTime++;
+					SelectBaseClock(A);
+				}
+				XChange->Map.ID=ID_DONE;
 			}
-			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_DECLOOP:
-			if(A->SHM->P.IdleTime > IDLE_COEF_MIN)
 			{
-				A->SHM->P.IdleTime--;
-				SelectBaseClock(A);
+				if(A->SHM->P.IdleTime > IDLE_COEF_MIN)
+				{
+					A->SHM->P.IdleTime--;
+					SelectBaseClock(A);
+				}
+				XChange->Map.ID=ID_DONE;
 			}
-			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_SCHED:
-			if(A->SHM->CPL.PROC)
 			{
-				if(A->SHM->S.Monitor == false)
+				if(A->SHM->CPL.PROC)
 				{
-					if((A->SHM->S.Attributes & 0xf) == SORT_FIELD_NONE)
-						A->SHM->S.Attributes=SORT_FIELD_RUNTIME;
+					if(A->SHM->S.Monitor == FALSE)
+					{
+						if((A->SHM->S.Attributes & 0xf) == SORT_FIELD_NONE)
+							A->SHM->S.Attributes=SORT_FIELD_RUNTIME;
 
-					A->SHM->S.Monitor=true;
+						A->SHM->S.Monitor=TRUE;
+					}
+					else
+						A->SHM->S.Monitor=FALSE;
 				}
-				else
-					A->SHM->S.Monitor=false;
+				XChange->Map.ID=ID_DONE;
 			}
-			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_RESET:
-			A->SHM->P.Cold=0;
-			atomic_store(&A->SHM->PlayID, ID_DONE);
+			{
+				A->SHM->P.Cold=0;
+				XChange->Map.ID=ID_DONE;
+			}
 			break;
 		case ID_TSC:
 			{
 				A->SHM->P.ClockSrc=SRC_TSC;
 				SelectBaseClock(A);
+				XChange->Map.ID=ID_DONE;
 			}
-			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_BIOS:
 			{
 				A->SHM->P.ClockSrc=SRC_BIOS;
 				SelectBaseClock(A);
+				XChange->Map.ID=ID_DONE;
 			}
-			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_SPEC:
 			{
 				A->SHM->P.ClockSrc=SRC_SPEC;
 				SelectBaseClock(A);
+				XChange->Map.ID=ID_DONE;
 			}
-			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 		case ID_ROM:
 			{
 				A->SHM->P.ClockSrc=SRC_ROM;
 				SelectBaseClock(A);
+				XChange->Map.ID=ID_DONE;
 			}
-			atomic_store(&A->SHM->PlayID, ID_DONE);
 			break;
 	}
 }
@@ -1402,10 +1472,10 @@ char	*FQN_Settings(const char *fName)
 }
 
 // Parse the options and the arguments.
-bool	ScanOptions(uARG *A, int argc, char *argv[])
+Bool32	ScanOptions(uARG *A, int argc, char *argv[])
 {
 	int i=0, j=0;
-	bool noerr=true;
+	Bool32 noerr=TRUE;
 
 	//  Parse the command line options which may override settings.
 	if( (argc - ((argc >> 1) << 1)) )
@@ -1420,15 +1490,15 @@ bool	ScanOptions(uARG *A, int argc, char *argv[])
 				}
 			if(i == OPTIONS_COUNT)
 			{
-				noerr=false;
+				noerr=FALSE;
 				break;
 			}
 		}
 	}
 	else
-		noerr=false;
+		noerr=FALSE;
 
-	if(noerr == false)
+	if(noerr == FALSE)
 	{
 		char	*program=strdup(argv[0]),
 			*progName=basename(program);
@@ -1489,7 +1559,9 @@ static void *uEmergency(void *uArg)
 				char str[sizeof(SIG_EMERGENCY_FMT)];
 				sprintf(str, SIG_EMERGENCY_FMT, caught);
 				tracerr(str);
-				Play(A, ID_QUIT);
+
+				XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_QUIT}};
+				Play(A, &XChange);
 			}
 				break;
 /*			case SIGCONT:
@@ -1516,7 +1588,7 @@ int main(int argc, char *argv[])
 
 		.Arch=
 		{
-			{ _GenuineIntel,         2,  ClockSpeed_GenuineIntel,         calloc(12 + 1, 1),           uCycle_GenuineIntel, Init_MSR_GenuineIntel, Close_MSR_Only     },
+			{ _GenuineIntel,         2,  ClockSpeed_GenuineIntel,         calloc(ARCHITECTURE_LEN, 1), uCycle_GenuineIntel, Init_MSR_GenuineIntel, Close_MSR_Only     },
 			{ _Core_Yonah,           2,  ClockSpeed_Core,                 "Core/Yonah",                uCycle_GenuineIntel, Init_MSR_GenuineIntel, Close_MSR_Only     },
 			{ _Core_Conroe,          2,  ClockSpeed_Core2,                "Core2/Conroe",              uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
 			{ _Core_Kentsfield,      4,  ClockSpeed_Core2,                "Core2/Kentsfield",          uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
@@ -1545,24 +1617,24 @@ int main(int argc, char *argv[])
 			{ _Haswell_ULT,          2,  ClockSpeed_Haswell_ULT,          "Haswell/Ultra Low TDP",     uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
 			{ _Haswell_ULX,          2,  ClockSpeed_Haswell_ULX,          "Haswell/Ultra Low eXtreme", uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
 		},
-		.Loader={.Monitor=true, .Array=REGISTERS_LIST},
-		.LOOP=true,
+		.Loader={.Monitor=TRUE, .Array=REGISTERS_LIST},
+		.LOOP=TRUE,
 		.Options=OPTIONS_LIST,
 		.TID_SigHandler=0,
 		.TID_Read=0,
 		.TID_Schedule=0,
 	};
 	uid_t	UID=geteuid();
-	bool	ROOT=(UID == 0),	// Check root access.
-		fEmergencyThread=false,
-		fSmBIOS=false;
+	Bool32	ROOT=(UID == 0),	// Check root access.
+		fEmergencyThread=FALSE,
+		fSmBIOS=FALSE;
 	int	rc=0;
 
-	if(ROOT == true)
+	if(ROOT == TRUE)
 	{
 		// Read the SMBIOS tree and return its size
-		memset(&A.Smb, 0, sizeof(SMBIOS_TREE));
-		if((fSmBIOS=Init_SMBIOS(&A.Smb)) == false)
+		memset(&A.SmbTmpStorage, 0, sizeof(SMBIOS_TREE));
+		if((fSmBIOS=Init_SMBIOS(&A.SmbTmpStorage)) == FALSE)
 			tracerr("Warning: cannot read the SmBIOS tree\nCheck if 'dmi' kernel module is loaded");
 
 		// Read the CPU Features.
@@ -1581,11 +1653,11 @@ int main(int argc, char *argv[])
 		&& (ftruncate(A.FD.Shm, A.Size.Shm) != -1)
 		&& ((A.SHM=mmap(0, A.Size.Shm, PROT_READ|PROT_WRITE, MAP_SHARED, A.FD.Shm, 0)) != MAP_FAILED))
 		{
-			A.SHM->CPL.MSR=false;
-			A.SHM->CPL.RESET=false;
-			A.SHM->CPL.SMBIOS=false;
-			A.SHM->CPL.IMC=false;
-			A.SHM->CPL.PROC=true;
+			A.SHM->CPL.MSR=FALSE;
+			A.SHM->CPL.RESET=FALSE;
+			A.SHM->CPL.SMBIOS=FALSE;
+			A.SHM->CPL.IMC=FALSE;
+			A.SHM->CPL.PROC=TRUE;
 
 			// Fill the shared memory with default values.
 			A.SHM->B=NULL;
@@ -1604,10 +1676,10 @@ int main(int argc, char *argv[])
 
 			strcpy(A.Arch[0].Architecture, "Genuine");
 			memcpy(&A.SHM->P.Features, &A.Features, sizeof(FEATURES));
-			strcpy(A.Arch[0].Architecture, A.SHM->P.Features.VendorID);
+			strncpy(A.Arch[0].Architecture, A.SHM->P.Features.VendorID, ARCHITECTURE_LEN);
 
 			memset(&A.SHM->S, 0, sizeof(SCHEDULE));
-			A.SHM->S.Monitor=false;
+			A.SHM->S.Monitor=FALSE;
 			A.SHM->S.Attributes=SORT_FIELD_NONE;
 
 			memset(&A.SHM->M, 0, sizeof(IMC_INFO));
@@ -1629,7 +1701,6 @@ int main(int argc, char *argv[])
 				if(A.SHM->P.IdleTime > IDLE_COEF_MAX)	A.SHM->P.IdleTime=IDLE_COEF_MAX;
 
 				Sync_Init(&A.SHM->Sync);
-				atomic_init(&A.SHM->PlayID, ID_NULL);
 
 				sigemptyset(&A.Signal);
 				sigaddset(&A.Signal, SIGINT);	// [CTRL] + [C]
@@ -1642,7 +1713,7 @@ int main(int argc, char *argv[])
 
 				if(!pthread_sigmask(SIG_BLOCK, &A.Signal, NULL)
 				&& !pthread_create(&A.TID_SigHandler, NULL, uEmergency, &A))
-					fEmergencyThread=true;
+					fEmergencyThread=TRUE;
 				else
 					tracerr("Remark: cannot start the signal handler");
 
@@ -1650,16 +1721,16 @@ int main(int argc, char *argv[])
 				if(fSmBIOS) {	// @ a SHM fixed offset address.
 					A.SHM->B=(SMBIOS_TREE *) A.SHM;
 					A.SHM->B+=A.Size.Shm;
-					A.Size.SmBIOS=PAGE_SIZE * ((A.Smb.Node.MemSum / PAGE_SIZE) + ((A.Smb.Node.MemSum % PAGE_SIZE) ? 1 : 0));
+					A.Size.SmBIOS=PAGE_SIZE * ((A.SmbTmpStorage.Node.MemSum / PAGE_SIZE) + ((A.SmbTmpStorage.Node.MemSum % PAGE_SIZE) ? 1 : 0));
 
 					if(((A.FD.SmBIOS=shm_open(SMB_FILENAME, O_CREAT|O_TRUNC|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) != -1)
 					&& (ftruncate(A.FD.SmBIOS, A.Size.SmBIOS) != -1)
 					&& ((A.SmBIOS=mmap(A.SHM->B, A.Size.SmBIOS, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_FIXED, A.FD.SmBIOS, 0)) != MAP_FAILED))
-						A.SHM->CPL.SMBIOS=Copy_SmbTree(&A.Smb, A.SHM->B);
+						A.SHM->CPL.SMBIOS=Copy_SmbTree(&A.SmbTmpStorage, A.SHM->B);
 					else
 						tracerr("Error: creating the SmBIOS shared memory");
 
-					fSmBIOS=!Close_SMBIOS(&A.Smb);
+					fSmBIOS=!Close_SMBIOS(&A.SmbTmpStorage);
 				}
 
 				// Find or force the Architecture specifications.
@@ -1681,14 +1752,14 @@ int main(int argc, char *argv[])
 					// Read the number of Cores activated in the BIOS.
 					if(A.SHM->P.Features.Std.DX.HTT)
 					{
-						if(A.SHM->CPL.SMBIOS == true)
+						if(A.SHM->CPL.SMBIOS == TRUE)
 							A.SHM->P.CPU=A.SHM->B->Proc->Attrib->ThreadCount;
 						else
 							tracerr("Warning: cannot read the maximum number of Threads from BIOS");
 					}
 					else
 					{
-						if(A.SHM->CPL.SMBIOS == true)
+						if(A.SHM->CPL.SMBIOS == TRUE)
 							A.SHM->P.CPU=A.SHM->B->Proc->Attrib->CoreCount;
 						else
 							tracerr("Warning: cannot read the maximum number of Cores BIOS");
@@ -1715,9 +1786,9 @@ int main(int argc, char *argv[])
 				A.SHM->P.OnLine=Create_Topology(&A);
 
 				if(A.SHM->P.Features.HTT_enabled)
-					A.SHM->P.PerCore=false;
+					A.SHM->P.PerCore=FALSE;
 				else
-					A.SHM->P.PerCore=true;
+					A.SHM->P.PerCore=TRUE;
 
 				if(A.SHM->P.ArchID != -1)
 				{
@@ -1731,7 +1802,7 @@ int main(int argc, char *argv[])
 						tracerr("Warning: cannot read the MSR registers\nCheck if the 'msr' kernel module is loaded");
 
 					// Read the Integrated Memory Controler information.
-					if((A.SHM->CPL.IMC=IMC_Read_Info(&A)) == false)
+					if((A.SHM->CPL.IMC=IMC_Read_Info(&A)) == FALSE)
 						tracerr("Warning: cannot read the IMC controler");
 
 					SelectBaseClock(&A);
@@ -1739,15 +1810,18 @@ int main(int argc, char *argv[])
 					memcpy(&A.SHM->H.Signature, &A.Arch[A.SHM->P.ArchID].Signature, sizeof(struct SIGNATURE));
 					A.SHM->H.MaxOfCores=A.Arch[A.SHM->P.ArchID].MaxOfCores;
 					A.SHM->H.ClockSpeed=A.Arch[A.SHM->P.ArchID].ClockSpeed();
-					strncpy(A.SHM->H.Architecture, A.Arch[A.SHM->P.ArchID].Architecture, 32);
+					strncpy(A.SHM->H.Architecture, A.Arch[A.SHM->P.ArchID].Architecture, ARCHITECTURE_LEN);
 
 					if((A.SHM->S.Attributes & 0xf) != SORT_FIELD_NONE)
-						Play(&A, ID_SCHED);
+					{
+						XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_SCHED}};
+						Play(&A, &XChange);
+					}
 
-					printf(	"Processor [%s]\t%d x CPU\n" \
+					printf(	"Processor [%s]\t%d/%d CPU Online\n" \
 						"Signature [%1X%1X_%1X%1X] Architecture [%s]\n" \
 						"\n%s",
-						A.SHM->P.Features.BrandString, A.SHM->P.CPU,
+						A.SHM->P.Features.BrandString, A.SHM->P.OnLine, A.SHM->P.CPU,
 						A.SHM->H.Signature.ExtFamily,
 						A.SHM->H.Signature.Family,
 						A.SHM->H.Signature.ExtModel,
@@ -1778,10 +1852,10 @@ int main(int argc, char *argv[])
 
 					while(A.LOOP)
 					{	// Fire [tasks schedule monitoring] & [MSR dump] threads.
-						bool fJoinSchedThread=false;
+						Bool32 fJoinSchedThread=FALSE;
 						if(A.SHM->S.Monitor && A.SHM->CPL.PROC)
 							fJoinSchedThread=A.SHM->S.Monitor=(pthread_create(&A.TID_Schedule, NULL, uSchedule, &A) == 0);
-						bool fJoinDumpThread=false;
+						Bool32 fJoinDumpThread=FALSE;
 						if(A.SHM->D.Monitor)
 							fJoinDumpThread=(pthread_create(&A.TID_Dump, NULL, uDump, &A) == 0);
 
@@ -1791,7 +1865,7 @@ int main(int argc, char *argv[])
 
 						// Fire C-States threads.
 						for(cpu=0; cpu < A.SHM->P.CPU; cpu++)
-							if(A.SHM->C[cpu].T.Offline != true)
+							if(A.SHM->C[cpu].T.Offline != TRUE)
 							{
 								uApic[cpu].cpu=cpu;
 								uApic[cpu].A=&A;
@@ -1799,7 +1873,7 @@ int main(int argc, char *argv[])
 							}
 						// Synchronize threads.
 						for(cpu=0; cpu < A.SHM->P.CPU; cpu++)
-							if(A.SHM->C[cpu].T.Offline != true)
+							if(A.SHM->C[cpu].T.Offline != TRUE)
 							{
 								pthread_join(uApic[cpu].TID, NULL);
 
@@ -1828,28 +1902,33 @@ int main(int argc, char *argv[])
 									A.SHM->P.Cold=A.SHM->C[cpu].ThermStat.DTS;
 							}
 						// Average the C-States.
-						A.SHM->P.Avg.Turbo/=A.SHM->P.CPU;
-						A.SHM->P.Avg.C0/=A.SHM->P.CPU;
-						A.SHM->P.Avg.C3/=A.SHM->P.CPU;
-						A.SHM->P.Avg.C6/=A.SHM->P.CPU;
+						A.SHM->P.Avg.Turbo/=A.SHM->P.OnLine;
+						A.SHM->P.Avg.C0/=A.SHM->P.OnLine;
+						A.SHM->P.Avg.C3/=A.SHM->P.OnLine;
+						A.SHM->P.Avg.C6/=A.SHM->P.OnLine;
 
-						if(fJoinDumpThread == true)
+						if(fJoinDumpThread == TRUE)
 							A.SHM->D.Monitor=(pthread_join(A.TID_Dump, NULL) == 0);
-						if(fJoinSchedThread == true)
+						if(fJoinSchedThread == TRUE)
 							A.SHM->S.Monitor=(pthread_join(A.TID_Schedule, NULL) == 0);
 
 						Sync_Signal(1, &A.SHM->Sync);
 
-						char RequestID=atomic_load(&A.SHM->PlayID);
 						// Settle down N x 50000 microseconds as specified by the command argument.
 						long int idleRemaining;
 						if((idleRemaining=Sync_Wait(0, &A.SHM->Sync, A.SHM->P.IdleTime)))
 						{
-							Play(&A, RequestID);
+							XCHG_MAP XChange={.Map64=atomic_load(&A.SHM->Sync.Play)};
+							Play(&A, &XChange);
+							atomic_store(&A.SHM->Sync.Play, XChange.Map64);
 
 							usleep(IDLE_BASE_USEC*idleRemaining);
 						}
-						else	Play(&A, RequestID);
+						else
+						{	XCHG_MAP XChange={.Map64=atomic_load(&A.SHM->Sync.Play)};
+							Play(&A, &XChange);
+							atomic_store(&A.SHM->Sync.Play, XChange.Map64);
+						}
 					}
 					// Release the ressources.
 					A.SHM->CPL.MSR=A.Arch[A.SHM->P.ArchID].Close_MSR(&A);
@@ -1861,7 +1940,7 @@ int main(int argc, char *argv[])
 				{
 					rc=2;
 				}
-				if(fEmergencyThread == true)
+				if(fEmergencyThread == TRUE)
 				{
 					pthread_kill(A.TID_SigHandler, SIGUSR1);
 					pthread_join(A.TID_SigHandler, NULL);
@@ -1872,8 +1951,8 @@ int main(int argc, char *argv[])
 				rc=1;
 
 			if(fSmBIOS)
-				if(Close_SMBIOS(&A.Smb) == false)
-					tracerr("Error: closing the SmBIOS tree");
+				if(Close_SMBIOS(&A.SmbTmpStorage) == FALSE)
+					tracerr("Error: freeing the temporary SmBIOS tree");
 			if(A.SmBIOS != MAP_FAILED)
 			{
 				if(munmap(A.SmBIOS, A.Size.SmBIOS) == -1)

@@ -81,9 +81,9 @@ enum {
 
 typedef	struct
 {
-	unsigned int	RGB;
-	char		*xrmClass,
-			*xrmKey;
+	unsigned long int	RGB;
+	char			*xrmClass,
+				*xrmKey;
 } COLORS;
 
 enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
@@ -139,14 +139,13 @@ typedef	union
 
 typedef	struct
 {
-	bool		(*Func)();
-	bool		*Key;
+	Bool32		(*Func)();
+	Bool32		*Key;
 } WBSTATE;
 
 struct WButton
 {
 	WBTYPE		Type;
-	char		ID;
 	int		Target;
 	int		x,
 			y;
@@ -158,6 +157,7 @@ struct WButton
 	WBSTATE		WBState;
 
 	struct	WButton	*Chain;
+	char		ID;
 };
 
 typedef	struct	WButton	WBUTTON;
@@ -213,7 +213,7 @@ typedef struct
 
 typedef struct
 {
-	bool		Locked;
+	Bool32		Locked;
 	int		S,
 			dx,
 			dy;
@@ -247,8 +247,8 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	Header_Height(N)		(One_Char_Height(N) + Quarter_Char_Height(N))
 #define	Footer_Height(N)		(One_Char_Height(N) + Quarter_Char_Height(N))
 
-#define	GEOMETRY_MAIN_COLS	49
-#define	GEOMETRY_MAIN_ROWS	14
+#define	GEOMETRY_MAIN_COLS	84
+#define	GEOMETRY_MAIN_ROWS	36
 #define	GEOMETRY_CORES_COLS	22
 #define	GEOMETRY_CORES_ROWS	8
 #define	GEOMETRY_CSTATES_COLS	8
@@ -256,7 +256,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	GEOMETRY_TEMPS_COLS	32
 #define	GEOMETRY_TEMPS_ROWS	10
 #define	GEOMETRY_SYSINFO_COLS	80
-#define	GEOMETRY_SYSINFO_ROWS	20
+#define	GEOMETRY_SYSINFO_ROWS	36
 
 #define	MAIN_TEXT_WIDTH		MAX(GEOMETRY_MAIN_COLS, A->L.Page[MAIN].Geometry.cols)
 #define	MAIN_TEXT_HEIGHT	MAX(GEOMETRY_MAIN_ROWS, A->L.Page[MAIN].Geometry.rows)
@@ -266,7 +266,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CORES_TEXT_WIDTH	MAX(A->SHM->P.Boost[9], A->L.Page[CORES].Geometry.cols)
 #define	CORES_TEXT_HEIGHT	(A->SHM->P.CPU)
 
-#define	CSTATES_TEXT_SPACING	3
+#define	CSTATES_TEXT_SPACING	4
 #define	CSTATES_TEXT_WIDTH	(MAX(A->SHM->P.CPU, A->L.Page[CSTATES].Geometry.cols) * CSTATES_TEXT_SPACING)
 #define	CSTATES_TEXT_HEIGHT	MAX(GEOMETRY_CSTATES_ROWS, A->L.Page[CSTATES].Geometry.rows)
 
@@ -276,12 +276,13 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	SYSINFO_TEXT_WIDTH	MAX(GEOMETRY_SYSINFO_COLS, A->L.Page[SYSINFO].Geometry.cols)
 #define	SYSINFO_TEXT_HEIGHT	MAX(GEOMETRY_SYSINFO_ROWS, A->L.Page[SYSINFO].Geometry.rows)
 
+#define	DUMP_HEX16_STR		16
 // BIN64: 16 x 4 digits + '\0'
 #define DUMP_BIN64_STR		(16 * 4) + 1
 // PRE_TEXT: ##' 'Addr[5]' 'Name&Padding[24]'['
 #define DUMP_PRE_TEXT		(2 + 1 + 5 + 1 + DUMP_REG_ALIGN + 1)
-// Columns: PRE_TEXT + BIN64 w/ 15 interspaces + ']' + ScrollButtons
-#define	GEOMETRY_DUMP_COLS	(DUMP_PRE_TEXT + DUMP_BIN64_STR + 15 + 1 + 2)
+// Columns: PRE_TEXT + BIN64 w/ 15 interspaces + '] ' + CoreNum + ScrollButtons
+#define	GEOMETRY_DUMP_COLS	(DUMP_PRE_TEXT + DUMP_BIN64_STR + 15 + 2 + 3 + 3)
 #define	GEOMETRY_DUMP_ROWS	(DUMP_ARRAY_DIMENSION + 2)
 #define	DUMP_TEXT_WIDTH		MAX(GEOMETRY_DUMP_COLS, A->L.Page[DUMP].Geometry.cols)
 #define	DUMP_TEXT_HEIGHT	MAX(GEOMETRY_DUMP_ROWS, A->L.Page[DUMP].Geometry.rows)
@@ -292,25 +293,28 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 
 #define	MENU_FORMAT	"[F1]     Help             [F2]     Core\n"               \
 			"[F3]     C-States         [F4]     Temps \n"             \
-			"[F5]     System Info      [F6]     Dump\n"               \
-			"\n"                                                      \
+			"[F5]     System Info      [F6]     Dump\n\n"             \
+			"KPad [+] Faster Loop      KPad [-] Slower Loop\n"        \
+			"[Pause]  Suspend/Resume\n"                               \
+			"\nWith the [Shift] key :\n"                              \
 			"                                 [Up]\n"                 \
 			"  Page Scrolling          [Left]      [Right]\n"         \
-			"                                [Down]\n"                \
-			"[Pause]  Suspend/Resume\n"                               \
+			"                                [Down]\n\n"              \
 			"[PgDw]   Page Down        [PgUp]   Page Up\n"            \
 			"[Home]   Line Begin       [End]    Line End\n"           \
-			"KPad [+] Faster Loop      KPad [-] Slower Loop\n\n"      \
-			"With the [Control] key, activate the followings :\n"     \
-			"[Home]   Page Begin       [End]    Page End\n"           \
+			"\nWith the [Control] key :\n"                            \
+			"[Home]   Page start       [End]    Page end\n"           \
 			"[L][l]   Refresh page     [Q][q]   Quit\n"               \
 			"[Y][y]   Cycles           [W][w]   Wallboard\n"          \
 			"[Z][z]   Frequency Hz     [P][p]   C-States %\n"         \
 			"[R][r]   Ratio values     [T][t]   Task schedule\n\n"    \
-			"Commands :\n"                                            \
+			"Command keys :\n"                                        \
+			"[Left]|[Right] Move cursor insertion (N/A)\n"            \
+			"[Up]|[Down] Browse commands history\n"                   \
 			"[Backspace] Remove the rightmost character\n"            \
-			"[Erase] Suppress the full Command line\n"                \
-			"[Enter] Submit the Command\n\n"                          \
+			"[Erase] Suppress the full command line\n"                \
+			"[Enter] Submit the command\n"                            \
+			"[Tab]   Expand commands\n\n"                             \
 			"Mouse buttons :\n"                                       \
 			"[Left]  Activate Button   [Right] Grab & Move Widget\n"  \
 			"[Wheel Down] Page Down    [Wheel Up] Page Up\n"
@@ -321,7 +325,9 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CORE_DELTA	"%04llu:%04llu %04llu %04llu / %04llu"
 #define	CORE_TASK	"%s"
 #define	CORE_RATIO	"%-3.1f"
-#define	CSTATES_PERCENT	"%6.2f%% %6.2f%% %6.2f%% %6.2f%%"
+#define	CSTATES_PERCENT	"%6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%"
+#define	CSTATES_AVERAGE	"%6.2f      %6.2f      %6.2f      %6.2f"
+#define	CSTATES_FOOTER	"~      % C0        % C1        % C3        % C6"
 #define	OVERCLOCK	"%s [%4.0f MHz]"
 #define	TEMPERATURE	"%3d"
 
@@ -430,9 +436,10 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 
 #define	SYSINFO_SECTION	"System Information"
 //                       ## 12345 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234]
-#define	DUMP_SECTION	"   Addr.     Register               60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0"
+#define	DUMP_SECTION	"   Addr.     Register               60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0 Core"
 #define	REG_HEXVAL	"%016llX"
-#define	REG_FORMAT	"%02d %05X %s%%%zdc["
+#define	REG_FORMAT_BOL	"%02d %05X %s%%%zdc["
+#define	REG_FORMAT_EOL	"] "CORE_NUM"\n"
 
 #define	TASK_SECTION	"Task Scheduling"
 
@@ -476,6 +483,9 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	DUMP_FRAME_VIEW_HSHIFT		1
 #define	DUMP_FRAME_VIEW_VSHIFT		1
 
+#define	KEYINPUT_DEPTH		256
+#define	HISTORY_DEPTH		100
+
 typedef struct
 {
 	int	cols,
@@ -486,7 +496,7 @@ typedef struct
 {
 	unsigned int		UnMapBitmask;
 	struct	{
-		bool		Pageable;
+		Bool32		Pageable;
 		MaxText		Geometry,
 				Visible,
 				Listing,
@@ -499,7 +509,7 @@ typedef struct
 		char		*Title;
 	} Page[WIDGETS];
 	struct {
-		bool		fillGraphics,
+		Bool32		fillGraphics,
 				freqHertz,
 				cycleValues,
 				ratioValues,
@@ -528,8 +538,12 @@ typedef struct
 	} Axes[WIDGETS], *Temps;
 	XPoint			TextCursor[3];
 	struct {
-		char		KeyBuffer[256];
-		int		KeyLength;
+		char		*KeyBuffer;
+		int		KeyLength, Recent, Browse, Top;
+		struct {
+			char	*KeyBuffer;
+			int	KeyLength;
+		} History[HISTORY_DEPTH];
 	} Input;
 	char			*Output;
 	unsigned long int	globalBackground,
@@ -537,7 +551,7 @@ typedef struct
 	COLORS			Colors[COLOR_COUNT];
 } LAYOUT;
 
-#define	_IS_MDI_		(A->MDI != false)
+#define	_IS_MDI_		(A->MDI != FALSE)
 
 #define	SPLASH_HIDDEN_FLAG	((A.Splash.attributes & 0x1000) >> 12)
 #define	SPLASH_DEFERRED_TIME	(__useconds_t) (A.Splash.attributes & 0xFFF)
@@ -575,13 +589,30 @@ typedef struct
 } OPTIONS;
 
 
-#define	COMMANDS_COUNT	9
+#define	COMMANDS_COUNT	13
 typedef	struct
 {
 	char	*Inst,
 		*Spec;
 	void	(*Proc)();
 } COMMANDS;
+
+#define	COMMAND_LIST					\
+{							\
+	{"help", NULL, Proc_Help},			\
+	{"menu", NULL, Proc_Menu},			\
+	{"quit", NULL, Proc_Quit},			\
+	{"clear", NULL, ClearMsg},			\
+	{"restart", NULL, Proc_Restart},		\
+	{"version", NULL, Proc_Release},		\
+	{"history", NULL, Proc_History},		\
+	{"get color", "%d", Get_Color},			\
+	{"set color", "%d %x", Set_Color},		\
+	{"set font", "%s", Set_Font},			\
+	{"dump msr", "%x %hu %hhu", Svr_Dump_Msr},	\
+	{"read msr", "%x %hu", Svr_Read_Msr},		\
+	{"write msr", "%x %hu %llx", Svr_Write_Msr}	\
+}
 
 
 typedef struct
@@ -596,30 +627,31 @@ typedef struct
 
 	SMBIOS_TREE	*SmBIOS;
 
-	unsigned int	Room;
-
 	Display		*display;
 	Screen		*screen;
 	char		*Geometries;
 	char		*fontName;
 	XFontStruct	*xfont;
-	char		xACL;
 	Atom		atom[5];
 	Cursor		MouseCursor[MC_COUNT];
 	XSPLASH		Splash;
 	XWINDOW		W[WIDGETS];
 	XTARGET		T;
-	bool		MDI;
 	LAYOUT		L;
 	sigset_t	Signal;
 	pthread_t	TID_SigHandler,
 			TID_Draw;
-	bool		LOOP,
+	Bool32		MDI,
+			LOOP,
 			RESTART,
 			PAUSE[WIDGETS];
+
+	unsigned int	Room;
+
 	char		*configFile;
 	OPTIONS		Options[OPTIONS_COUNT];
 	COMMANDS	Commands[COMMANDS_COUNT];
+	char		xACL;
 } uARG;
 
 // Instructions set.
@@ -628,30 +660,19 @@ void	Proc_Help(uARG *A);
 void	Proc_Quit(uARG *A);
 void	Proc_Restart(uARG *A);
 void	Proc_Release(uARG *A);
-void	Get_Color(uARG *A, int C);
-void	Set_Color(uARG *A, int C);
-void	Set_Font(uARG *A, int C);
-
-#define	COMMAND_LIST \
-{ \
-	{"help", NULL, Proc_Help}, \
-	{"menu", NULL, Proc_Menu}, \
-	{"quit", NULL, Proc_Quit}, \
-	{"clear", NULL, ClearMsg}, \
-	{"restart", NULL, Proc_Restart}, \
-	{"version", NULL, Proc_Release},  \
-	{"get color", "%d", Get_Color},   \
-	{"set color", "%d %x", Set_Color}, \
-	{"set font", "%s", Set_Font} \
-}
+void	Get_Color(uARG *A, int cmd);
+void	Set_Color(uARG *A, int cmd);
+void	Set_Font(uARG *A, int cmd);
+void	Svr_Dump_Msr(uARG *A, int cmd);
+void	Svr_Read_Msr(uARG *A, int cmd);
 
 // Definition of the Buttons management functions (CallBack).
-bool	Button_State(uARG *A, WBUTTON *wButton);
-bool	SCHED_State(uARG *A, WBUTTON *wButton);
-bool	TSC_State(uARG *A, WBUTTON *wButton);
-bool	BIOS_State(uARG *A, WBUTTON *wButton);
-bool	SPEC_State(uARG *A, WBUTTON *wButton);
-bool	ROM_State(uARG *A, WBUTTON *wButton);
+Bool32	Button_State(uARG *A, WBUTTON *wButton);
+Bool32	SCHED_State(uARG *A, WBUTTON *wButton);
+Bool32	TSC_State(uARG *A, WBUTTON *wButton);
+Bool32	BIOS_State(uARG *A, WBUTTON *wButton);
+Bool32	SPEC_State(uARG *A, WBUTTON *wButton);
+Bool32	ROM_State(uARG *A, WBUTTON *wButton);
 
 void	CallBackSave(uARG *A, WBUTTON *wButton) ;
 void	CallBackQuit(uARG *A, WBUTTON *wButton) ;

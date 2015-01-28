@@ -138,8 +138,8 @@ typedef	struct
 		double		(*ClockSpeed)();
 		char		*Architecture;
 		void		*(*uCycle)(void *uA, int cpu, int T);
-		bool		(*Init_MSR)(void *);
-		bool		(*Close_MSR)(void *);
+		Bool32		(*Init_MSR)(void *);
+		Bool32		(*Close_MSR)(void *);
 } ARCH;
 
 
@@ -206,12 +206,12 @@ typedef int __kernel_pid_t;
 #define	SCHED_PID_FORMAT	"  .%-30s: %%ld\n"
 #define	SCHED_TASK_SECTION	"runnable tasks:"
 #define	TASK_SECTION		"Task Scheduling"
-#define	TASK_STATE_FMT		"%c"
+#define	TASK_STATE_FMT		"%1s"
 #define	TASK_COMM_FMT		"%15s"
-#define	TASK_TIME_FMT		"%9Ld.%06ld"
+#define	TASK_TIME_FMT		"%9Ld.%06Ld"
 #define	TASK_CTXSWITCH_FMT	"%9Ld"
-#define	TASK_PRIORITY_FMT	"%5d"
-#define	TASK_NODE_FMT		"%d"
+#define	TASK_PRIORITY_FMT	"%5ld"
+#define	TASK_NODE_FMT		"%ld"
 #define	TASK_GROUP_FMT		"%s"
 
 #define	TASK_STRUCT_FORMAT	TASK_STATE_FMT""TASK_COMM_FMT" "TASK_PID_FMT" "TASK_TIME_FMT" "TASK_CTXSWITCH_FMT" "TASK_PRIORITY_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_NODE_FMT" "TASK_GROUP_FMT
@@ -252,7 +252,7 @@ typedef struct
 
 	SHM_STRUCT	*SHM;
 
-	SMBIOS_TREE	*SmBIOS;
+	SMBIOS_TREE	*SmBIOS, SmbTmpStorage;
 
 	struct
 	{
@@ -260,12 +260,11 @@ typedef struct
 			SmBIOS;
 	} Size;
 
-	SMBIOS_TREE	Smb;
 	FEATURES	Features;
 	ARCH		Arch[ARCHITECTURES];
 const	DUMP_STRUCT	Loader;
 
-	bool		LOOP;
+	Bool64		LOOP;
 	OPTIONS		Options[OPTIONS_COUNT];
 
 	sigset_t	Signal;
@@ -282,7 +281,7 @@ const	DUMP_STRUCT	Loader;
 
 typedef struct
 {
-	int		cpu;
+	long int	cpu;
 	pthread_t	TID;
 	uARG		*A;
 } uAPIC;

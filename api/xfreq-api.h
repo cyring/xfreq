@@ -7,13 +7,12 @@
 
 
 #include <unistd.h>
-#include <stdbool.h>
 #include <stdatomic.h>
 #include <time.h>
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "42-b"
+#define _NIGHTLY "43"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #define	ToStr(_inst)	_ToStr(_inst)
@@ -41,7 +40,7 @@ enum	{SRC_TSC, SRC_BIOS, SRC_SPEC, SRC_ROM, SRC_USER, SRC_COUNT};
 
 typedef struct
 {
-	char		VendorID[12 + 1];
+	char		VendorID[16];
 	struct
 	{
 		struct SIGNATURE
@@ -263,9 +262,9 @@ typedef struct
 			Unused5	: 32-30;
 		} DX;
 	} ExtFunc;
-	char		BrandString[48+1];
-	bool		InvariantTSC,
+	unsigned int	InvariantTSC,
                         HTT_enabled;
+	char		BrandString[48];
 } FEATURES;
 
 #define	IA32_TIME_STAMP_COUNTER		0x10
@@ -526,7 +525,7 @@ typedef struct
 #define	IDLE_COEF_MIN	2
 typedef struct
 {
-	signed int			ArchID;
+	signed long int			ArchID;
 	FEATURES			Features;
 	PLATFORM_ID			PlatformId;
 	PERF_STATUS			PerfStatus;
@@ -555,18 +554,20 @@ typedef struct
 	useconds_t			IdleTime;
 } PROCESSOR;
 
+#define	ARCHITECTURE_LEN	32
 typedef	struct
 {
 	struct	SIGNATURE	Signature;
 		unsigned int	MaxOfCores;
 		double		ClockSpeed;
-		char		Architecture[32+1];
+		char		Architecture[ARCHITECTURE_LEN];
 } ARCHITECTURE;
 
-#define	DUMP_ARRAY_DIMENSION	11
+#define	DUMP_ARRAY_DIMENSION	16
 #define	DUMP_REG_ALIGN		24
 typedef	struct
 {
+	unsigned int		Core;
 	char			Name[DUMP_REG_ALIGN];
 	unsigned int		Addr;
 	unsigned long long int	Value;
@@ -574,22 +575,27 @@ typedef	struct
 
 #define	REGISTERS_LIST							\
 {									\
-	{"IA32_PERF_STATUS",        IA32_PERF_STATUS,		0},	\
-	{"IA32_PLATFORM_ID",        IA32_PLATFORM_ID,		0},	\
-	{"IA32_PKG_THERM_STATUS",   IA32_PKG_THERM_STATUS,	0},	\
-	{"IA32_THERM_STATUS",       IA32_THERM_STATUS,		0},	\
-	{"IA32_MISC_ENABLE",        IA32_MISC_ENABLE,		0},	\
-	{"IA32_FIXED_CTR1",         IA32_FIXED_CTR1,		0},	\
-	{"IA32_FIXED_CTR2",         IA32_FIXED_CTR2,		0},	\
-	{"MSR_CORE_C3_RESIDENCY",   MSR_CORE_C3_RESIDENCY,	0},	\
-	{"MSR_PLATFORM_INFO",       MSR_PLATFORM_INFO,		0},	\
-	{"MSR_TURBO_RATIO_LIMIT",   MSR_TURBO_RATIO_LIMIT,	0},	\
-	{"MSR_TEMPERATURE_TARGET",  MSR_TEMPERATURE_TARGET,	0},	\
+	{ 0, "IA32_PLATFORM_ID",        IA32_PLATFORM_ID,        0},	\
+	{ 0, "MSR_PLATFORM_INFO",       MSR_PLATFORM_INFO,       0},	\
+	{ 0, "IA32_MISC_ENABLE",        IA32_MISC_ENABLE,        0},	\
+	{ 0, "IA32_PERF_STATUS",        IA32_PERF_STATUS,        0},	\
+	{ 0, "IA32_THERM_STATUS",       IA32_THERM_STATUS,       0},	\
+	{ 0, "MSR_TURBO_RATIO_LIMIT",   MSR_TURBO_RATIO_LIMIT,   0},	\
+	{ 0, "MSR_TEMPERATURE_TARGET",  MSR_TEMPERATURE_TARGET,  0},	\
+	{ 0, "IA32_FIXED_CTR1",         IA32_FIXED_CTR1,         0},	\
+	{ 0, "IA32_FIXED_CTR2",         IA32_FIXED_CTR2,         0},	\
+	{ 0, "MSR_CORE_C3_RESIDENCY",   MSR_CORE_C3_RESIDENCY,   0},	\
+	{ 1, "IA32_FIXED_CTR1",         IA32_FIXED_CTR1,         0},	\
+	{ 1, "IA32_FIXED_CTR2",         IA32_FIXED_CTR2,         0},	\
+	{ 2, "IA32_FIXED_CTR1",         IA32_FIXED_CTR1,         0},	\
+	{ 2, "IA32_FIXED_CTR2",         IA32_FIXED_CTR2,         0},	\
+	{ 3, "IA32_FIXED_CTR1",         IA32_FIXED_CTR1,         0},	\
+	{ 3, "IA32_FIXED_CTR2",         IA32_FIXED_CTR2,         0},	\
 }
 
 typedef struct
 {
-	bool		Monitor;
+	Bool64		Monitor;
 	DUMP_ARRAY	Array[DUMP_ARRAY_DIMENSION];
 } DUMP_STRUCT;
 
@@ -668,19 +674,19 @@ typedef	enum
 #define	TASK_PIPE_DEPTH		10
 typedef	struct
 {
-	bool		Monitor;
+	Bool32		Monitor;
 	unsigned int	Attributes;
 } SCHEDULE;
 
 typedef	struct
 {
-	long long int	nsec_high;
-	long int	nsec_low;
+	long long int	nsec_high,
+			nsec_low;
 } RUNTIME;
 
 typedef	struct
 {
-	bool		Offline;
+	Bool32		Offline;
 	unsigned
 			APIC_ID	 : 32-0,
 			Core_ID	 : 32-0,
@@ -689,8 +695,6 @@ typedef	struct
 
 typedef	struct {
 	TOPOLOGY		T;
-
-	signed int		FD;
 	GLOBAL_PERF_COUNTER	GlobalPerfCounter;
 	FIXED_PERF_COUNTER	FixedPerfCounter;
 	struct {
@@ -731,23 +735,26 @@ typedef	struct {
 
 	struct TASK_STRUCT
 	{
-		char		state;
-		char		comm[TASK_COMM_LEN + 1];
-		int		pid;
+		char		state[8];
+		char		comm[TASK_COMM_LEN];
+		long int	pid;
 		RUNTIME		vruntime;
 		long long int	nvcsw;			// sum of [non]voluntary context switch counts
-		int		prio;
+		long int	prio;
 		RUNTIME		exec_vruntime;		// a duplicate of vruntime ?
 		RUNTIME		sum_exec_runtime;
 		RUNTIME		sum_sleep_runtime;
-		int		node;
+		long int	node;
 		char		group_path[32];		// #define PATH_MAX 4096 # chars in a path name including nul
 	} Task[TASK_PIPE_DEPTH];
+
+	signed int		FD,
+				Align64;
 } CPU_STRUCT;
 
 typedef	struct
 {
-	bool	MSR,
+	Bool64	MSR,
 		RESET,
 		SMBIOS,
 		IMC,
@@ -758,15 +765,25 @@ typedef struct
 {
 	atomic_ullong	IF;
 	atomic_ullong	Rooms;
+	atomic_ullong	Play;
+	atomic_ullong	Data;
 } SYNCHRONIZATION;
+
+typedef	union
+{
+	unsigned long long int		Map64;
+	struct {
+		unsigned int		Addr;
+		unsigned short int	Core;
+		unsigned char		Arg;
+		char			ID;
+	} Map;
+} XCHG_MAP;
 
 typedef	struct
 {
 	char		AppName[TASK_COMM_LEN];
-	atomic_char	PlayID;
-
 	SYNCHRONIZATION	Sync;
-
 	PRIVILEGE_LEVEL	CPL;
 	PROCESSOR	P;
 	ARCHITECTURE	H;
@@ -785,14 +802,19 @@ typedef	struct
 #define	ID_TSC		't'
 #define	ID_BIOS		'b'
 #define	ID_SPEC		'a'
-#define	ID_ROM		'r'
+#define	ID_ROM		'o'
 #define	ID_USER		'u'
 #define	ID_INCLOOP	'<'
 #define	ID_DECLOOP	'>'
+#define	ID_DUMPMSR	'd'
+#define	ID_READMSR	'r'
+#define	ID_WRITEMSR	'w'
 
 #define	SIG_EMERGENCY_FMT	"\nShutdown(%02d)"
-#define	TASK_PID_FMT		"%5d"
+#define	TASK_PID_FMT		"%5ld"
 
+extern unsigned int fROL32(unsigned int r32, unsigned short int m16);
+extern unsigned int fROR32(unsigned int r32, unsigned short int m16);
 extern void abstimespec(useconds_t usec, struct timespec *tsec);
 extern int addtimespec(struct timespec *asec, const struct timespec *tsec);
 extern void Sync_Init(SYNCHRONIZATION *sync);
@@ -802,4 +824,4 @@ extern void Sync_Close(unsigned int room, SYNCHRONIZATION *sync);
 extern long int Sync_Wait(unsigned int room, SYNCHRONIZATION *sync, useconds_t idleTime);
 extern void Sync_Signal(unsigned int room, SYNCHRONIZATION *sync);
 
-extern char *SMB_Find_String(struct STRUCTINFO *smb, int ID);
+extern char *Smb_Find_String(struct STRUCTINFO *smb, int ID);

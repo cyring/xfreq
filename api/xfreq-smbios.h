@@ -7,7 +7,8 @@
 
 
 #include <stdio.h>
-#include <stdbool.h>
+
+#include "xfreq-types.h"
 
 // System Management BIOS (SMBIOS) Reference Specification
 // Version: 2.7.1 § 7.5
@@ -30,7 +31,7 @@ struct NODE
 
 struct STRING
 {
-		int		ID;
+		long int	ID;
 		char		*Buffer;
 		struct STRING	*Link;
 		struct NODE	Node;
@@ -158,9 +159,10 @@ struct SMBIOS4
 				Version;
 				struct
 				{
-		unsigned int
-					Tension	: 7-0,
-					Mode	: 8-7;
+		unsigned long int
+					Tension	:  7-0,
+					Mode	:  8-7,
+					Unused	: 64-8;
 				} Voltage;
 		unsigned long long int
 				Clock,
@@ -300,6 +302,6 @@ typedef struct
 
 typedef	void*	PADDR;
 
-extern bool Init_SMBIOS(SMBIOS_TREE *Smb);
-extern bool Close_SMBIOS(SMBIOS_TREE *Smb);
-extern bool Copy_SmbTree(SMBIOS_TREE *SmbSrc, SMBIOS_TREE *SmbDest);
+extern Bool32 Init_SMBIOS(SMBIOS_TREE *Smb);
+extern Bool32 Close_SMBIOS(SMBIOS_TREE *Smb);
+extern Bool32 Copy_SmbTree(SMBIOS_TREE *SmbSrc, SMBIOS_TREE *SmbDest);

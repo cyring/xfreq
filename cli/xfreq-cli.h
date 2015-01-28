@@ -12,7 +12,7 @@
 #define	pthread_tryjoin_np(t, r) pthread_timedjoin_np(t, r, 0)
 #endif
 
-#define	OPTIONS_COUNT	4
+#define	OPTIONS_COUNT	6
 typedef struct
 {
 	char		*argument;
@@ -32,12 +32,12 @@ typedef struct
 	SHM_STRUCT	*SHM;
 	SMBIOS_TREE	*SmBIOS;
 
-	unsigned int	Room;
-
 	sigset_t	Signal;
 	pthread_t	TID_SigHandler,
 			TID_Read;
 
-	bool		LOOP;
+	unsigned int	Room;
+
+	Bool32		LOOP;
 	OPTIONS		Options[OPTIONS_COUNT];
 } uARG;

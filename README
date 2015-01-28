@@ -178,6 +178,14 @@
  *
  * [HISTORY]
  *
+ * R 2.1.43: 01/28/2015
+ *         - Provide an history of commands.
+ *         - Added keys to the commands menu.
+ *         - Added commands to read and write msr.
+ *         - Added a command to change the msr dump array and the associated Core.
+ *         - Resize the Widgets.
+ *         - Fixed the C-state averages with the online CPU count.
+ *
  * R 2.1.42-b: 01/20/2015
  *        - Now trace errors if compiled with DEBUG.
  *
