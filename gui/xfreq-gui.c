@@ -934,7 +934,7 @@ void	GeometriesToLayout(uARG *A)
 int	OpenWidgets(uARG *A)
 {
 	int noerr=TRUE;
-	char str[sizeof(HDSIZE)]={0};
+	char *str=calloc(sizeof(HDSIZE), 1);
 
 	// Allocate memory for chart elements.
 	A->L.Usage.C0=calloc(A->SHM->P.CPU, sizeof(XRectangle));
@@ -1766,6 +1766,8 @@ int	OpenWidgets(uARG *A)
 			XSelectInput(A->display, A->W[G].window, EventProfile);
 		}
 		else	noerr=FALSE;
+
+	free(str);
 	return(noerr);
 }
 
@@ -1856,7 +1858,7 @@ void	BuildLayout(uARG *A, int G)
 			break;
 		case CORES:
 		{
-			char str[16]={0};
+			char str[8]={0};
 
 			// Draw the Core identifiers, the header, and the footer on the chart.
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
@@ -1915,7 +1917,7 @@ void	BuildLayout(uARG *A, int G)
 			break;
 		case CSTATES:
 		{
-			char str[16]={0};
+			char str[8]={0};
 
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawImageString(A->display, A->W[G].pixmap.B, A->W[G].gc,
@@ -2002,7 +2004,7 @@ void	BuildLayout(uARG *A, int G)
 					A->L.Page[G].Title,
 					strlen(A->L.Page[G].Title) );
 
-			char str[256]={0};
+			char *str=calloc(256, 1);
 
 			int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
 			sprintf(str, OVERCLOCK, A->SHM->P.Features.BrandString, A->SHM->P.Boost[1] * A->SHM->P.ClockSpeed);
@@ -2075,7 +2077,7 @@ void	BuildLayout(uARG *A, int G)
 												enabled(A->SHM->P.MiscFeatures.PerfMonitoring),
 												enabled(!A->SHM->P.MiscFeatures.BTS),
 												enabled(A->SHM->P.MiscFeatures.CPUID_MaxVal),
-					powered(A->SHM->P.Features.Thermal_Power_Leaf.AX.TurboIDA),	enabled(!A->SHM->P.MiscFeatures.Turbo_IDA),
+					powered(A->SHM->P.Features.Thermal_Power_Leaf.AX.TurboIDA),	enabled(A->SHM->P.MiscFeatures.Turbo_IDA),
 
 					A->SHM->P.Boost[0], A->SHM->P.Boost[1], A->SHM->P.Boost[2], A->SHM->P.Boost[3], A->SHM->P.Boost[4], A->SHM->P.Boost[5], A->SHM->P.Boost[6], A->SHM->P.Boost[7], A->SHM->P.Boost[8], A->SHM->P.Boost[9],
 
@@ -2255,6 +2257,7 @@ void	BuildLayout(uARG *A, int G)
 						str,
 						strlen(str));
 			}
+			free(str);
 		}
 			break;
 		case DUMP:
@@ -2314,7 +2317,7 @@ void	DrawLayout(uARG *A, int G)
 			XSetForeground(A->display, A->W[G].gc, A->L.Play.flashCursor ? A->L.Colors[COLOR_CURSOR].RGB : A->W[G].background);
 
 			XPoint Origin=	{
-					.x=(A->L.Input.KeyLength * One_Char_Width(G)) + Quarter_Char_Width(G),
+					.x=(A->L.Input.KeyInsert * One_Char_Width(G)) + Quarter_Char_Width(G),
 					.y=edline - (Quarter_Char_Height(G) >> 1)
 					};
 			DrawCursor(A, G, &Origin);
@@ -2478,7 +2481,7 @@ void	DrawLayout(uARG *A, int G)
 			break;
 		case CSTATES:
 		{
-			char str[64]={0};
+			char *str=calloc(64, 1);
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
@@ -2545,11 +2548,12 @@ void	DrawLayout(uARG *A, int G)
 								One_Char_Height(G) * (cpu + 1 + 1),
 								str, strlen(str) );
 					}
+			free(str);
 		}
 			break;
 		case TEMPS:
 		{
-			char str[16]={0};
+			char str[8]={0};
 			// Display the Core temperature.
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
@@ -2685,12 +2689,12 @@ void	DrawLayout(uARG *A, int G)
 			int Rows=DUMP_ARRAY_DIMENSION, row=0;
 
 			char *items=calloc(Rows, DUMP_TEXT_WIDTH);
+			char *mask=calloc(DUMP_PRE_TEXT, 1), *str=calloc(DUMP_PRE_TEXT, 1);
+			char *binStr=calloc(DUMP_BIN64_STR + 1, 1);
 			for(row=0; row < Rows; row++)
 			{
-				char binStr[DUMP_BIN64_STR + 1]={0};
 				DumpRegister(A->SHM->D.Array[row].Value, NULL, binStr);
 
-				char mask[DUMP_PRE_TEXT]={0}, str[DUMP_PRE_TEXT]={0};
 				sprintf(mask, REG_FORMAT_BOL, row,
 							A->SHM->D.Array[row].Addr,
 							A->SHM->D.Array[row].Name,
@@ -2708,6 +2712,9 @@ void	DrawLayout(uARG *A, int G)
 				sprintf(str, REG_FORMAT_EOL, A->SHM->D.Array[row].Core);
 				strcat(items, str);
 			}
+			free(binStr);
+			free(str);
+			free(mask);
 			if(A->L.Page[G].Pageable)
 			{	// Clear the scrolling area.
 				XSetForeground(A->display, A->W[G].gc, A->W[G].background);
@@ -2742,7 +2749,7 @@ void	DrawLayout(uARG *A, int G)
 // Update the Widget name with the Top Core frequency, temperature, c-states.
 void	UpdateWidgetName(uARG *A, int G)
 {
-	char str[64]={0};
+	char *str=calloc(64, 1);
 	switch(G) {
 		case MAIN:
 			if(_IS_MDI_)
@@ -2783,6 +2790,7 @@ void	UpdateWidgetName(uARG *A, int G)
 			}
 			break;
 	}
+	free(str);
 }
 
 // Implementation of CallBack functions.
@@ -3075,7 +3083,8 @@ char	*FQN_Settings(const char *fName)
 
 Bool32	SaveSettings(uARG *A)
 {
-	char storePath[4096]={0};
+	Bool32 rc=FALSE;
+	char *storePath=calloc(4096, 1);
 
 	if((A->configFile != NULL) && strlen(A->configFile) > 0)
 		strcpy(storePath, A->configFile);
@@ -3092,8 +3101,7 @@ Bool32	SaveSettings(uARG *A)
 	{
 		XrmDatabase xdb=XrmGetFileDatabase(storePath);
 
-		char strVal[256]={0};
-		char strKey[32]={0};
+		char *strVal=calloc(256, 1), *strKey=calloc(32, 1);
 		int i=0;
 		for(i=1; i < OPTIONS_COUNT; i++)
 			if(A->Options[i].xrmName != NULL)
@@ -3154,16 +3162,21 @@ Bool32	SaveSettings(uARG *A)
 			sprintf(strVal, "%s.%s: 0x%lx", A->L.Colors[i].xrmClass, A->L.Colors[i].xrmKey, A->L.Colors[i].RGB);
 			XrmPutLineResource(&xdb, strVal);
 		}
+		free(strVal);
+		free(strKey);
 		XrmPutFileDatabase(xdb, storePath);
 		XrmDestroyDatabase(xdb);
 
-		return(TRUE);
+		rc=TRUE;
 	}
 	else
-		return(FALSE);
+		rc=FALSE;
+
+	free(storePath);
+	return(rc);
 }
 
-// Instructions set.
+// Commands set.
 void	Proc_Menu(uARG *A)
 {
 	Output(A, MENU_FORMAT);
@@ -3171,14 +3184,18 @@ void	Proc_Menu(uARG *A)
 
 void	Proc_Help(uARG *A)
 {
-	char stringNL[16]={0};
+	char *items=calloc(COMMANDS_COUNT, 16), *stringNL=calloc(16, 1);
 
 	int cmd=0;
 	for(cmd=1; cmd < COMMANDS_COUNT; cmd++)
 	{
 		sprintf(stringNL, "%s\n", A->Commands[cmd].Inst);
-		Output(A, stringNL);
+		strcat(items, stringNL);
 	}
+	Output(A, items);
+
+	free(stringNL);
+	free(items);
 }
 
 void	Proc_Release(uARG *A)
@@ -3446,22 +3463,34 @@ static void *uLoop(uARG *A)
 			{
 				KeySym	KeySymPressed;
 				XComposeStatus ComposeStatus={0};
-				char xkBuffer[256];
+				char xkBuffer[KEYINPUT_DEPTH];
 				int  xkLength;
 
 				if((xkLength=XLookupString(&E.xkey,
 							xkBuffer,
-							256,
+							KEYINPUT_DEPTH,
 							&KeySymPressed,
 							&ComposeStatus)) )
 					if(!(E.xkey.state & AllModMask)
 					&& (	((KeySymPressed >= XK_space) && (KeySymPressed <= XK_asciitilde))
 					||	((KeySymPressed >= XK_KP_0) && (KeySymPressed <= XK_KP_9))	)
-					&& ((A->L.Input.KeyLength + xkLength) < 255)
-					&& G == MAIN)
+					&& ((A->L.Input.KeyLength + xkLength) < (KEYINPUT_DEPTH - 1))
+					&& (G == MAIN))
 					{
-						memcpy(&A->L.Input.KeyBuffer[A->L.Input.KeyLength], xkBuffer, xkLength);
-						A->L.Input.KeyLength+=xkLength;
+						if(A->L.Input.KeyInsert == A->L.Input.KeyLength)
+						{
+							memcpy(&A->L.Input.KeyBuffer[A->L.Input.KeyLength], xkBuffer, xkLength);
+							A->L.Input.KeyInsert=A->L.Input.KeyLength+=xkLength;
+						}
+						else {
+							memmove(&A->L.Input.KeyBuffer[A->L.Input.KeyInsert + 1],
+								&A->L.Input.KeyBuffer[A->L.Input.KeyInsert],
+								A->L.Input.KeyLength - A->L.Input.KeyInsert);
+							memcpy(&A->L.Input.KeyBuffer[A->L.Input.KeyInsert], xkBuffer, xkLength);
+							A->L.Input.KeyInsert+=xkLength;
+							A->L.Input.KeyLength+=xkLength;
+						}
+
 						fDraw(MAIN, FALSE, TRUE);
 					}
 				switch(KeySymPressed)
@@ -3471,14 +3500,23 @@ static void *uLoop(uARG *A)
 					case XK_KP_Delete:
 						if(A->L.Input.KeyLength > 0)
 						{
-							A->L.Input.KeyLength=0;
+							A->L.Input.KeyInsert=A->L.Input.KeyLength=0;
+
 							fDraw(MAIN, FALSE, TRUE);
 						}
 						break;
 					case XK_BackSpace:
-						if(A->L.Input.KeyLength > 0)
+						if(A->L.Input.KeyInsert > 0)
 						{
+							if(A->L.Input.KeyInsert < A->L.Input.KeyLength)
+							{
+								memmove(&A->L.Input.KeyBuffer[A->L.Input.KeyInsert - 1],
+									&A->L.Input.KeyBuffer[A->L.Input.KeyInsert],
+									A->L.Input.KeyLength - A->L.Input.KeyInsert);
+							}
+							A->L.Input.KeyInsert--;
 							A->L.Input.KeyLength--;
+
 							fDraw(MAIN, FALSE, TRUE);
 						}
 						break;
@@ -3489,24 +3527,21 @@ static void *uLoop(uARG *A)
 							A->L.Input.KeyBuffer[A->L.Input.KeyLength]='\0';
 							Output(A, A->L.Input.KeyBuffer);
 							Output(A, "\n");
-
-							if(!ExecCommand(A))
-								Output(A, "Syntax Error\n");
-							else
 							{
 								A->L.Input.History[A->L.Input.Recent].KeyLength=A->L.Input.KeyLength;
 								memcpy(A->L.Input.History[A->L.Input.Recent].KeyBuffer,
 									A->L.Input.KeyBuffer,
 									A->L.Input.History[A->L.Input.Recent].KeyLength);
-
 								A->L.Input.Browse=A->L.Input.Recent;
-
 								if(A->L.Input.Top < (HISTORY_DEPTH - 1))
 									A->L.Input.Top++;
-
 								A->L.Input.Recent=(A->L.Input.Recent < A->L.Input.Top) ? A->L.Input.Recent + 1 : 0;
 							}
-							A->L.Input.KeyLength=0;
+							if(!ExecCommand(A))
+								Output(A, "Syntax Error\n");
+
+							A->L.Input.KeyInsert=A->L.Input.KeyLength=0;
+
 							fDraw(MAIN, TRUE, FALSE);
 						}
 						break;
@@ -3515,7 +3550,8 @@ static void *uLoop(uARG *A)
 						{
 							int cmd=0;
 							for(cmd=0; cmd < COMMANDS_COUNT; cmd++)
-								if(strncmp(A->L.Input.KeyBuffer, A->Commands[cmd].Inst, A->L.Input.KeyLength) == 0) {
+								if(strncmp(A->L.Input.KeyBuffer, A->Commands[cmd].Inst, A->L.Input.KeyLength) == 0)
+								{
 									Output(A, A->Commands[cmd].Inst);
 									Output(A, "\n");
 								}
@@ -3573,39 +3609,53 @@ static void *uLoop(uARG *A)
 					case XK_KP_Up:
 						if(E.xkey.state & ShiftMask)
 							Play(A, G, ID_NORTH, NULL);
-						else if((G == MAIN))
-						{
-							A->L.Input.KeyLength=A->L.Input.History[A->L.Input.Browse].KeyLength;
-							memcpy(A->L.Input.KeyBuffer, A->L.Input.History[A->L.Input.Browse].KeyBuffer, A->L.Input.KeyLength);
+						else
+							if((G == MAIN) && (A->L.Input.Top > 0))
+							{
+								A->L.Input.KeyInsert=A->L.Input.KeyLength=A->L.Input.History[A->L.Input.Browse].KeyLength;
+								memcpy(A->L.Input.KeyBuffer, A->L.Input.History[A->L.Input.Browse].KeyBuffer, A->L.Input.KeyLength);
+								A->L.Input.Browse=(A->L.Input.Browse < A->L.Input.Top) ? A->L.Input.Browse + 1 : 0;
 
-							A->L.Input.Browse=(A->L.Input.Browse < A->L.Input.Top) ? A->L.Input.Browse + 1 : 0;
-
-							fDraw(MAIN, FALSE, TRUE);
-						}
+								fDraw(MAIN, FALSE, TRUE);
+							}
 						break;
 					case XK_Down:
 					case XK_KP_Down:
 						if(E.xkey.state & ShiftMask)
 							Play(A, G, ID_SOUTH, NULL);
-						else if((G == MAIN))
-						{
-							A->L.Input.KeyLength=A->L.Input.History[A->L.Input.Browse].KeyLength;
-							memcpy(A->L.Input.KeyBuffer, A->L.Input.History[A->L.Input.Browse].KeyBuffer, A->L.Input.KeyLength);
+						else
+							if((G == MAIN) && (A->L.Input.Top > 0))
+							{
+								A->L.Input.KeyInsert=A->L.Input.KeyLength=A->L.Input.History[A->L.Input.Browse].KeyLength;
+								memcpy(A->L.Input.KeyBuffer, A->L.Input.History[A->L.Input.Browse].KeyBuffer, A->L.Input.KeyLength);
+								A->L.Input.Browse=(A->L.Input.Browse > 0) ? A->L.Input.Browse - 1 : A->L.Input.Top;
 
-							A->L.Input.Browse=(A->L.Input.Browse > 0) ? A->L.Input.Browse - 1 : A->L.Input.Top;
-
-							fDraw(MAIN, FALSE, TRUE);
-						}
+								fDraw(MAIN, FALSE, TRUE);
+							}
 						break;
 					case XK_Right:
 					case XK_KP_Right:
 						if(E.xkey.state & ShiftMask)
 							Play(A, G, ID_EAST, NULL);
+						else
+							if(A->L.Input.KeyInsert < A->L.Input.KeyLength)
+							{
+								A->L.Input.KeyInsert++;
+
+								fDraw(MAIN, FALSE, TRUE);
+							}
 						break;
 					case XK_Left:
 					case XK_KP_Left:
 						if(E.xkey.state & ShiftMask)
 							Play(A, G, ID_WEST, NULL);
+						else
+							if(A->L.Input.KeyInsert > 0)
+							{
+								A->L.Input.KeyInsert--;
+
+								fDraw(MAIN, FALSE, TRUE);
+							}
 						break;
 					case XK_Page_Up:
 					case XK_KP_Page_Up:
@@ -3620,14 +3670,26 @@ static void *uLoop(uARG *A)
 					case XK_Home:
 						if(E.xkey.state & ControlMask)
 							Play(A, G, ID_CTRLHOME, NULL);
-						else
+						else if(E.xkey.state & ShiftMask)
 							Play(A, G, ID_PGHOME, NULL);
+						else if(G == MAIN)
+						{
+							A->L.Input.KeyInsert=0;
+
+							fDraw(MAIN, FALSE, TRUE);
+						}
 						break;
 					case XK_End:
 						if(E.xkey.state & ControlMask)
 							Play(A, G, ID_CTRLEND, NULL);
-						else
+						else if(E.xkey.state & ShiftMask)
 							Play(A, G, ID_PGEND, NULL);
+						else if(G == MAIN)
+						{
+							A->L.Input.KeyInsert=A->L.Input.KeyLength;
+
+							fDraw(MAIN, FALSE, TRUE);
+						}
 						break;
 					case XK_KP_Add:
 						Play(A, G, ID_DECLOOP, NULL);
@@ -4255,7 +4317,7 @@ int main(int argc, char *argv[])
 				.TextCursor={	{.x=+0, .y=+0},
 						{.x=+4, .y=-4},
 						{.x=+4, .y=+4} },
-				.Input={.KeyBuffer=calloc(KEYINPUT_DEPTH, 1), .KeyLength=0, .Top=0},
+				.Input={.KeyBuffer=calloc(KEYINPUT_DEPTH, 1), .KeyLength=0, .KeyInsert=0, .Top=0},
 				.Output=NULL,
 			},
 			.LOOP=TRUE,

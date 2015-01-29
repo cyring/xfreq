@@ -309,7 +309,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"[Z][z]   Frequency Hz     [P][p]   C-States %\n"         \
 			"[R][r]   Ratio values     [T][t]   Task schedule\n\n"    \
 			"Command keys :\n"                                        \
-			"[Left]|[Right] Move cursor insertion (N/A)\n"            \
+			"[Left]|[Right]|[Home]|[End] Move cursor insertion\n"     \
 			"[Up]|[Down] Browse commands history\n"                   \
 			"[Backspace] Remove the rightmost character\n"            \
 			"[Erase] Suppress the full command line\n"                \
@@ -539,7 +539,7 @@ typedef struct
 	XPoint			TextCursor[3];
 	struct {
 		char		*KeyBuffer;
-		int		KeyLength, Recent, Browse, Top;
+		int		KeyLength, KeyInsert, Recent, Browse, Top;
 		struct {
 			char	*KeyBuffer;
 			int	KeyLength;
