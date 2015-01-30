@@ -178,6 +178,9 @@
  *
  * [HISTORY]
  *
+ * R 2.1.43-b: 01/30/2015
+ *         - Fixed history & command line expansion; keys mgnt; menu.
+ *
  * R 2.1.43-a: 01/29/2015
  *         - Keys management enhanced.
  *         - Fixed the Turbo Boost status.

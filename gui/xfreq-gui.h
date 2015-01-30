@@ -291,33 +291,35 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	GEOMETRY_FORMAT	"%dx%d%+d%+d,"
 #define	GEOMETRY_SIZE	strlen("640x360+5120+2880,")
 
-#define	MENU_FORMAT	"[F1]     Help             [F2]     Core\n"               \
-			"[F3]     C-States         [F4]     Temps \n"             \
-			"[F5]     System Info      [F6]     Dump\n\n"             \
-			"KPad [+] Faster Loop      KPad [-] Slower Loop\n"        \
-			"[Pause]  Suspend/Resume\n"                               \
-			"\nWith the [Shift] key :\n"                              \
-			"                                 [Up]\n"                 \
-			"  Page Scrolling          [Left]      [Right]\n"         \
-			"                                [Down]\n\n"              \
-			"[PgDw]   Page Down        [PgUp]   Page Up\n"            \
-			"[Home]   Line Begin       [End]    Line End\n"           \
-			"\nWith the [Control] key :\n"                            \
-			"[Home]   Page start       [End]    Page end\n"           \
-			"[L][l]   Refresh page     [Q][q]   Quit\n"               \
-			"[Y][y]   Cycles           [W][w]   Wallboard\n"          \
-			"[Z][z]   Frequency Hz     [P][p]   C-States %\n"         \
-			"[R][r]   Ratio values     [T][t]   Task schedule\n\n"    \
-			"Command keys :\n"                                        \
-			"[Left]|[Right]|[Home]|[End] Move cursor insertion\n"     \
-			"[Up]|[Down] Browse commands history\n"                   \
-			"[Backspace] Remove the rightmost character\n"            \
-			"[Erase] Suppress the full command line\n"                \
-			"[Enter] Submit the command\n"                            \
-			"[Tab]   Expand commands\n\n"                             \
-			"Mouse buttons :\n"                                       \
-			"[Left]  Activate Button   [Right] Grab & Move Widget\n"  \
-			"[Wheel Down] Page Down    [Wheel Up] Page Up\n"
+#define	MENU_FORMAT	"[F1]      Help             [F2]     Core\n"               \
+			"[F3]      C-States         [F4]     Temps \n"             \
+			"[F5]      System Info      [F6]     Dump\n"               \
+			"KeyPad[+] Faster Loop     KeyPad[-] Slower Loop\n"        \
+			"[Pause]   Suspend/Resume display\n"                       \
+			"\nWith the [Shift] key :\n"                               \
+			"                                  [Up]\n"                 \
+			"  Page Scrolling           [Left]      [Right]\n"         \
+			"                                 [Down]\n\n"              \
+			"[PgDw]   Page Down         [PgUp]   Page Up\n"            \
+			"[Home]   Line Begin        [End]    Line End\n"           \
+			"\nWith the [Control] key:\n"                              \
+			"[Home]   Page start        [End]    Page end\n"           \
+			"[L][l]   Refresh page      [Q][q]   Quit\n"               \
+			"[Y][y]   Cycles            [W][w]   Wallboard\n"          \
+			"[Z][z]   Frequency Hz      [P][p]   C-States %\n"         \
+			"[R][r]   Ratio values      [T][t]   Task schedule\n\n"    \
+			"Command keys:\n"                                          \
+			"[Left] | [Right] | [Home] | [End] Move the cursor insertion\n"  \
+			"[Up] | [Down]  Browse forward, backward the commands history\n" \
+			"KeyPad [Enter] Substitute command line using history index\n"   \
+			"[Backspace] Remove the character before the cursor\n"           \
+			"[Erase]     Remove the character after the cursor\n"            \
+			"[Escape]    Cancel the full command line\n"                     \
+			"[Enter]     Submit the command line\n"                          \
+			"[Tab]       Expand the command line\n\n"                        \
+			"Mouse buttons:\n"                                         \
+			"[Left]  Activate Button    [Right] Grab & Move Widget\n"  \
+			"[Wheel Down] Page Down     [Wheel Up] Page Up\n"
 
 #define	CORE_NUM	"#%-2d"
 #define	CORE_FREQ	"%4.0fMHz"
@@ -539,11 +541,11 @@ typedef struct
 	XPoint			TextCursor[3];
 	struct {
 		char		*KeyBuffer;
-		int		KeyLength, KeyInsert, Recent, Browse, Top;
+		int		KeyLength, KeyInsert, Recent, Browse, Top, Cmd;
 		struct {
 			char	*KeyBuffer;
 			int	KeyLength;
-		} History[HISTORY_DEPTH];
+		} History[HISTORY_DEPTH], Expand;
 	} Input;
 	char			*Output;
 	unsigned long int	globalBackground,
@@ -605,13 +607,13 @@ typedef	struct
 	{"clear", NULL, ClearMsg},			\
 	{"restart", NULL, Proc_Restart},		\
 	{"version", NULL, Proc_Release},		\
-	{"history", NULL, Proc_History},		\
+	{"history", "%d", Proc_History},		\
 	{"get color", "%d", Get_Color},			\
 	{"set color", "%d %x", Set_Color},		\
 	{"set font", "%s", Set_Font},			\
-	{"dump msr", "%x %hu %hhu", Svr_Dump_Msr},	\
-	{"read msr", "%x %hu", Svr_Read_Msr},		\
-	{"write msr", "%x %hu %llx", Svr_Write_Msr}	\
+	{"dump msr", "%x %hu %hhu", Svr_Dump_MSR},	\
+	{"read msr", "%x %hu", Svr_Read_MSR},		\
+	{"write msr", "%x %hu %llx", Svr_Write_MSR}	\
 }
 
 
@@ -654,18 +656,19 @@ typedef struct
 	char		xACL;
 } uARG;
 
-// Instructions set.
+/* Commands set.
 void	Proc_Menu(uARG *A);
 void	Proc_Help(uARG *A);
 void	Proc_Quit(uARG *A);
 void	Proc_Restart(uARG *A);
 void	Proc_Release(uARG *A);
+void	Proc_History(uARG *A);
 void	Get_Color(uARG *A, int cmd);
 void	Set_Color(uARG *A, int cmd);
 void	Set_Font(uARG *A, int cmd);
 void	Svr_Dump_Msr(uARG *A, int cmd);
 void	Svr_Read_Msr(uARG *A, int cmd);
-
+*/
 // Definition of the Buttons management functions (CallBack).
 Bool32	Button_State(uARG *A, WBUTTON *wButton);
 Bool32	SCHED_State(uARG *A, WBUTTON *wButton);
