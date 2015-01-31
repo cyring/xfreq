@@ -178,6 +178,13 @@
  *
  * [HISTORY]
  *
+ * R 2.1.43-c: 01/31/2015
+ *         - Added the serial # of the Motherboard in the SysInfo Widget.
+ *         - Fixed the GUI synchronism with data returned by server.
+ *         - The History substitution is now activated by the [F12] key.
+ *         - Enhanced the command line and its cursor.
+ *         - Reverted changes to the Turbo Boost status: bit 38: 1=disable , 0=enable
+ *
  * R 2.1.43-b: 01/30/2015
  *         - Fixed history & command line expansion; keys mgnt; menu.
  *

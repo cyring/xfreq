@@ -1317,6 +1317,9 @@ static void *uCycle(void *uApic)
 // Implementation of the callback functions.
 void	Play(uARG *A, XCHG_MAP *XChange)
 {
+#if defined(DEBUG)
+	if(XChange != NULL) printf(">Play(XID[%03hhd], Arg[%03hhd])\n", XChange->Map.ID, XChange->Map.Arg);
+#endif
 	switch(XChange->Map.ID)
 	{
 		case ID_NULL:
@@ -1349,6 +1352,7 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 					A->SHM->D.Array[XChange->Map.Arg].Addr=XChange->Map.Addr;
 					A->SHM->D.Array[XChange->Map.Arg].Core=XChange->Map.Core;
 				}
+				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
 			}
 			break;
@@ -1360,6 +1364,7 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 					Read_MSR(A->SHM->C[XChange->Map.Core].FD, XChange->Map.Addr, &data);
 				}
 				atomic_store(&A->SHM->Sync.Data, data);
+				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
 			}
 			break;
@@ -1370,6 +1375,7 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 					unsigned long long int data=atomic_load(&A->SHM->Sync.Data);
 					Write_MSR(A->SHM->C[XChange->Map.Core].FD, XChange->Map.Addr, &data);
 				}
+				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
 			}
 			break;
@@ -1380,6 +1386,7 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 					A->SHM->P.IdleTime++;
 					SelectBaseClock(A);
 				}
+				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
 			}
 			break;
@@ -1390,6 +1397,7 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 					A->SHM->P.IdleTime--;
 					SelectBaseClock(A);
 				}
+				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
 			}
 			break;
@@ -1407,12 +1415,14 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 					else
 						A->SHM->S.Monitor=FALSE;
 				}
+				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
 			}
 			break;
 		case ID_RESET:
 			{
 				A->SHM->P.Cold=0;
+				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
 			}
 			break;
@@ -1420,6 +1430,7 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 			{
 				A->SHM->P.ClockSrc=SRC_TSC;
 				SelectBaseClock(A);
+				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
 			}
 			break;
@@ -1427,6 +1438,7 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 			{
 				A->SHM->P.ClockSrc=SRC_BIOS;
 				SelectBaseClock(A);
+				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
 			}
 			break;
@@ -1434,6 +1446,7 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 			{
 				A->SHM->P.ClockSrc=SRC_SPEC;
 				SelectBaseClock(A);
+				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
 			}
 			break;
@@ -1441,10 +1454,14 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 			{
 				A->SHM->P.ClockSrc=SRC_ROM;
 				SelectBaseClock(A);
+				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
 			}
 			break;
 	}
+#if defined(DEBUG)
+	if(XChange != NULL) printf("<Play(XID[%03hhd], Arg[%03hhd])\n", XChange->Map.ID, XChange->Map.Arg);
+#endif
 }
 
 char	*FQN_Settings(const char *fName)

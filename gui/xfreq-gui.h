@@ -245,7 +245,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	Twice_Half_Char_Height(N)	(Twice_Char_Height(N) + Half_Char_Height(N))
 
 #define	Header_Height(N)		(One_Char_Height(N) + Quarter_Char_Height(N))
-#define	Footer_Height(N)		(One_Char_Height(N) + Quarter_Char_Height(N))
+#define	Footer_Height(N)		(One_Char_Height(N) + Half_Char_Height(N)/*Quarter_Char_Height(N)*/)
 
 #define	GEOMETRY_MAIN_COLS	84
 #define	GEOMETRY_MAIN_ROWS	36
@@ -311,9 +311,9 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"Command keys:\n"                                          \
 			"[Left] | [Right] | [Home] | [End] Move the cursor insertion\n"  \
 			"[Up] | [Down]  Browse forward, backward the commands history\n" \
-			"KeyPad [Enter] Substitute command line using history index\n"   \
+			"[F12] Substitute command line using the history index\n"        \
 			"[Backspace] Remove the character before the cursor\n"           \
-			"[Erase]     Remove the character after the cursor\n"            \
+			"[Erase]     Remove the character under the cursor\n"            \
 			"[Escape]    Cancel the full command line\n"                     \
 			"[Enter]     Submit the command line\n"                          \
 			"[Tab]       Expand the command line\n\n"                        \
@@ -427,7 +427,8 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	SMBIOS7_FORMAT	"        |- %s [%4lld]%s\n"
 #define	SMBIOS2_FORMAT	"    Board [%s]\n"									\
 			"        |- version %s\n"								\
-			"        |- manufactured by %s\n"
+			"        |- manufactured by %s\n"							\
+			"        |- serial [%s]\n"
 #define	SMBIOS0_FORMAT	"    BIOS  [%s]\n"									\
 			"        |- version %s\n"								\
 			"        |- released date %s\n"								\
@@ -522,7 +523,8 @@ typedef struct
 				flashCursor,
 				alwaysOnTop,
 				noDecorations,
-				skipTaskbar;
+				skipTaskbar,
+				cursorShape;
 	} Play;
 	struct {;
 		int		Scroll,
@@ -572,6 +574,7 @@ typedef struct
 #define	XDB_KEY_FOREGROUND	"Foreground"
 #define	XDB_KEY_CLOCK_SOURCE	"ClockSource"
 #define	XDB_KEY_ROM_ADDRESS	"ClockRomAddr"
+#define	XDB_KEY_CURSOR_SHAPE	"CursorShape"
 #define	XDB_KEY_PLAY_GRAPHICS	"FillGraphics"
 #define	XDB_KEY_PLAY_FREQ	"PlayFrequency"
 #define	XDB_KEY_PLAY_CYCLES	"PlayCycles"
@@ -580,7 +583,7 @@ typedef struct
 #define	XDB_KEY_PLAY_CSTATES	"PlayCStates"
 #define	XDB_KEY_PLAY_WALLBOARD	"PlayBrand"
 
-#define	OPTIONS_COUNT	18
+#define	OPTIONS_COUNT	19
 typedef struct
 {
 	char		*argument;
@@ -656,19 +659,6 @@ typedef struct
 	char		xACL;
 } uARG;
 
-/* Commands set.
-void	Proc_Menu(uARG *A);
-void	Proc_Help(uARG *A);
-void	Proc_Quit(uARG *A);
-void	Proc_Restart(uARG *A);
-void	Proc_Release(uARG *A);
-void	Proc_History(uARG *A);
-void	Get_Color(uARG *A, int cmd);
-void	Set_Color(uARG *A, int cmd);
-void	Set_Font(uARG *A, int cmd);
-void	Svr_Dump_Msr(uARG *A, int cmd);
-void	Svr_Read_Msr(uARG *A, int cmd);
-*/
 // Definition of the Buttons management functions (CallBack).
 Bool32	Button_State(uARG *A, WBUTTON *wButton);
 Bool32	SCHED_State(uARG *A, WBUTTON *wButton);

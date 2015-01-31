@@ -464,14 +464,6 @@ void	WidgetButtonPress(uARG *A, int G, XEvent *E)
 		}
 }
 
-// Draw the TextCursor shape.
-void	DrawCursor(uARG *A, int G, XPoint *Origin)
-{
-	A->L.TextCursor[0].x=Origin->x;
-	A->L.TextCursor[0].y=Origin->y;
-	XFillPolygon(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.TextCursor, 3, Nonconvex, CoordModePrevious);
-}
-
 // Draw the shape for a window icon.
 void	DrawIconWindow(Display *display, Drawable drawable, GC gc, XRectangle *rect, unsigned long int bg, unsigned long int fg)
 {
@@ -1099,7 +1091,7 @@ int	OpenWidgets(uARG *A)
 
 							CreateButton(	A, SCROLLING, ID_WEST, G,
 									A->W[G].width
-									- (MAX( 3*One_Char_Height(G)+Quarter_Char_Height(G),
+									- (MAX( 3 * One_Char_Height(G)+Quarter_Char_Height(G),
 										3 * One_Char_Width(G)+Quarter_Char_Width(G)) + 2),
 									A->W[G].height - (square + 2),
 									square,
@@ -2014,7 +2006,7 @@ void	BuildLayout(uARG *A, int G)
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawImageString(A->display, A->W[G].pixmap.B, A->W[G].gc,
 					A->W[G].width - (24 * One_Char_Width(G)),
-					A->W[G].height - Quarter_Char_Height(G),
+					A->W[G].height - Half_Char_Height(G),
 					str, strlen(str) );
 
 			if(A->L.Page[G].Pageable)
@@ -2077,7 +2069,7 @@ void	BuildLayout(uARG *A, int G)
 												enabled(A->SHM->P.MiscFeatures.PerfMonitoring),
 												enabled(!A->SHM->P.MiscFeatures.BTS),
 												enabled(A->SHM->P.MiscFeatures.CPUID_MaxVal),
-					powered(A->SHM->P.Features.Thermal_Power_Leaf.AX.TurboIDA),	enabled(A->SHM->P.MiscFeatures.Turbo_IDA),
+					powered(A->SHM->P.Features.Thermal_Power_Leaf.AX.TurboIDA),	enabled(!A->SHM->P.MiscFeatures.Turbo_IDA),
 
 					A->SHM->P.Boost[0], A->SHM->P.Boost[1], A->SHM->P.Boost[2], A->SHM->P.Boost[3], A->SHM->P.Boost[4], A->SHM->P.Boost[5], A->SHM->P.Boost[6], A->SHM->P.Boost[7], A->SHM->P.Boost[8], A->SHM->P.Boost[9],
 
@@ -2176,11 +2168,14 @@ void	BuildLayout(uARG *A, int G)
 							A->SHM->B->Cache[ix]->Attrib->Installed_Size, ix < 2 ? "     " : "");
 						strcat(items, str);
 					}
+					sprintf(str, "        |- manufactured by %s\n", Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Proc, A->SHM->B->Proc->Attrib->Manufacturer));
+					strcat(items, str);
 
 					sprintf(str, SMBIOS2_FORMAT,
 						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Product),
 						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Version),
-						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Manufacturer));
+						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Manufacturer),
+						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Serial));
 					strcat(items, str);
 
 					sprintf(str, SMBIOS0_FORMAT,
@@ -2295,6 +2290,23 @@ void	FlushLayout(uARG *A, int G)
 	XFlush(A->display);
 }
 
+// Draw the TextCursor shape.
+void	DrawCursor(uARG *A, int G, XPoint *Origin)
+{
+	// Flash the TextCursor.
+	A->L.Play.flashCursor=!A->L.Play.flashCursor;
+	XSetForeground(A->display, A->W[G].gc, A->L.Play.flashCursor ? A->L.Colors[COLOR_CURSOR].RGB : A->W[G].background);
+
+	if(A->L.Play.cursorShape == TRUE)
+		{
+		A->L.TextCursor[0].x=Origin->x;
+		A->L.TextCursor[0].y=Origin->y;
+		XFillPolygon(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.TextCursor, 3, Nonconvex, CoordModePrevious);
+		}
+	else
+		XDrawRectangle(A->display, A->W[G].pixmap.F, A->W[G].gc, Origin->x - 1, Origin->y - Footer_Height(G) + 1, One_Char_Width(G), Footer_Height(G) - 2);
+}
+
 // Draw the layout foreground.
 void	DrawLayout(uARG *A, int G)
 {
@@ -2302,26 +2314,37 @@ void	DrawLayout(uARG *A, int G)
 	{
 		case MAIN:
 		{
-			int edline=_IS_MDI_ ? A->L.Axes[G].Segment[1].y2 + Footer_Height(G) : A->W[G].height;
+			const int KeyStop=MAIN_TEXT_WIDTH - 8;
+			XPoint Origin=	{
+					.x=0,
+					.y=A->W[G].height - 1
+					};
+			if(A->L.Input.KeyInsert > KeyStop)
+				Origin.x=(KeyStop * One_Char_Width(G)) + Quarter_Char_Width(G);
+			else
+				Origin.x=(A->L.Input.KeyInsert * One_Char_Width(G)) + Quarter_Char_Width(G);
+
 			// Draw the buffer if it is not empty.
 			if(A->L.Input.KeyLength > 0)
 			{
 				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PROMPT].RGB);
-				XDrawImageString(A->display, A->W[G].pixmap.F, A->W[G].gc,
-						Quarter_Char_Width(G),
-						edline - Quarter_Char_Height(G),
-						A->L.Input.KeyBuffer, A->L.Input.KeyLength);
+
+				if(A->L.Input.KeyInsert > KeyStop)
+				{
+					const int KeyShift=A->L.Input.KeyInsert - KeyStop;
+
+					XDrawImageString(A->display, A->W[G].pixmap.F, A->W[G].gc,
+							Quarter_Char_Width(G),
+							A->W[G].height - Half_Char_Height(G),
+							&A->L.Input.KeyBuffer[KeyShift], KeyStop);
+				}
+				else
+					XDrawImageString(A->display, A->W[G].pixmap.F, A->W[G].gc,
+							Quarter_Char_Width(G),
+							A->W[G].height - Half_Char_Height(G),
+							&A->L.Input.KeyBuffer[0], MIN(A->L.Input.KeyLength, KeyStop));
 			}
-			// Flash the TextCursor.
-			A->L.Play.flashCursor=!A->L.Play.flashCursor;
-			XSetForeground(A->display, A->W[G].gc, A->L.Play.flashCursor ? A->L.Colors[COLOR_CURSOR].RGB : A->W[G].background);
-
-			XPoint Origin=	{
-					.x=(A->L.Input.KeyInsert * One_Char_Width(G)) + Quarter_Char_Width(G),
-					.y=edline - (Quarter_Char_Height(G) >> 1)
-					};
 			DrawCursor(A, G, &Origin);
-
 		}
 			break;
 		case CORES:
@@ -2826,6 +2849,9 @@ Bool32	Button_State(uARG *A, WBUTTON *wButton)
 
 void	Play(uARG *A, int G, char ID, XCHG_MAP *XChange)
 {
+#if defined(DEBUG)
+	printf(">Play(ID[%03hhd], XID[%03hhd])\n", ID, (XChange != NULL) ? XChange->Map.ID : ID_NULL);
+#endif
 	switch(ID)
 	{
 		case ID_NORTH:
@@ -3050,11 +3076,13 @@ void	Play(uARG *A, int G, char ID, XCHG_MAP *XChange)
 					XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID}};
 					atomic_store(&A->SHM->Sync.Play, XChange.Map64);
 				}
-
 				Sync_Signal(0, &A->SHM->Sync);
 			}
 			break;
 	}
+#if defined(DEBUG)
+	printf("<Play(XID[%03hhd])\n", (XChange != NULL) ? XChange->Map.ID : ID_NULL);
+#endif
 }
 
 char	*FQN_Settings(const char *fName)
@@ -3300,37 +3328,6 @@ void	Svr_Read_MSR(uARG *A, int cmd)
 				"Where: p1=address (Hex), p2=Core# (Int)\n");
 }
 
-void	Svr_Print_MSR(uARG *A)
-{
-	unsigned long long int decVal=atomic_load(&A->SHM->Sync.Data);
-
-	char hexStr[DUMP_HEX16_STR], binStr[DUMP_BIN64_STR],
-		fullStr[20 + 1 + 1 + DUMP_HEX16_STR + 7 + 1 + 1 + 1 + DUMP_BIN64_STR + 15 + 1 + 1];
-
-	DumpRegister(decVal, hexStr, binStr);
-
-	sprintf(fullStr, "%llu (", decVal);
-
-	int H=0;
-	for(H=0; H < 7; H++)
-	{
-		strncat(fullStr, &hexStr[H << 1], 2);
-		strcat(fullStr, " ");
-	}
-	strncat(fullStr, &hexStr[H << 1], 2);
-	strcat(fullStr, ")\n[");
-
-	for(H=0; H < 15; H++)
-	{
-		strncat(fullStr, &binStr[H << 2], 4);
-		strcat(fullStr, " ");
-	};
-	strncat(fullStr, &binStr[H << 2], 4);
-	strcat(fullStr, "]\n");
-
-	Output(A, fullStr);
-}
-
 void	Svr_Write_MSR(uARG *A, int cmd)
 {
 	XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_NULL}};
@@ -3400,6 +3397,72 @@ void	CallBackRestoreWidget(uARG *A, WBUTTON *wButton)
 	RestoreWidget(A, wButton->Target);
 }
 
+void	Server(uARG *A, int G, XCHG_MAP *XChange)
+{
+#if defined(DEBUG)
+	if(XChange != NULL) printf(">Server(XID[%03hhd], Arg[%03hhd])\n", XChange->Map.ID, XChange->Map.Arg);
+#endif
+	switch(XChange->Map.Arg)
+	{
+		case ID_DONE:
+			{
+				XChange->Map.Arg=ID_NULL;
+			}
+		break;
+		case ID_READMSR:
+			if(G == MAIN)
+			{
+				unsigned long long int decVal=atomic_load(&A->SHM->Sync.Data);
+
+				char hexStr[DUMP_HEX16_STR], binStr[DUMP_BIN64_STR],
+					fullStr[20 + 1 + 1 + DUMP_HEX16_STR + 7 + 1 + 1 + 1 + DUMP_BIN64_STR + 15 + 1 + 1];
+
+				DumpRegister(decVal, hexStr, binStr);
+				sprintf(fullStr, "%llu (", decVal);
+
+				int H=0;
+				for(H=0; H < 7; H++)
+				{
+					strncat(fullStr, &hexStr[H << 1], 2);
+					strcat(fullStr, " ");
+				}
+				strncat(fullStr, &hexStr[H << 1], 2);
+				strcat(fullStr, ")\n[");
+
+				for(H=0; H < 15; H++)
+				{
+					strncat(fullStr, &binStr[H << 2], 4);
+					strcat(fullStr, " ");
+				};
+				strncat(fullStr, &binStr[H << 2], 4);
+				strcat(fullStr, "]\n");
+
+				Output(A, fullStr);
+				fDraw(MAIN, TRUE, FALSE);
+			}
+		case ID_DUMPMSR:
+		case ID_WRITEMSR:
+		case ID_INCLOOP:
+		case ID_DECLOOP:
+		case ID_SCHED:
+		case ID_TSC:
+		case ID_BIOS:
+		case ID_SPEC:
+		case ID_ROM:
+			{
+				XChange->Map.Arg=ID_NULL;
+
+				int Z=0;
+				for(Z=MAIN; Z < WIDGETS; Z++)
+					XDefineCursor(A->display, A->W[Z].window, A->MouseCursor[MC_DEFAULT]);
+			}
+		break;
+	}
+#if defined(DEBUG)
+	if(XChange != NULL) printf("<Server(XID[%03hhd], Arg[%03hhd])\n", XChange->Map.ID, XChange->Map.Arg);
+#endif
+}
+
 // The far drawing procedure which paints the foreground.
 static void *uDraw(void *uArg)
 {
@@ -3420,14 +3483,9 @@ static void *uDraw(void *uArg)
 				if(!(A->L.UnMapBitmask & (1 << G)))
 					UpdateWidgetName(A, G);
 
-				if(XChange.Map.ID == ID_DONE)
-				{
-					if(G == MAIN)
-					{
-						Svr_Print_MSR(A);
-						fDraw(MAIN, TRUE, FALSE);
-					}
-					XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
+				if((XChange.Map.ID == ID_DONE) && (XChange.Map.Arg != ID_NULL)) {
+					Server(A, G, &XChange);
+					atomic_store(&A->SHM->Sync.Play, XChange.Map64);
 				}
 			}
 		}
@@ -3541,6 +3599,7 @@ static void *uLoop(uARG *A)
 						}
 						break;
 					case XK_Return:
+					case XK_KP_Enter:
 						if((G == MAIN) && (A->L.Input.KeyLength > 0))
 						{
 							A->L.Input.KeyBuffer[A->L.Input.KeyLength]='\0';
@@ -3563,7 +3622,7 @@ static void *uLoop(uARG *A)
 							fDraw(MAIN, TRUE, FALSE);
 						}
 						break;
-					case XK_KP_Enter:
+					case XK_F12:
 						if((G == MAIN) && (A->L.Input.KeyLength > 0))
 						{
 							long int idx=-1;
@@ -4359,6 +4418,7 @@ int main(int argc, char *argv[])
 					.alwaysOnTop=FALSE,
 					.noDecorations=FALSE,
 					.skipTaskbar=FALSE,
+					.cursorShape=FALSE
 				},
 				.WB={
 					.Scroll=0,
@@ -4386,6 +4446,7 @@ int main(int argc, char *argv[])
 				{"-D", "%d",  &A.MDI,                  "Run as a MDI Window (Bool) [0/1]",                                     NULL                                       },
 				{"-U", "%x",  &A.L.UnMapBitmask,       "Bitmap of unmap Widgets (Hex) eq. 0b00111111\n" \
 								       "\t\t  where each bit set in the argument is a hidden Widget",          NULL                                       },
+				{"-u", "%u",  &A.L.Play.cursorShape,   "Set the cursor shape (Bool) [0/1]",                                    XDB_CLASS_MAIN"."XDB_KEY_CURSOR_SHAPE      },
 				{"-F", "%s",  A.fontName,              "Font name (String)\n" \
 				                                       "\t\t  default font is 'Fixed'",                                        XDB_CLASS_MAIN"."XDB_KEY_FONT              },
 				{"-x", "%c",  &A.xACL,                 "Enable or disable the X ACL (Char) ['Y'/'N']",                         NULL                                       },
