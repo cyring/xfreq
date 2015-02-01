@@ -245,7 +245,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	Twice_Half_Char_Height(N)	(Twice_Char_Height(N) + Half_Char_Height(N))
 
 #define	Header_Height(N)		(One_Char_Height(N) + Quarter_Char_Height(N))
-#define	Footer_Height(N)		(One_Char_Height(N) + Half_Char_Height(N)/*Quarter_Char_Height(N)*/)
+#define	Footer_Height(N)		(One_Char_Height(N) + Half_Char_Height(N))
 
 #define	GEOMETRY_MAIN_COLS	84
 #define	GEOMETRY_MAIN_ROWS	36

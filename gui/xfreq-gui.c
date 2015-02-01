@@ -514,7 +514,7 @@ void	ScaleMDI(uARG *A)
 		G++ ;
 	}
 	A->W[MAIN].width=A->W[RightMost].x + A->W[RightMost].width + CHARACTER_WIDTH;
-	A->W[MAIN].height=A->W[BottomMost].y + A->W[BottomMost].height + Footer_Height(G) + CHARACTER_HEIGHT;
+	A->W[MAIN].height=A->W[BottomMost].y + A->W[BottomMost].height/* + Footer_Height(MAIN)*/ + CHARACTER_HEIGHT;
 	// Adjust the Header & Footer axes with the new width.
 	int i=0;
 	for(i=0; i < A->L.Axes[MAIN].N; i++)
@@ -2314,10 +2314,11 @@ void	DrawLayout(uARG *A, int G)
 	{
 		case MAIN:
 		{
+			int edline=_IS_MDI_ ? A->L.Axes[G].Segment[1].y2 + Footer_Height(G) : A->W[G].height;
 			const int KeyStop=MAIN_TEXT_WIDTH - 8;
 			XPoint Origin=	{
 					.x=0,
-					.y=A->W[G].height - 1
+					.y=edline - 1
 					};
 			if(A->L.Input.KeyInsert > KeyStop)
 				Origin.x=(KeyStop * One_Char_Width(G)) + Quarter_Char_Width(G);
@@ -2335,13 +2336,13 @@ void	DrawLayout(uARG *A, int G)
 
 					XDrawImageString(A->display, A->W[G].pixmap.F, A->W[G].gc,
 							Quarter_Char_Width(G),
-							A->W[G].height - Half_Char_Height(G),
+							edline - Half_Char_Height(G),
 							&A->L.Input.KeyBuffer[KeyShift], KeyStop);
 				}
 				else
 					XDrawImageString(A->display, A->W[G].pixmap.F, A->W[G].gc,
 							Quarter_Char_Width(G),
-							A->W[G].height - Half_Char_Height(G),
+							edline - Half_Char_Height(G),
 							&A->L.Input.KeyBuffer[0], MIN(A->L.Input.KeyLength, KeyStop));
 			}
 			DrawCursor(A, G, &Origin);
@@ -3052,10 +3053,10 @@ void	Play(uARG *A, int G, char ID, XCHG_MAP *XChange)
 				A->L.Play.wallboard=!A->L.Play.wallboard;
 			}
 			break;
-
 		case ID_DUMPMSR:
 		case ID_READMSR:
 		case ID_WRITEMSR:
+		case ID_REFRESH:
 		case ID_INCLOOP:
 		case ID_DECLOOP:
 		case ID_SCHED:
@@ -3440,6 +3441,8 @@ void	Server(uARG *A, int G, XCHG_MAP *XChange)
 				Output(A, fullStr);
 				fDraw(MAIN, TRUE, FALSE);
 			}
+		case ID_REFRESH:
+				fDraw(SYSINFO, FALSE, TRUE);
 		case ID_DUMPMSR:
 		case ID_WRITEMSR:
 		case ID_INCLOOP:
@@ -3672,7 +3675,12 @@ static void *uLoop(uARG *A)
 					case XK_L:
 						// Draw the Widget once.
 						if(E.xkey.state & ControlMask)
-							fDraw(G, FALSE, TRUE);
+						{
+							if(G == SYSINFO)
+								Play(A, G, ID_REFRESH, NULL);
+							else
+								fDraw(G, FALSE, TRUE);
+						}
 						break;
 					case XK_p:
 					case XK_P:

@@ -12,7 +12,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "43-c"
+#define _NIGHTLY "43-d"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #if defined(Linux)
@@ -792,6 +792,7 @@ typedef	struct
 #define	ID_SPEC		'a'
 #define	ID_ROM		'o'
 #define	ID_USER		'u'
+#define	ID_REFRESH	'h'
 #define	ID_INCLOOP	'<'
 #define	ID_DECLOOP	'>'
 #define	ID_DUMPMSR	'd'

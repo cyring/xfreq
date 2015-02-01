@@ -24,6 +24,7 @@
  * api/xfreq-api.h
  * api/xfreq-smbios.c
  * api/xfreq-smbios.h
+ * api/xfreq-types.h
  * cli/Makefile
  * cli/xfreq-cli.c
  * cli/xfreq-cli.h
@@ -81,6 +82,8 @@
  * +---------------------------+-----------+--------------------------------------+
  * | dmi-sysfs.ko              | optional  | DMI tables (2)                       |
  * +---------------------------+-----------+--------------------------------------+
+ * | acpi-cpufreq.ko           | optional  | ACPI Processor P-States Driver       |
+ * +---------------------------+-----------+--------------------------------------+
  * | /proc/sched_debug         | optional  | reference: kernel/sched/debug.c      |
  * +---------------------------+-----------+--------------------------------------+
  * | /proc/<pid>/*             | optional  | reference: linux/fs/proc/base.c      |
@@ -135,9 +138,6 @@
  * + power energy performance counters
  *
  * + kernel module : to reduce cpu usage near to 0.01% : In Progress.
- *     using mmap to transfer the complete RO data structure to userland : Done.
- *     compute the best idle sleep time.
- *     change from "pull" to "push" with a "data is ready" event : Done.
  *
  * + memory fetch : to remove dependancies with the dmi_sysfs & msr Linux modules.
  *     using a R/O mmap to "/dev/mem".
@@ -160,27 +160,27 @@
  * + some button-switchs & sliders to enable/disable/set the PKG/Core features in the System Info Widget.
  * + full transparency & opacity.
  * + integrate XCB, wayland ?
- * + gradiant coloring.
  * + screenshot key.
  * + resize footer separator w/ MDI.
  *
  *
  *  Source code
  * -------------
- * + clang compliant : rewrite code to remove any "warning: use of GNU old-style ..." : Done.
- * + provide some configure and install scripts, especially an ArchLinux PKGBUILD : Done.
- * + split the code between GUI and hardware parts : Done.
- * + release candidate : Done.
- * + The threads asynchronism is a mess, one needs to follow the guidelines : Done.
- *   defined in http://www.cs.kent.edu/~ruttan/sysprog/lectures/multi-thread/multi-thread.html
- *   --> Code changed to Atomic Variables
+ * + provide some configure and install scripts,
+ *     ArchLinux PKGBUILD : Done.
+ *     FreeBSD port: ToDo.
+ * + threads asynchronism changed to Atomic Variables
  *
  *
  * [HISTORY]
  *
+ * R 2.1.43-d: 02/01/2015
+ *         - Fixed the MDI.
+ *         - Refreshing the SysInfo Widget with [Ctrl]+[l] updates the msr in the Server.
+ *
  * R 2.1.43-c: 01/31/2015
  *         - Added the serial # of the Motherboard in the SysInfo Widget.
- *         - Fixed the GUI synchronism with data returned by server.
+ *         - Fixed the GUI synchronism with data returned by Server.
  *         - The History substitution is now activated by the [F12] key.
  *         - Enhanced the command line and its cursor.
  *         - Reverted changes to the Turbo Boost status: bit 38: 1=disable , 0=enable

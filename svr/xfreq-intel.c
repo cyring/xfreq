@@ -41,7 +41,31 @@
 static  char    Version[] = AutoDate;
 
 
-//	Initialize MSR based on Architecture. Open one MSR handle per Core.
+//	Initialize MSR.
+Bool32	Init_MSR(void *uArg)
+{
+	uARG *A=(uARG *) uArg;
+
+	ssize_t	retval=0;
+	int	tmpFD=open(CPU_BP, O_RDONLY);
+	Bool32	rc=TRUE;
+
+	if(tmpFD != -1)
+	{
+		rc=((retval=Read_MSR(tmpFD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &A->SHM->P.MiscFeatures)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_MTRR_DEF_TYPE,(MTRR_DEF_TYPE *) &A->SHM->P.MTRRdefType)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->SHM->P.Turbo)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
+		close(tmpFD);
+	}
+	else rc=FALSE;
+	return(rc);
+}
+
+//	Initialize MSR based on Architecture.
 Bool32	Init_MSR_GenuineIntel(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
@@ -249,6 +273,8 @@ Bool32	Init_MSR_Nehalem(void *uArg)
 		rc=((retval=Read_MSR(tmpFD, IA32_MTRR_DEF_TYPE,(MTRR_DEF_TYPE *) &A->SHM->P.MTRRdefType)) != -1);
 		rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1);
 		rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->SHM->P.Turbo)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
 		close(tmpFD);
 
@@ -1375,6 +1401,14 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 					unsigned long long int data=atomic_load(&A->SHM->Sync.Data);
 					Write_MSR(A->SHM->C[XChange->Map.Core].FD, XChange->Map.Addr, &data);
 				}
+				XChange->Map.Arg=XChange->Map.ID;
+				XChange->Map.ID=ID_DONE;
+			}
+			break;
+		case ID_REFRESH:
+			{
+				if(A->SHM->CPL.MSR == TRUE)
+					Init_MSR(A);
 				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
 			}
