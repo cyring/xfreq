@@ -514,7 +514,7 @@ void	ScaleMDI(uARG *A)
 		G++ ;
 	}
 	A->W[MAIN].width=A->W[RightMost].x + A->W[RightMost].width + CHARACTER_WIDTH;
-	A->W[MAIN].height=A->W[BottomMost].y + A->W[BottomMost].height/* + Footer_Height(MAIN)*/ + CHARACTER_HEIGHT;
+	A->W[MAIN].height=A->W[BottomMost].y + A->W[BottomMost].height + CHARACTER_HEIGHT;
 	// Adjust the Header & Footer axes with the new width.
 	int i=0;
 	for(i=0; i < A->L.Axes[MAIN].N; i++)
@@ -2048,7 +2048,7 @@ void	BuildLayout(uARG *A, int G)
 					powered(A->SHM->P.Features.Std.CX.DS_CPL),
 					powered(A->SHM->P.Features.Std.CX.VMX),
 					powered(A->SHM->P.Features.Std.CX.SMX),
-					powered(A->SHM->P.Features.Std.CX.EIST),		enabled(A->SHM->P.MiscFeatures.EIST),
+					enabled(A->SHM->P.Power.Control.C1E), powered(A->SHM->P.Features.Std.CX.EIST), enabled(A->SHM->P.MiscFeatures.EIST),
 					powered(A->SHM->P.Features.Std.CX.CNXT_ID),
 					powered(A->SHM->P.Features.Std.CX.FMA),
 					powered(A->SHM->P.Features.Std.CX.xTPR),		enabled(!A->SHM->P.MiscFeatures.xTPR),
@@ -2069,7 +2069,9 @@ void	BuildLayout(uARG *A, int G)
 												enabled(A->SHM->P.MiscFeatures.PerfMonitoring),
 												enabled(!A->SHM->P.MiscFeatures.BTS),
 												enabled(A->SHM->P.MiscFeatures.CPUID_MaxVal),
-					powered(A->SHM->P.Features.Thermal_Power_Leaf.AX.TurboIDA),	enabled(!A->SHM->P.MiscFeatures.Turbo_IDA),
+
+					powered(A->SHM->P.Features.Thermal_Power_Leaf.AX.TurboIDA),	(A->SHM->P.MiscFeatures.Turbo_IDA) ? "OFF"
+													: ((A->SHM->P.PerfControl.Turbo_IDA) ? "TMP" : "ON"),
 
 					A->SHM->P.Boost[0], A->SHM->P.Boost[1], A->SHM->P.Boost[2], A->SHM->P.Boost[3], A->SHM->P.Boost[4], A->SHM->P.Boost[5], A->SHM->P.Boost[6], A->SHM->P.Boost[7], A->SHM->P.Boost[8], A->SHM->P.Boost[9],
 
@@ -2314,7 +2316,7 @@ void	DrawLayout(uARG *A, int G)
 	{
 		case MAIN:
 		{
-			int edline=_IS_MDI_ ? A->L.Axes[G].Segment[1].y2 + Footer_Height(G) : A->W[G].height;
+			int edline=_IS_MDI_ ? A->L.Axes[G].Segment[1].y2 + Footer_Height(G) + 1 : A->W[G].height;
 			const int KeyStop=MAIN_TEXT_WIDTH - 8;
 			XPoint Origin=	{
 					.x=0,
@@ -3056,6 +3058,7 @@ void	Play(uARG *A, int G, char ID, XCHG_MAP *XChange)
 		case ID_DUMPMSR:
 		case ID_READMSR:
 		case ID_WRITEMSR:
+		case ID_CTLFEATURE:
 		case ID_REFRESH:
 		case ID_INCLOOP:
 		case ID_DECLOOP:
@@ -3345,6 +3348,63 @@ void	Svr_Write_MSR(uARG *A, int cmd)
 				"Where: p1=address (Hex), p2=Core# (Int), p3=value (Hex)\n");
 }
 
+unsigned long long int
+	Transcode_Feature(char *featureStr)
+{
+	if(strncmp(featureStr, "turbo", 5) == 0)
+		return(0b00000010);	// Turbo feature @ bit 1
+	else
+		return(0b00000000);
+}
+
+void	Svr_Engage_Feature(uARG *A, int cmd)
+{
+	XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_NULL}};
+	char *str=NULL;
+	Bool32 noerr=TRUE;
+
+	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &str) == 1) && (str != NULL))
+	{
+		XChange.Map.Arg=0b00000001;	// Engage
+
+		if((XChange.Map.Addr=Transcode_Feature(str)))
+			Play(A, MAIN, ID_CTLFEATURE, &XChange);
+		else
+			noerr=FALSE;
+		free(str);
+	}
+	else noerr=FALSE;
+
+	if(noerr != TRUE)
+		Output(A,	"Usage: engage p1\n"		\
+				"Where: p1=feature (String)\n"	\
+				"and  : feature={turbo}\n");
+}
+
+void	Svr_Diseng_Feature(uARG *A, int cmd)
+{
+	XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_NULL}};
+	char *str=NULL;
+	Bool32 noerr=TRUE;
+
+	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &str) == 1) && (str != NULL))
+	{
+		XChange.Map.Arg=0b10000000;	// Disengage
+
+		if((XChange.Map.Addr=Transcode_Feature(str)))
+			Play(A, MAIN, ID_CTLFEATURE, &XChange);
+		else
+			noerr=FALSE;
+		free(str);
+	}
+	else noerr=FALSE;
+
+	if(noerr != TRUE)
+		Output(A,	"Usage: disengage p1\n"	\
+				"Where: p1=feature (String)\n"	\
+				"and  : feature={turbo}\n");
+}
+
 // Process the commands language.
 Bool32	ExecCommand(uARG *A)
 {
@@ -3441,6 +3501,7 @@ void	Server(uARG *A, int G, XCHG_MAP *XChange)
 				Output(A, fullStr);
 				fDraw(MAIN, TRUE, FALSE);
 			}
+		case ID_CTLFEATURE:
 		case ID_REFRESH:
 				fDraw(SYSINFO, FALSE, TRUE);
 		case ID_DUMPMSR:

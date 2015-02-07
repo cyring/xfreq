@@ -56,8 +56,10 @@ Bool32	Init_MSR(void *uArg)
 		rc=((retval=Read_MSR(tmpFD, IA32_MTRR_DEF_TYPE,(MTRR_DEF_TYPE *) &A->SHM->P.MTRRdefType)) != -1);
 		rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1);
 		rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->SHM->P.Turbo)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_POWER_CTL, (POWER_CONTROL *) &A->SHM->P.Power.Control)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
 		close(tmpFD);
 	}
@@ -78,8 +80,10 @@ Bool32	Init_MSR_GenuineIntel(void *uArg)
 	{
 		rc=((retval=Read_MSR(tmpFD, IA32_MISC_ENABLE,  (MISC_PROC_FEATURES *) &A->SHM->P.MiscFeatures)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_MTRR_DEF_TYPE,(MTRR_DEF_TYPE *) &A->SHM->P.MTRRdefType)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_POWER_CTL,     (POWER_CONTROL *) &A->SHM->P.Power.Control)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
 		// MSR_PLATFORM_INFO may be available in this Intel Architecture ?
 		if((rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1)) == TRUE)
@@ -139,8 +143,10 @@ Bool32	Init_MSR_Core(void *uArg)
 	{
 		rc=((retval=Read_MSR(tmpFD, IA32_MISC_ENABLE,  (MISC_PROC_FEATURES *) &A->SHM->P.MiscFeatures)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_MTRR_DEF_TYPE,(MTRR_DEF_TYPE *) &A->SHM->P.MTRRdefType)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_POWER_CTL,     (POWER_CONTROL *) &A->SHM->P.Power.Control)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
 		// MSR_PLATFORM_INFO may be available with Core2 ?
 		if((rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1)) == TRUE)
@@ -273,8 +279,10 @@ Bool32	Init_MSR_Nehalem(void *uArg)
 		rc=((retval=Read_MSR(tmpFD, IA32_MTRR_DEF_TYPE,(MTRR_DEF_TYPE *) &A->SHM->P.MTRRdefType)) != -1);
 		rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1);
 		rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->SHM->P.Turbo)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_POWER_CTL,     (POWER_CONTROL *) &A->SHM->P.Power.Control)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
 		close(tmpFD);
 
@@ -1405,6 +1413,47 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 				XChange->Map.ID=ID_DONE;
 			}
 			break;
+		case ID_CTLFEATURE:
+		{
+			int cpu=0;
+			switch(XChange->Map.Arg)
+			{	// Engage
+				case 0b00000001:
+					switch(XChange->Map.Addr)
+					{	// Turbo
+						case 0b00000010:
+						{
+							PERF_CONTROL PerfControlMSR={0};
+							for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+							{
+								Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL, (PERF_CONTROL *) &PerfControlMSR);
+								PerfControlMSR.Turbo_IDA=0;
+								Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL, (PERF_CONTROL *) &PerfControlMSR);
+							}
+						}
+						break;
+					}
+				break;
+				// Disengage
+				case 0b10000000:
+					switch(XChange->Map.Addr)
+					{	// Turbo
+						case 0b00000010:
+						{
+							PERF_CONTROL PerfControlMSR={0};
+							for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+							{
+								Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL, (PERF_CONTROL *) &PerfControlMSR);
+								PerfControlMSR.Turbo_IDA=1;
+								Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL, (PERF_CONTROL *) &PerfControlMSR);
+							}
+						}
+						break;
+					}
+				break;
+			}
+		}
+			// No break
 		case ID_REFRESH:
 			{
 				if(A->SHM->CPL.MSR == TRUE)

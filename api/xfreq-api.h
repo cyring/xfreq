@@ -12,7 +12,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "43-d"
+#define _NIGHTLY "44"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #if defined(Linux)
@@ -260,6 +260,7 @@ typedef struct
 #define	IA32_MPERF			0xe7
 #define	IA32_APERF			0xe8
 #define	IA32_PERF_STATUS		0x198
+#define	IA32_PERF_CTL			0x199
 #define	IA32_CLOCK_MODULATION		0x19a
 #define	IA32_THERM_INTERRUPT		0x19b
 #define IA32_THERM_STATUS		0x19c
@@ -281,6 +282,7 @@ typedef struct
 #define	MSR_PLATFORM_INFO		0xce
 #define	MSR_TURBO_RATIO_LIMIT		0x1ad
 #define	MSR_TEMPERATURE_TARGET		0x1a2
+#define	MSR_POWER_CTL			0x1fc
 
 typedef	struct
 {
@@ -311,6 +313,15 @@ typedef	struct
 		NonInt_BusRatio	: 47-46,
 		ReservedBits4	: 64-47;
 } PERF_STATUS;
+
+typedef	struct
+{
+	unsigned long long int
+		EIST_Target	: 16-0,
+		ReservedBits1	: 32-16,
+		Turbo_IDA	: 33-32,
+		ReservedBits2	: 64-33;
+} PERF_CONTROL;
 
 typedef struct
 {
@@ -454,10 +465,6 @@ typedef	struct
 		ReservedBits3	: 64-12;
 } EXT_FEATURE;
 
-#define	LOW_TEMP_VALUE		35
-#define MED_TEMP_VALUE		45
-#define	HIGH_TEMP_VALUE		65
-
 typedef struct
 {
 	unsigned long long int
@@ -506,22 +513,38 @@ typedef struct
 		ReservedBits2	: 64-24;
 } TJMAX;
 
+typedef	struct
+{
+	unsigned long long int
+		ReservedBits1	:  1-0,
+		C1E		:  2-1,
+		ReservedBits2	: 64-2;
+} POWER_CONTROL;
+
+typedef	struct
+{
+	POWER_CONTROL	Control;
+} POWER;
+
 #define	IDLE_BASE_USEC	50000
 #define	IDLE_SCHED_DEF	19
 #define	IDLE_COEF_DEF	20
 #define	IDLE_COEF_MAX	80
 #define	IDLE_COEF_MIN	2
+
 typedef struct
 {
 	signed long int			ArchID;
 	FEATURES			Features;
 	PLATFORM_ID			PlatformId;
 	PERF_STATUS			PerfStatus;
+	PERF_CONTROL			PerfControl;
 	MISC_PROC_FEATURES		MiscFeatures;
 	MTRR_DEF_TYPE			MTRRdefType;
 	EXT_FEATURE			ExtFeature;
 	PLATFORM_INFO			PlatformInfo;
 	TURBO				Turbo;
+	POWER				Power;
 	off_t				BClockROMaddr;
 	double				ClockSpeed;
 	unsigned int			CPU,
@@ -798,6 +821,7 @@ typedef	struct
 #define	ID_DUMPMSR	'd'
 #define	ID_READMSR	'r'
 #define	ID_WRITEMSR	'w'
+#define	ID_CTLFEATURE	'g'
 
 #define	SIG_EMERGENCY_FMT	"\nShutdown(%02d)"
 #define	TASK_PID_FMT		"%5ld"

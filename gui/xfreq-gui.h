@@ -12,6 +12,10 @@
 #define	pthread_tryjoin_np(t, r) pthread_timedjoin_np(t, r, 0)
 #endif
 
+#define	LOW_TEMP_VALUE		35
+#define MED_TEMP_VALUE		45
+#define	HIGH_TEMP_VALUE		65
+
 enum {
 	BACKGROUND_MAIN,
 	FOREGROUND_MAIN,
@@ -329,7 +333,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CORE_RATIO	"%-3.1f"
 #define	CSTATES_PERCENT	"%6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%"
 #define	CSTATES_AVERAGE	"%6.2f      %6.2f      %6.2f      %6.2f"
-#define	CSTATES_FOOTER	"~      % TB        % C0        % C3        % C6"
+#define	CSTATES_FOOTER	"~      % Ta        % C0        % C3        % C6"
 #define	OVERCLOCK	"%s [%4.0f MHz]"
 #define	TEMPERATURE	"%3d"
 
@@ -343,6 +347,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"\n"											\
 			"Architecture [%s]\n"									\
 			"\n"											\
+			"Boot Processor features:\n"								\
 			"Virtual Mode Extension                                        VME [%c]\n"		\
 			"Debugging Extension                                            DE [%c]\n"		\
 			"Page Size Extension                                           PSE [%c]\n"		\
@@ -366,7 +371,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"CPL Qualified Debug Store                                  DS-CPL [%c]\n"		\
 			"Virtual Machine Extensions                                    VMX [%c]\n"		\
 			"Safer Mode Extensions                                         SMX [%c]\n"		\
-			"SpeedStep                                                    EIST [%c]   [%3s]\n"	\
+			"SpeedStep                              C1E [%3s]             EIST [%c]   [%3s]\n"	\
 			"L1 Data Cache Context ID                                  CNXT-ID [%c]\n"		\
 			"Fused Multiply Add                                            FMA [%c]\n"		\
 			"xTPR Update Control                                          xTPR [%c]   [%3s]\n"	\
@@ -594,7 +599,7 @@ typedef struct
 } OPTIONS;
 
 
-#define	COMMANDS_COUNT	13
+#define	COMMANDS_COUNT	15
 typedef	struct
 {
 	char	*Inst,
@@ -616,7 +621,9 @@ typedef	struct
 	{"set font", "%s", Set_Font},			\
 	{"dump msr", "%x %hu %hhu", Svr_Dump_MSR},	\
 	{"read msr", "%x %hu", Svr_Read_MSR},		\
-	{"write msr", "%x %hu %llx", Svr_Write_MSR}	\
+	{"write msr", "%x %hu %llx", Svr_Write_MSR},	\
+	{"engage", "%ms", Svr_Engage_Feature},		\
+	{"disengage", "%ms", Svr_Diseng_Feature}	\
 }
 
 
