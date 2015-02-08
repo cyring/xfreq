@@ -41,32 +41,6 @@
 static  char    Version[] = AutoDate;
 
 
-//	Initialize MSR.
-Bool32	Init_MSR(void *uArg)
-{
-	uARG *A=(uARG *) uArg;
-
-	ssize_t	retval=0;
-	int	tmpFD=open(CPU_BP, O_RDONLY);
-	Bool32	rc=TRUE;
-
-	if(tmpFD != -1)
-	{
-		rc=((retval=Read_MSR(tmpFD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &A->SHM->P.MiscFeatures)) != -1);
-		rc=((retval=Read_MSR(tmpFD, IA32_MTRR_DEF_TYPE,(MTRR_DEF_TYPE *) &A->SHM->P.MTRRdefType)) != -1);
-		rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1);
-		rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->SHM->P.Turbo)) != -1);
-		rc=((retval=Read_MSR(tmpFD, MSR_POWER_CTL, (POWER_CONTROL *) &A->SHM->P.Power.Control)) != -1);
-		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
-		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
-		rc=((retval=Read_MSR(tmpFD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
-		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
-		close(tmpFD);
-	}
-	else rc=FALSE;
-	return(rc);
-}
-
 //	Initialize MSR based on Architecture.
 Bool32	Init_MSR_GenuineIntel(void *uArg)
 {
@@ -432,6 +406,38 @@ Bool32	Close_MSR_Counters(void *uArg)
 				close(A->SHM->C[cpu].FD);
 		}
 	return(FALSE);
+}
+
+//	Refresh the SHM data structure from updated MSR registers.
+Bool32	Refresh_SHM(void *uArg)
+{
+	uARG *A=(uARG *) uArg;
+
+	ssize_t	retval=0;
+	int	cpu=0;
+	Bool32	rc=TRUE;
+
+	if(A->SHM->C[cpu].T.Offline != TRUE)
+	{
+		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &A->SHM->P.MiscFeatures)) != -1);
+		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_MTRR_DEF_TYPE,(MTRR_DEF_TYPE *) &A->SHM->P.MTRRdefType)) != -1);
+		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1);
+		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->SHM->P.Turbo)) != -1);
+		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, MSR_POWER_CTL, (POWER_CONTROL *) &A->SHM->P.Power.Control)) != -1);
+		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
+		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
+		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
+		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
+
+	}
+	for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+		if(A->SHM->C[cpu].T.Offline != TRUE)
+		{
+			rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
+			rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->SHM->C[cpu].FixedPerfCounter)) != -1);
+		}
+
+	return(rc);
 }
 
 // Read the Time Stamp Counter.
@@ -1417,11 +1423,11 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 		{
 			int cpu=0;
 			switch(XChange->Map.Arg)
-			{	// Engage
-				case 0b00000001:
+			{
+				case CTL_ENABLE:
 					switch(XChange->Map.Addr)
-					{	// Turbo
-						case 0b00000010:
+					{	// Engage Turbo
+						case CTL_TURBO:
 						{
 							PERF_CONTROL PerfControlMSR={0};
 							for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
@@ -1434,11 +1440,10 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 						break;
 					}
 				break;
-				// Disengage
-				case 0b10000000:
+				case CTL_DISABLE:
 					switch(XChange->Map.Addr)
-					{	// Turbo
-						case 0b00000010:
+					{	// Disengage Turbo
+						case CTL_TURBO:
 						{
 							PERF_CONTROL PerfControlMSR={0};
 							for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
@@ -1457,7 +1462,7 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 		case ID_REFRESH:
 			{
 				if(A->SHM->CPL.MSR == TRUE)
-					Init_MSR(A);
+					Refresh_SHM(A);
 				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
 			}

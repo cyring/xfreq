@@ -12,7 +12,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "44"
+#define _NIGHTLY "44-a"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #if defined(Linux)
@@ -822,6 +822,11 @@ typedef	struct
 #define	ID_READMSR	'r'
 #define	ID_WRITEMSR	'w'
 #define	ID_CTLFEATURE	'g'
+
+#define	CTL_NOP		0b00000000
+#define	CTL_ENABLE	0b00000001
+#define	CTL_DISABLE	0b10000000
+#define	CTL_TURBO	0b00000010
 
 #define	SIG_EMERGENCY_FMT	"\nShutdown(%02d)"
 #define	TASK_PID_FMT		"%5ld"

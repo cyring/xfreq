@@ -2071,7 +2071,7 @@ void	BuildLayout(uARG *A, int G)
 												enabled(A->SHM->P.MiscFeatures.CPUID_MaxVal),
 
 					powered(A->SHM->P.Features.Thermal_Power_Leaf.AX.TurboIDA),	(A->SHM->P.MiscFeatures.Turbo_IDA) ? "OFF"
-													: ((A->SHM->P.PerfControl.Turbo_IDA) ? "TMP" : "ON"),
+													: ((A->SHM->P.PerfControl.Turbo_IDA) ? "DIS" : "ON"),
 
 					A->SHM->P.Boost[0], A->SHM->P.Boost[1], A->SHM->P.Boost[2], A->SHM->P.Boost[3], A->SHM->P.Boost[4], A->SHM->P.Boost[5], A->SHM->P.Boost[6], A->SHM->P.Boost[7], A->SHM->P.Boost[8], A->SHM->P.Boost[9],
 
@@ -3349,15 +3349,15 @@ void	Svr_Write_MSR(uARG *A, int cmd)
 }
 
 unsigned long long int
-	Transcode_Feature(char *featureStr)
+	Help_Transcode_Feature(char *featureStr)
 {
 	if(strncmp(featureStr, "turbo", 5) == 0)
-		return(0b00000010);	// Turbo feature @ bit 1
+		return(CTL_TURBO);	// Turbo feature @ bit 1
 	else
-		return(0b00000000);
+		return(CTL_NOP);
 }
 
-void	Svr_Engage_Feature(uARG *A, int cmd)
+void	Svr_Enable_Feature(uARG *A, int cmd)
 {
 	XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_NULL}};
 	char *str=NULL;
@@ -3365,9 +3365,9 @@ void	Svr_Engage_Feature(uARG *A, int cmd)
 
 	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &str) == 1) && (str != NULL))
 	{
-		XChange.Map.Arg=0b00000001;	// Engage
+		XChange.Map.Arg=CTL_ENABLE;
 
-		if((XChange.Map.Addr=Transcode_Feature(str)))
+		if((XChange.Map.Addr=Help_Transcode_Feature(str)))
 			Play(A, MAIN, ID_CTLFEATURE, &XChange);
 		else
 			noerr=FALSE;
@@ -3376,12 +3376,12 @@ void	Svr_Engage_Feature(uARG *A, int cmd)
 	else noerr=FALSE;
 
 	if(noerr != TRUE)
-		Output(A,	"Usage: engage p1\n"		\
+		Output(A,	"Usage: enable p1\n"		\
 				"Where: p1=feature (String)\n"	\
 				"and  : feature={turbo}\n");
 }
 
-void	Svr_Diseng_Feature(uARG *A, int cmd)
+void	Svr_Disable_Feature(uARG *A, int cmd)
 {
 	XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_NULL}};
 	char *str=NULL;
@@ -3389,9 +3389,9 @@ void	Svr_Diseng_Feature(uARG *A, int cmd)
 
 	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &str) == 1) && (str != NULL))
 	{
-		XChange.Map.Arg=0b10000000;	// Disengage
+		XChange.Map.Arg=CTL_DISABLE;
 
-		if((XChange.Map.Addr=Transcode_Feature(str)))
+		if((XChange.Map.Addr=Help_Transcode_Feature(str)))
 			Play(A, MAIN, ID_CTLFEATURE, &XChange);
 		else
 			noerr=FALSE;
@@ -3400,7 +3400,7 @@ void	Svr_Diseng_Feature(uARG *A, int cmd)
 	else noerr=FALSE;
 
 	if(noerr != TRUE)
-		Output(A,	"Usage: disengage p1\n"	\
+		Output(A,	"Usage: disable p1\n"	\
 				"Where: p1=feature (String)\n"	\
 				"and  : feature={turbo}\n");
 }
