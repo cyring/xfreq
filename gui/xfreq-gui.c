@@ -449,17 +449,23 @@ void	WidgetButtonPress(uARG *A, int G, XEvent *E)
 		&& (x < wButton->x + xOffset + wButton->w)
 		&& (y < wButton->y + yOffset + wButton->h))
 		{
-			// Flash the buttons.
+			// Set the flashing color.
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PULSE].RGB);
+			// Draw the button through its callback function.
 			wButton->DrawFunc(A, wButton);
 			fDraw(G, FALSE, TRUE);
+			// Sleep to visualy flash the user.
 			usleep(WBUTTON_PULSE_US);
-			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
-			wButton->DrawFunc(A, wButton);
-			fDraw(G, FALSE, TRUE);
-
 			// Execute its callback.
 			wButton->CallBack(A, wButton);
+			// Set the color back to the button state.
+			if((wButton->WBState.Func != NULL) && (wButton->WBState.Func(A, wButton) == TRUE))
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_FOCUS].RGB);
+			else
+				XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+			// Draw the button again.
+			wButton->DrawFunc(A, wButton);
+			fDraw(G, FALSE, TRUE);
 			break;
 		}
 }
@@ -513,8 +519,8 @@ void	ScaleMDI(uARG *A)
 			BottomMost=G;
 		G++ ;
 	}
-	A->W[MAIN].width=A->W[RightMost].x + A->W[RightMost].width + CHARACTER_WIDTH;
-	A->W[MAIN].height=A->W[BottomMost].y + A->W[BottomMost].height + CHARACTER_HEIGHT;
+	A->W[MAIN].width=A->W[RightMost].x + A->W[RightMost].width + DEFAULT_FONT_CHAR_WIDTH;
+	A->W[MAIN].height=A->W[BottomMost].y + A->W[BottomMost].height + DEFAULT_FONT_CHAR_HEIGHT;
 	// Adjust the Header & Footer axes with the new width.
 	int i=0;
 	for(i=0; i < A->L.Axes[MAIN].N; i++)
@@ -926,7 +932,7 @@ void	GeometriesToLayout(uARG *A)
 int	OpenWidgets(uARG *A)
 {
 	int noerr=TRUE;
-	char *str=calloc(sizeof(HDSIZE), 1);
+	char *str=calloc(sizeof(DEFAULT_HEADER_STR), 1);
 
 	// Allocate memory for chart elements.
 	A->L.Usage.C0=calloc(A->SHM->P.CPU, sizeof(XRectangle));
@@ -1002,7 +1008,7 @@ int	OpenWidgets(uARG *A)
 						SetHFrame(G, GetHViewport(G) << MAIN_FRAME_VIEW_HSHIFT);
 						SetVFrame(G, GetVViewport(G) << MAIN_FRAME_VIEW_VSHIFT);
 
-						XTextExtents(	A->xfont, HDSIZE, MAIN_TEXT_WIDTH,
+						XTextExtents(	A->xfont, DEFAULT_HEADER_STR, MAIN_TEXT_WIDTH,
 								&A->W[G].extents.dir, &A->W[G].extents.ascent,
 								&A->W[G].extents.descent, &A->W[G].extents.overall);
 
@@ -1109,7 +1115,7 @@ int	OpenWidgets(uARG *A)
 						SetHFrame(G, GetHViewport(G));
 						SetVFrame(G, GetVViewport(G));
 
-						XTextExtents(	A->xfont, HDSIZE, CORES_TEXT_WIDTH << 1,
+						XTextExtents(	A->xfont, DEFAULT_HEADER_STR, CORES_TEXT_WIDTH << 1,
 								&A->W[G].extents.dir, &A->W[G].extents.ascent,
 								&A->W[G].extents.descent, &A->W[G].extents.overall);
 
@@ -1195,7 +1201,7 @@ int	OpenWidgets(uARG *A)
 						SetHFrame(G, GetHViewport(G));
 						SetVFrame(G, GetVViewport(G));
 
-						XTextExtents(	A->xfont, HDSIZE, CSTATES_TEXT_WIDTH,
+						XTextExtents(	A->xfont, DEFAULT_HEADER_STR, CSTATES_TEXT_WIDTH,
 								&A->W[G].extents.dir, &A->W[G].extents.ascent,
 								&A->W[G].extents.descent, &A->W[G].extents.overall);
 
@@ -1275,7 +1281,7 @@ int	OpenWidgets(uARG *A)
 						SetHFrame(G, GetHViewport(G));
 						SetVFrame(G, GetVViewport(G));
 
-						XTextExtents(	A->xfont, HDSIZE, TEMPS_TEXT_WIDTH,
+						XTextExtents(	A->xfont, DEFAULT_HEADER_STR, TEMPS_TEXT_WIDTH,
 								&A->W[G].extents.dir, &A->W[G].extents.ascent,
 								&A->W[G].extents.descent, &A->W[G].extents.overall);
 
@@ -1384,7 +1390,7 @@ int	OpenWidgets(uARG *A)
 						SetHFrame(G, GetHViewport(G) << SYSINFO_FRAME_VIEW_HSHIFT);
 						SetVFrame(G, GetVViewport(G) << SYSINFO_FRAME_VIEW_VSHIFT);
 
-						XTextExtents(	A->xfont, HDSIZE, SYSINFO_TEXT_WIDTH,
+						XTextExtents(	A->xfont, DEFAULT_HEADER_STR, SYSINFO_TEXT_WIDTH,
 								&A->W[G].extents.dir, &A->W[G].extents.ascent,
 								&A->W[G].extents.descent, &A->W[G].extents.overall);
 
@@ -1502,7 +1508,7 @@ int	OpenWidgets(uARG *A)
 						SetHFrame(G, GetHViewport(G) << DUMP_FRAME_VIEW_HSHIFT);
 						SetVFrame(G, GetVViewport(G) << DUMP_FRAME_VIEW_VSHIFT);
 
-						XTextExtents(	A->xfont, HDSIZE, DUMP_TEXT_WIDTH,
+						XTextExtents(	A->xfont, DEFAULT_HEADER_STR, DUMP_TEXT_WIDTH,
 								&A->W[G].extents.dir, &A->W[G].extents.ascent,
 								&A->W[G].extents.descent, &A->W[G].extents.overall);
 
@@ -3465,11 +3471,6 @@ void	Server(uARG *A, int G, XCHG_MAP *XChange)
 #endif
 	switch(XChange->Map.Arg)
 	{
-		case ID_DONE:
-			{
-				XChange->Map.Arg=ID_NULL;
-			}
-		break;
 		case ID_READMSR:
 			if(G == MAIN)
 			{
@@ -3499,13 +3500,21 @@ void	Server(uARG *A, int G, XCHG_MAP *XChange)
 				strcat(fullStr, "]\n");
 
 				Output(A, fullStr);
-				fDraw(MAIN, TRUE, FALSE);
+				fDraw(G, TRUE, FALSE);
 			}
+		// No break
+		case ID_WRITEMSR:
 		case ID_CTLFEATURE:
+			if(G == MAIN)
+			{
+				XDefineCursor(A->display, A->W[G].window, A->MouseCursor[MC_DEFAULT]);
+
+				XChange->Map.Arg=ID_NULL;
+			}
+			break;
 		case ID_REFRESH:
 				fDraw(SYSINFO, FALSE, TRUE);
 		case ID_DUMPMSR:
-		case ID_WRITEMSR:
 		case ID_INCLOOP:
 		case ID_DECLOOP:
 		case ID_SCHED:
@@ -3514,12 +3523,13 @@ void	Server(uARG *A, int G, XCHG_MAP *XChange)
 		case ID_SPEC:
 		case ID_ROM:
 			{
-				XChange->Map.Arg=ID_NULL;
-
-				int Z=0;
-				for(Z=MAIN; Z < WIDGETS; Z++)
-					XDefineCursor(A->display, A->W[Z].window, A->MouseCursor[MC_DEFAULT]);
+				int g=0;
+				for(g=MAIN; g < WIDGETS; g++)
+					XDefineCursor(A->display, A->W[g].window, A->MouseCursor[MC_DEFAULT]);
 			}
+		// No break
+		case ID_DONE:
+				XChange->Map.Arg=ID_NULL;
 		break;
 	}
 #if defined(DEBUG)
@@ -4223,16 +4233,16 @@ int main(int argc, char *argv[])
 				.gc=0,
 				.x=+0,
 				.y=+0,
-				.width=(GEOMETRY_MAIN_COLS * CHARACTER_WIDTH),
-				.height=((1 + GEOMETRY_MAIN_ROWS + 1) * CHARACTER_HEIGHT),
+				.width=(GEOMETRY_MAIN_COLS * DEFAULT_FONT_CHAR_WIDTH),
+				.height=((1 + GEOMETRY_MAIN_ROWS + 1) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
 				.extents={
 					.overall={0},
 					.dir=0,
-					.ascent=FONT_ASCENT,
-					.descent=FONT_DESCENT,
-					.charWidth=CHARACTER_WIDTH,
-					.charHeight=CHARACTER_HEIGHT,
+					.ascent=DEFAULT_FONT_ASCENT,
+					.descent=DEFAULT_FONT_DESCENT,
+					.charWidth=DEFAULT_FONT_CHAR_WIDTH,
+					.charHeight=DEFAULT_FONT_CHAR_HEIGHT,
 				},
 				.background=_BACKGROUND_MAIN,
 				.foreground=_FOREGROUND_MAIN,
@@ -4245,16 +4255,16 @@ int main(int argc, char *argv[])
 				.gc=0,
 				.x=+0,
 				.y=+230,
-				.width=(((GEOMETRY_CORES_COLS << 1) + 4 + 1) * CHARACTER_WIDTH),
-				.height=((2 + GEOMETRY_CORES_ROWS + 2) * CHARACTER_HEIGHT),
+				.width=(((GEOMETRY_CORES_COLS << 1) + 4 + 1) * DEFAULT_FONT_CHAR_WIDTH),
+				.height=((2 + GEOMETRY_CORES_ROWS + 2) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
 				.extents={
 					.overall={0},
 					.dir=0,
-					.ascent=FONT_ASCENT,
-					.descent=FONT_DESCENT,
-					.charWidth=CHARACTER_WIDTH,
-					.charHeight=CHARACTER_HEIGHT,
+					.ascent=DEFAULT_FONT_ASCENT,
+					.descent=DEFAULT_FONT_DESCENT,
+					.charWidth=DEFAULT_FONT_CHAR_WIDTH,
+					.charHeight=DEFAULT_FONT_CHAR_HEIGHT,
 				},
 				.background=_BACKGROUND_CORES,
 				.foreground=_FOREGROUND_CORES,
@@ -4267,16 +4277,16 @@ int main(int argc, char *argv[])
 				.gc=0,
 				.x=+300,
 				.y=+230,
-				.width=((((GEOMETRY_CSTATES_COLS * CSTATES_TEXT_SPACING) << 1) + 2) * CHARACTER_WIDTH),
-				.height=((2 + GEOMETRY_CSTATES_ROWS + 2) * CHARACTER_HEIGHT),
+				.width=((((GEOMETRY_CSTATES_COLS * CSTATES_TEXT_SPACING) << 1) + 2) * DEFAULT_FONT_CHAR_WIDTH),
+				.height=((2 + GEOMETRY_CSTATES_ROWS + 2) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
 				.extents={
 					.overall={0},
 					.dir=0,
-					.ascent=FONT_ASCENT,
-					.descent=FONT_DESCENT,
-					.charWidth=CHARACTER_WIDTH,
-					.charHeight=CHARACTER_HEIGHT,
+					.ascent=DEFAULT_FONT_ASCENT,
+					.descent=DEFAULT_FONT_DESCENT,
+					.charWidth=DEFAULT_FONT_CHAR_WIDTH,
+					.charHeight=DEFAULT_FONT_CHAR_HEIGHT,
 				},
 				.background=_BACKGROUND_CSTATES,
 				.foreground=_FOREGROUND_CSTATES,
@@ -4289,16 +4299,16 @@ int main(int argc, char *argv[])
 				.gc=0,
 				.x=+550,
 				.y=+230,
-				.width=((GEOMETRY_TEMPS_COLS + 6) * CHARACTER_WIDTH),
-				.height=((2 + GEOMETRY_TEMPS_ROWS + 2) * CHARACTER_HEIGHT),
+				.width=((GEOMETRY_TEMPS_COLS + 6) * DEFAULT_FONT_CHAR_WIDTH),
+				.height=((2 + GEOMETRY_TEMPS_ROWS + 2) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
 				.extents={
 					.overall={0},
 					.dir=0,
-					.ascent=FONT_ASCENT,
-					.descent=FONT_DESCENT,
-					.charWidth=CHARACTER_WIDTH,
-					.charHeight=CHARACTER_HEIGHT,
+					.ascent=DEFAULT_FONT_ASCENT,
+					.descent=DEFAULT_FONT_DESCENT,
+					.charWidth=DEFAULT_FONT_CHAR_WIDTH,
+					.charHeight=DEFAULT_FONT_CHAR_HEIGHT,
 				},
 				.background=_BACKGROUND_TEMPS,
 				.foreground=_FOREGROUND_TEMPS,
@@ -4311,16 +4321,16 @@ int main(int argc, char *argv[])
 				.gc=0,
 				.x=+0,
 				.y=+430,
-				.width=(GEOMETRY_SYSINFO_COLS * CHARACTER_WIDTH),
-				.height=((1 + GEOMETRY_SYSINFO_ROWS + 1) * CHARACTER_HEIGHT),
+				.width=(GEOMETRY_SYSINFO_COLS * DEFAULT_FONT_CHAR_WIDTH),
+				.height=((1 + GEOMETRY_SYSINFO_ROWS + 1) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
 				.extents={
 					.overall={0},
 					.dir=0,
-					.ascent=FONT_ASCENT,
-					.descent=FONT_DESCENT,
-					.charWidth=CHARACTER_WIDTH,
-					.charHeight=CHARACTER_HEIGHT,
+					.ascent=DEFAULT_FONT_ASCENT,
+					.descent=DEFAULT_FONT_DESCENT,
+					.charWidth=DEFAULT_FONT_CHAR_WIDTH,
+					.charHeight=DEFAULT_FONT_CHAR_HEIGHT,
 				},
 				.background=_BACKGROUND_SYSINFO,
 				.foreground=_FOREGROUND_SYSINFO,
@@ -4333,16 +4343,16 @@ int main(int argc, char *argv[])
 				.gc=0,
 				.x=+0,
 				.y=+730,
-				.width=(GEOMETRY_DUMP_COLS * CHARACTER_WIDTH),
-				.height=((1 + GEOMETRY_DUMP_ROWS + 1) * CHARACTER_HEIGHT),
+				.width=(GEOMETRY_DUMP_COLS * DEFAULT_FONT_CHAR_WIDTH),
+				.height=((1 + GEOMETRY_DUMP_ROWS + 1) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
 				.extents={
 					.overall={0},
 					.dir=0,
-					.ascent=FONT_ASCENT,
-					.descent=FONT_DESCENT,
-					.charWidth=CHARACTER_WIDTH,
-					.charHeight=CHARACTER_HEIGHT,
+					.ascent=DEFAULT_FONT_ASCENT,
+					.descent=DEFAULT_FONT_DESCENT,
+					.charWidth=DEFAULT_FONT_CHAR_WIDTH,
+					.charHeight=DEFAULT_FONT_CHAR_HEIGHT,
 				},
 				.background=_BACKGROUND_DUMP,
 				.foreground=_FOREGROUND_DUMP,
