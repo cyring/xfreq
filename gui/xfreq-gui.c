@@ -450,22 +450,25 @@ void	WidgetButtonPress(uARG *A, int G, XEvent *E)
 		&& (y < wButton->y + yOffset + wButton->h))
 		{
 			// Set the flashing color.
-			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PULSE].RGB);
+			XSetForeground(A->display, A->W[T].gc, A->L.Colors[COLOR_PULSE].RGB);
 			// Draw the button through its callback function.
 			wButton->DrawFunc(A, wButton);
-			fDraw(G, FALSE, TRUE);
+			fDraw(T, FALSE, TRUE);
 			// Sleep to visualy flash the user.
 			usleep(WBUTTON_PULSE_US);
 			// Execute its callback.
 			wButton->CallBack(A, wButton);
 			// Set the color back to the button state.
-			if((wButton->WBState.Func != NULL) && (wButton->WBState.Func(A, wButton) == TRUE))
-				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_FOCUS].RGB);
-			else
-				XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+			XSetForeground(A->display, A->W[T].gc, A->W[T].foreground);
+			if(wButton->WBState.Func != NULL)
+			{
+				if(wButton->WBState.Func(A, wButton) == TRUE)
+					XSetForeground(A->display, A->W[T].gc, A->L.Colors[COLOR_FOCUS].RGB);
+			}
 			// Draw the button again.
 			wButton->DrawFunc(A, wButton);
-			fDraw(G, FALSE, TRUE);
+			fDraw(T, FALSE, TRUE);
+
 			break;
 		}
 }
@@ -526,7 +529,8 @@ void	ScaleMDI(uARG *A)
 	for(i=0; i < A->L.Axes[MAIN].N; i++)
 		A->L.Axes[MAIN].Segment[i].x2=A->W[MAIN].width;
 	// Adjust scrolling width.
-	SetHViewport(MAIN, (A->W[MAIN].width / One_Char_Width(MAIN)) - 3);
+	A->L.Page[MAIN].Geometry.cols=A->W[MAIN].width / One_Char_Width(MAIN);
+	SetHViewport(MAIN, A->L.Page[MAIN].Geometry.cols - 3);
 	SetVFrame(MAIN, GetVViewport(MAIN) << MAIN_FRAME_VIEW_VSHIFT);
 }
 
@@ -916,15 +920,21 @@ void	GeometriesToLayout(uARG *A)
 		int G=0, n=0, c=0, r=0, x=0, y=0,
 			ws=(!_IS_MDI_ ? WidthOfScreen(A->screen)  : A->W[MAIN].width), hs=(!_IS_MDI_ ? HeightOfScreen(A->screen) : A->W[MAIN].height);
 
-		for(G=MAIN; (strlen(pGeometry) > 0) && (G < WIDGETS); G++, pGeometry+=n)
-		{
-			sscanf(pGeometry, GEOMETRY_PARSER, &c, &r, &x, &y, &n);
+		while(pGeometry != NULL)
+			if(strlen(pGeometry) > 0)
+			{
+				sscanf(pGeometry, GEOMETRY_PARSER, &G, &c, &r, &x, &y, &n);
 
-			A->L.Page[G].Geometry.cols=(c > 0) ? c : A->L.Page[G].Geometry.cols;
-			A->L.Page[G].Geometry.rows=(r > 0) ? r : A->L.Page[G].Geometry.rows;
-			A->W[G].x=(x < 0) ? ws + x : x;
-			A->W[G].y=(y < 0) ? hs + y : y;
-		}
+				if((G >= MAIN) && (G <= LAST_WIDGET))
+				{
+					A->L.Page[G].Geometry.cols=(c > 0) ? c : A->L.Page[G].Geometry.cols;
+					A->L.Page[G].Geometry.rows=(r > 0) ? r : A->L.Page[G].Geometry.rows;
+					A->W[G].x=(x < 0) ? ws + x : x;
+					A->W[G].y=(y < 0) ? hs + y : y;
+				}
+				pGeometry=(n > 0) ? pGeometry + n : NULL;
+			}
+			else	break;
 	}
 }
 
@@ -1428,6 +1438,8 @@ int	OpenWidgets(uARG *A)
 								NULL,
 								NULL);
 
+						if(A->L.Page[G].Pageable)
+						{
 						CreateButton(	A, SCROLLING, ID_NORTH, G,
 								A->W[G].width - square,
 								Header_Height(G) + 2,
@@ -1464,7 +1476,7 @@ int	OpenWidgets(uARG *A)
 								CallBackButton,
 								NULL,
 								NULL);
-
+						}
 						struct {
 							char		ID;
 							RESOURCE	RSC;
@@ -1546,6 +1558,8 @@ int	OpenWidgets(uARG *A)
 								NULL,
 								NULL);
 
+						if(A->L.Page[G].Pageable)
+						{
 						CreateButton(	A, SCROLLING, ID_NORTH, G,
 								A->W[G].width - square,
 								Header_Height(G) + 2,
@@ -1582,7 +1596,7 @@ int	OpenWidgets(uARG *A)
 								CallBackButton,
 								NULL,
 								NULL);
-
+						}
 						struct {
 							char		ID;
 							RESOURCE	RSC;
@@ -3286,7 +3300,7 @@ void	Get_Color(uARG *A, int cmd)
 	}
 	else
 		Output(A,	"Usage: get color p1\n"	\
-				"Where: p1=color index (Int)\n");
+				"Where: p1=index (Int)\n");
 }
 
 void	Set_Color(uARG *A, int cmd)
@@ -3300,7 +3314,7 @@ void	Set_Color(uARG *A, int cmd)
 	}
 	else
 		Output(A,	"Usage: set color p1 p2\n"	\
-				"Where: p1=RGB color (Hex), p2=color index (Int)\n");
+				"Where: p1=index (Int), p2=RGB (Hex)\n");
 }
 
 void	Set_Font(uARG *A, int cmd)
@@ -3354,13 +3368,16 @@ void	Svr_Write_MSR(uARG *A, int cmd)
 				"Where: p1=address (Hex), p2=Core# (Int), p3=value (Hex)\n");
 }
 
-unsigned long long int
-	Help_Transcode_Feature(char *featureStr)
+unsigned int Help_Transcode_Feature(char *pStr)
 {
-	if(strncmp(featureStr, "turbo", 5) == 0)
-		return(CTL_TURBO);	// Turbo feature @ bit 1
-	else
-		return(CTL_NOP);
+	CTL_FEATURES CtList[]=FEATURES_LIST, *pCtl=CtList;
+
+	while(pCtl->Inst != NULL)
+		if(!strncmp(pStr, pCtl->Inst, strlen(pCtl->Inst)))
+			break;
+		else
+			pCtl++;
+	return(pCtl->ID);
 }
 
 void	Svr_Enable_Feature(uARG *A, int cmd)
@@ -4091,7 +4108,7 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 					{
 						char geometry[GEOMETRY_SIZE + 1];
 
-						sprintf(geometry, GEOMETRY_FORMAT,
+						sprintf(geometry, GEOMETRY_FORMAT, G,
 								A->L.Page[G].Geometry.cols,
 								A->L.Page[G].Geometry.rows,
 								A->W[G].x,
@@ -4253,8 +4270,8 @@ int main(int argc, char *argv[])
 				.window=0,
 				.pixmap={.B=0, .F=0},
 				.gc=0,
-				.x=+0,
-				.y=+230,
+				.x=+DEFAULT_FONT_CHAR_WIDTH,
+				.y=+545,
 				.width=(((GEOMETRY_CORES_COLS << 1) + 4 + 1) * DEFAULT_FONT_CHAR_WIDTH),
 				.height=((2 + GEOMETRY_CORES_ROWS + 2) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
@@ -4275,8 +4292,8 @@ int main(int argc, char *argv[])
 				.window=0,
 				.pixmap={.B=0, .F=0},
 				.gc=0,
-				.x=+300,
-				.y=+230,
+				.x=+750,
+				.y=+545,
 				.width=((((GEOMETRY_CSTATES_COLS * CSTATES_TEXT_SPACING) << 1) + 2) * DEFAULT_FONT_CHAR_WIDTH),
 				.height=((2 + GEOMETRY_CSTATES_ROWS + 2) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
@@ -4297,8 +4314,8 @@ int main(int argc, char *argv[])
 				.window=0,
 				.pixmap={.B=0, .F=0},
 				.gc=0,
-				.x=+550,
-				.y=+230,
+				.x=+400,
+				.y=+545,
 				.width=((GEOMETRY_TEMPS_COLS + 6) * DEFAULT_FONT_CHAR_WIDTH),
 				.height=((2 + GEOMETRY_TEMPS_ROWS + 2) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
@@ -4319,8 +4336,8 @@ int main(int argc, char *argv[])
 				.window=0,
 				.pixmap={.B=0, .F=0},
 				.gc=0,
-				.x=+0,
-				.y=+430,
+				.x=+520,
+				.y=+30,
 				.width=(GEOMETRY_SYSINFO_COLS * DEFAULT_FONT_CHAR_WIDTH),
 				.height=((1 + GEOMETRY_SYSINFO_ROWS + 1) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
@@ -4341,8 +4358,8 @@ int main(int argc, char *argv[])
 				.window=0,
 				.pixmap={.B=0, .F=0},
 				.gc=0,
-				.x=+0,
-				.y=+730,
+				.x=DEFAULT_FONT_CHAR_WIDTH << 5,
+				.y=+755,
 				.width=(GEOMETRY_DUMP_COLS * DEFAULT_FONT_CHAR_WIDTH),
 				.height=((1 + GEOMETRY_DUMP_ROWS + 1) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
@@ -4530,7 +4547,7 @@ int main(int argc, char *argv[])
 				                                       "\t\t  default font is 'Fixed'",                                        XDB_CLASS_MAIN"."XDB_KEY_FONT              },
 				{"-x", "%c",  &A.xACL,                 "Enable or disable the X ACL (Char) ['Y'/'N']",                         NULL                                       },
 				{"-g", "%ms", &A.Geometries,           "Widgets geometries (String)\n" \
-				                                       "\t\t  argument is a series of '[cols]x[rows]+[x]+[y], .. ,'",          NULL                                       },
+				                                       "\t\t  argument is a series of '#:[cols]x[rows]+[x]+[y], .. ,'",        NULL                                       },
 				{"-b", "%x",  &A.L.globalBackground,   "Background color (Hex) {RGB}\n" \
 								       "\t\t  argument is coded with primary colors 0xRRGGBB",                 NULL                                       },
 				{"-f", "%x",  &A.L.globalForeground,   "Foreground color (Hex) {RGB}",                                         NULL                                       },
@@ -4546,7 +4563,7 @@ int main(int argc, char *argv[])
 				{"-i", "%hx", &A.Splash.attributes,    "Splash screen attributes 0x{H}{NNN} (Hex)\n" \
 				                                       "\t\t  where {H} bit:13 hides Splash and {NNN} (usec) defers start-up", NULL                                       },
 			},
-			.Commands=COMMAND_LIST
+			.Commands=COMMANDS_LIST
 		};
 	for(A.L.Input.Recent=HISTORY_DEPTH - 1; A.L.Input.Recent >= 0; A.L.Input.Recent--)
 	{

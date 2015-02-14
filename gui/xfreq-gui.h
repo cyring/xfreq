@@ -291,9 +291,9 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	DUMP_TEXT_WIDTH		MAX(GEOMETRY_DUMP_COLS, A->L.Page[DUMP].Geometry.cols)
 #define	DUMP_TEXT_HEIGHT	MAX(GEOMETRY_DUMP_ROWS, A->L.Page[DUMP].Geometry.rows)
 
-#define	GEOMETRY_PARSER	"%dx%d%d%d,%n"
-#define	GEOMETRY_FORMAT	"%dx%d%+d%+d,"
-#define	GEOMETRY_SIZE	strlen("640x360+5120+2880,")
+#define	GEOMETRY_PARSER	"%d:%dx%d%d%d,%n"
+#define	GEOMETRY_FORMAT	"%d:%dx%d%+d%+d,"
+#define	GEOMETRY_SIZE	strlen("0:640x360+5120+2880,")
 
 #define	MENU_FORMAT	"[F1]      Help             [F2]     Core\n"               \
 			"[F3]      C-States         [F4]     Temps \n"             \
@@ -444,7 +444,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 
 #define	SYSINFO_SECTION	"System Information"
 //                       ## 12345 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234]
-#define	DUMP_SECTION	"   Addr.     Register               60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0 Core"
+#define	DUMP_SECTION	"#  Addr.     Register               60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0 Core"
 #define	REG_HEXVAL	"%016llX"
 #define	REG_FORMAT_BOL	"%02d %05X %s%%%zdc["
 #define	REG_FORMAT_EOL	"] "CORE_NUM"\n"
@@ -607,7 +607,7 @@ typedef	struct
 	void	(*Proc)();
 } COMMANDS;
 
-#define	COMMAND_LIST					\
+#define	COMMANDS_LIST					\
 {							\
 	{"help", NULL, Proc_Help},			\
 	{"menu", NULL, Proc_Menu},			\
@@ -615,17 +615,28 @@ typedef	struct
 	{"clear", NULL, ClearMsg},			\
 	{"restart", NULL, Proc_Restart},		\
 	{"version", NULL, Proc_Release},		\
-	{"history", "%d", Proc_History},		\
-	{"get color", "%d", Get_Color},			\
-	{"set color", "%d %x", Set_Color},		\
-	{"set font", "%s", Set_Font},			\
-	{"dump msr", "%x %hu %hhu", Svr_Dump_MSR},	\
-	{"read msr", "%x %hu", Svr_Read_MSR},		\
-	{"write msr", "%x %hu %llx", Svr_Write_MSR},	\
-	{"enable", "%ms", Svr_Enable_Feature},		\
-	{"disable", "%ms", Svr_Disable_Feature}		\
+	{"history", NULL, Proc_History},		\
+	{"get color ", "%d", Get_Color},		\
+	{"set color ", "%d %x", Set_Color},		\
+	{"set font ", "%s", Set_Font},			\
+	{"dump msr ", "%x %hu %hhu", Svr_Dump_MSR},	\
+	{"read msr ", "%x %hu", Svr_Read_MSR},		\
+	{"write msr ", "%x %hu %llx", Svr_Write_MSR},	\
+	{"enable ", "%ms", Svr_Enable_Feature},		\
+	{"disable ", "%ms", Svr_Disable_Feature}	\
 }
 
+typedef	struct
+{
+	char		*Inst;
+	unsigned int	ID;
+} CTL_FEATURES;
+
+#define	FEATURES_LIST		\
+{				\
+	{"turbo", CTL_TURBO},	\
+	{NULL, CTL_NOP}		\
+}
 
 typedef struct
 {
