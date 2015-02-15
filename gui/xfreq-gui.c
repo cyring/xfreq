@@ -3368,9 +3368,9 @@ void	Svr_Write_MSR(uARG *A, int cmd)
 				"Where: p1=address (Hex), p2=Core# (Int), p3=value (Hex)\n");
 }
 
-unsigned int Help_Transcode_Feature(char *pStr)
+unsigned int Ctl_Feature_Transcode(char *pStr)
 {
-	CTL_FEATURES CtList[]=FEATURES_LIST, *pCtl=CtList;
+	CTL_FEATURES CtlList[]=FEATURES_LIST, *pCtl=CtlList;
 
 	while(pCtl->Inst != NULL)
 		if(!strncmp(pStr, pCtl->Inst, strlen(pCtl->Inst)))
@@ -3378,6 +3378,19 @@ unsigned int Help_Transcode_Feature(char *pStr)
 		else
 			pCtl++;
 	return(pCtl->ID);
+}
+
+void	Ctl_Feature_Help(char *items)
+{
+	CTL_FEATURES CtlList[]=FEATURES_LIST, *pCtl=CtlList;
+
+	while(pCtl->Inst != NULL)
+	{
+		strcat(items, " ");
+		strcat(items, pCtl->Inst);
+		strcat(items, " ");
+		pCtl++;
+	}
 }
 
 void	Svr_Enable_Feature(uARG *A, int cmd)
@@ -3390,7 +3403,7 @@ void	Svr_Enable_Feature(uARG *A, int cmd)
 	{
 		XChange.Map.Arg=CTL_ENABLE;
 
-		if((XChange.Map.Addr=Help_Transcode_Feature(str)))
+		if((XChange.Map.Addr=Ctl_Feature_Transcode(str)))
 			Play(A, MAIN, ID_CTLFEATURE, &XChange);
 		else
 			noerr=FALSE;
@@ -3399,9 +3412,16 @@ void	Svr_Enable_Feature(uARG *A, int cmd)
 	else noerr=FALSE;
 
 	if(noerr != TRUE)
-		Output(A,	"Usage: enable p1\n"		\
+	{
+		char *items=calloc(80,1);
+		strcpy(items,	"Usage: enable p1\n"		\
 				"Where: p1=feature (String)\n"	\
-				"and  : feature={turbo}\n");
+				"and  : feature={");
+		Ctl_Feature_Help(items);
+		strcat(items, "}\n");
+		Output(A, items);
+		free(items);
+	}
 }
 
 void	Svr_Disable_Feature(uARG *A, int cmd)
@@ -3414,7 +3434,7 @@ void	Svr_Disable_Feature(uARG *A, int cmd)
 	{
 		XChange.Map.Arg=CTL_DISABLE;
 
-		if((XChange.Map.Addr=Help_Transcode_Feature(str)))
+		if((XChange.Map.Addr=Ctl_Feature_Transcode(str)))
 			Play(A, MAIN, ID_CTLFEATURE, &XChange);
 		else
 			noerr=FALSE;
@@ -3423,9 +3443,16 @@ void	Svr_Disable_Feature(uARG *A, int cmd)
 	else noerr=FALSE;
 
 	if(noerr != TRUE)
-		Output(A,	"Usage: disable p1\n"	\
+	{
+		char *items=calloc(80,1);
+		strcpy(items,	"Usage: disable p1\n"	\
 				"Where: p1=feature (String)\n"	\
-				"and  : feature={turbo}\n");
+				"and  : feature={");
+		Ctl_Feature_Help(items);
+		strcat(items, "}\n");
+		Output(A, items);
+		free(items);
+	}
 }
 
 // Process the commands language.

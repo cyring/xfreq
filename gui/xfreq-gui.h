@@ -635,6 +635,9 @@ typedef	struct
 #define	FEATURES_LIST		\
 {				\
 	{"turbo", CTL_TURBO},	\
+	{"eist", CTL_EIST},	\
+	{"c1e", CTL_C1E},	\
+	{"tcc",	CTL_TCC},	\
 	{NULL, CTL_NOP}		\
 }
 

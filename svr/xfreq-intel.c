@@ -1426,33 +1426,95 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 			{
 				case CTL_ENABLE:
 					switch(XChange->Map.Addr)
-					{	// Engage Turbo
-						case CTL_TURBO:
-						{
-							PERF_CONTROL PerfControlMSR={0};
-							for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+					{
+						case CTL_TURBO:	// Package
+							if(A->SHM->P.Features.Thermal_Power_Leaf.AX.TurboIDA)
 							{
-								Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL, (PERF_CONTROL *) &PerfControlMSR);
-								PerfControlMSR.Turbo_IDA=0;
-								Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL, (PERF_CONTROL *) &PerfControlMSR);
+								PERF_CONTROL PerfControlMSR={0};
+								for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+								{
+									Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL, (PERF_CONTROL *) &PerfControlMSR);
+									PerfControlMSR.Turbo_IDA=0;	// Engage Turbo
+									Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL, (PERF_CONTROL *) &PerfControlMSR);
+								}
 							}
-						}
+						break;
+						case CTL_EIST:	// Package
+							if(A->SHM->P.Features.Std.CX.EIST)
+							{
+								MISC_PROC_FEATURES MiscFeaturesMSR={0};
+								Read_MSR(A->SHM->C[0].FD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &MiscFeaturesMSR);
+								MiscFeaturesMSR.EIST=1;
+								Write_MSR(A->SHM->C[0].FD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &MiscFeaturesMSR);
+							}
+						break;
+						case CTL_C1E:	// Core
+							if(A->SHM->P.Features.Std.CX.EIST)
+							{	// Package
+								POWER PowerMSR={{0}};
+								Read_MSR(A->SHM->C[0].FD, MSR_POWER_CTL, (POWER *) &PowerMSR);
+								PowerMSR.Control.C1E=1;
+								Write_MSR(A->SHM->C[0].FD, MSR_POWER_CTL, (POWER *) &PowerMSR);
+							}
+						break;
+						case CTL_TCC:	// Thread
+							if(A->SHM->P.MiscFeatures.TCC)
+							{
+								MISC_PROC_FEATURES MiscFeaturesMSR={0};
+								for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+								{
+									Read_MSR(A->SHM->C[cpu].FD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &MiscFeaturesMSR);
+									MiscFeaturesMSR.TCC=1;
+									Write_MSR(A->SHM->C[cpu].FD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &MiscFeaturesMSR);
+								}
+							}
 						break;
 					}
 				break;
 				case CTL_DISABLE:
 					switch(XChange->Map.Addr)
-					{	// Disengage Turbo
-						case CTL_TURBO:
-						{
-							PERF_CONTROL PerfControlMSR={0};
-							for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+					{
+						case CTL_TURBO:	// Package
+							if(A->SHM->P.Features.Thermal_Power_Leaf.AX.TurboIDA)
 							{
-								Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL, (PERF_CONTROL *) &PerfControlMSR);
-								PerfControlMSR.Turbo_IDA=1;
-								Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL, (PERF_CONTROL *) &PerfControlMSR);
+								PERF_CONTROL PerfControlMSR={0};
+								for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+								{
+									Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL, (PERF_CONTROL *) &PerfControlMSR);
+									PerfControlMSR.Turbo_IDA=1;	// Disengage Turbo
+									Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL, (PERF_CONTROL *) &PerfControlMSR);
+								}
 							}
-						}
+						break;
+						case CTL_EIST:	// Package
+							if(A->SHM->P.Features.Std.CX.EIST)
+							{
+								MISC_PROC_FEATURES MiscFeaturesMSR={0};
+								Read_MSR(A->SHM->C[0].FD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &MiscFeaturesMSR);
+								MiscFeaturesMSR.EIST=0;
+								Write_MSR(A->SHM->C[0].FD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &MiscFeaturesMSR);
+							}
+						break;
+						case CTL_C1E:	// Core
+							if(A->SHM->P.Features.Std.CX.EIST)
+							{	// Package
+								POWER PowerMSR={{0}};
+								Read_MSR(A->SHM->C[0].FD, MSR_POWER_CTL, (POWER *) &PowerMSR);
+								PowerMSR.Control.C1E=0;
+								Write_MSR(A->SHM->C[0].FD, MSR_POWER_CTL, (POWER *) &PowerMSR);
+							}
+						break;
+						case CTL_TCC:	// Thread
+							if(A->SHM->P.MiscFeatures.TCC)
+							{
+								MISC_PROC_FEATURES MiscFeaturesMSR={0};
+								for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+								{
+									Read_MSR(A->SHM->C[cpu].FD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &MiscFeaturesMSR);
+									MiscFeaturesMSR.TCC=0;
+									Write_MSR(A->SHM->C[cpu].FD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &MiscFeaturesMSR);
+								}
+							}
 						break;
 					}
 				break;
