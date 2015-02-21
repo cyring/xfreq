@@ -124,6 +124,7 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 #define	RSC_RATIO	"Ratio"
 #define	RSC_SCHED	"Task"
 #define	RSC_TSC		"TSC"
+#define	RSC_TSC_AUX	"AUX"
 #define	RSC_BIOS	"BIOS"
 #define	RSC_SPEC	"SPEC"
 #define	RSC_ROM		"ROM"
@@ -270,7 +271,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CORES_TEXT_WIDTH	MAX(A->SHM->P.Boost[9], A->L.Page[CORES].Geometry.cols)
 #define	CORES_TEXT_HEIGHT	(A->SHM->P.CPU)
 
-#define	CSTATES_TEXT_SPACING	4
+#define	CSTATES_TEXT_SPACING	5
 #define	CSTATES_TEXT_WIDTH	(MAX(A->SHM->P.CPU, A->L.Page[CSTATES].Geometry.cols) * CSTATES_TEXT_SPACING)
 #define	CSTATES_TEXT_HEIGHT	MAX(GEOMETRY_CSTATES_ROWS, A->L.Page[CSTATES].Geometry.rows)
 
@@ -328,12 +329,12 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CORE_NUM	"#%-2d"
 #define	CORE_FREQ	"%4.0fMHz"
 #define	CORE_CYCLES	"%016llu:%016llu"
-#define	CORE_DELTA	"%04llu:%04llu %04llu %04llu / %04llu"
+#define	CORE_DELTA	"%04llu:%04llu %04llu %04llu %04llu / %04llu"
 #define	CORE_TASK	"%s"
 #define	CORE_RATIO	"%-3.1f"
-#define	CSTATES_PERCENT	"%6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%"
-#define	CSTATES_AVERAGE	"%6.2f      %6.2f      %6.2f      %6.2f"
-#define	CSTATES_FOOTER	"~      % Ta        % C0        % C3        % C6"
+#define	CSTATES_PERCENT	"%6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%"
+#define	CSTATES_AVERAGE	"%6.2f      %6.2f      %6.2f      %6.2f      %6.2f"
+#define	CSTATES_FOOTER	"~      % Ta        % C0        % C1        % C3        % C6"
 #define	OVERCLOCK	"%s [%4.0f MHz]"
 #define	TEMPERATURE	"%3d"
 
@@ -398,12 +399,18 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"               %3d   %3d   %3d   %3d   %3d   %3d   %3d   %3d   %3d   %3d\n"		\
 			"\n"											\
 			"Instruction set:\n"									\
-			"FPU       [%c]           CX8 [%c]          SEP [%c]    CMOV [%c]        CLFSH [%c]\n"	\
-			"MMX       [%c]          FXSR [%c]          SSE [%c]    SSE2 [%c]         SSE3 [%c]\n"	\
-			"SSSE3     [%c]        SSE4.1 [%c]       SSE4.2 [%c]                 PCLMULDQ [%c]\n"	\
-			"MONITOR   [%c][%3s]     CX16 [%c]        MOVBE [%c]                   POPCNT [%c]\n"	\
-			"AES       [%c]      AVX/AVX2 [%c/%c]       F16C [%c]                   RDRAND [%c]\n"	\
-			"LAHF/SAHF [%c]       SYSCALL [%c][%3s]  RDTSCP [%c]    IA64 [%c]    BM1/BM2 [%c/%c]\n"	\
+			"FPU       [%c]           CX8 [%c]          SEP [%c]             CMOV [%c]\n"		\
+			"CLFSH     [%c]           MMX [%c]         FXSR [%c]              SSE [%c]\n"		\
+			"SSE2      [%c]          SSE3 [%c]        SSSE3 [%c]           SSE4.1 [%c]\n"		\
+			"SSE4.2    [%c]      PCLMULDQ [%c]      MONITOR [%c][%3s]        CX16 [%c]\n"		\
+			"MOVBE     [%c]        POPCNT [%c]          AES [%c]         AVX/AVX2 [%c/%c]\n"	\
+			"F16C      [%c]        RDRAND [%c]\n"							\
+			"\n"											\
+			"Extended Feature:\n"									\
+			"LAHF/SAHF [%c]        RDTSCP [%c]         IA64 [%c]          BM1/BM2 [%c/%c]\n"	\
+			"SYSCALL/SYSRET                                                SCE [%c]   [%3s]\n"	\
+			"IA32e mode active                                             LMA       [%3s]\n"	\
+			"XD-Bit enable                                                 NXE       [%3s]\n"	\
 			"\n"
 
 #define	TOPOLOGY_SECTION "Processor topology:                                       %-3ux CPU Online\n"		\
@@ -538,6 +545,7 @@ typedef struct
 	} WB;
 	struct {
 		XRectangle	*C0,
+				*C1,
 				*C3,
 				*C6;
 	} Usage;
@@ -684,6 +692,7 @@ typedef struct
 Bool32	Button_State(uARG *A, WBUTTON *wButton);
 Bool32	SCHED_State(uARG *A, WBUTTON *wButton);
 Bool32	TSC_State(uARG *A, WBUTTON *wButton);
+Bool32	TSC_AUX_State(uARG *A, WBUTTON *wButton);
 Bool32	BIOS_State(uARG *A, WBUTTON *wButton);
 Bool32	SPEC_State(uARG *A, WBUTTON *wButton);
 Bool32	ROM_State(uARG *A, WBUTTON *wButton);

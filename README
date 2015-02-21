@@ -174,6 +174,10 @@
  *
  * [HISTORY]
  *
+ * R 2.1.16: 02/21/2015
+ *         - Derive C1 state from others.
+ *         - 64-bit Aux TSC can be now selected as a source to estimate clock frequency.
+ *
  * R 2.1.45: 02/15/2015
  *         - Added new commands to "safely" enable, disable:
  *           EIST,

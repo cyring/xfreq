@@ -58,7 +58,7 @@ Bool32	Init_MSR_GenuineIntel(void *uArg)
 		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
-		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE_ENABLE *) &A->SHM->P.ExtFeature)) != -1);
 		// MSR_PLATFORM_INFO may be available in this Intel Architecture ?
 		if((rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1)) == TRUE)
 		{	//  Then, we get the Min & Max non Turbo Ratios which might inverted.
@@ -121,7 +121,7 @@ Bool32	Init_MSR_Core(void *uArg)
 		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
-		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE_ENABLE *) &A->SHM->P.ExtFeature)) != -1);
 		// MSR_PLATFORM_INFO may be available with Core2 ?
 		if((rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1)) == TRUE)
 		{
@@ -185,7 +185,7 @@ Bool32	Init_MSR_Core(void *uArg)
 				A->SHM->C[cpu].FixedPerfCounter.EN1_Usr=1;
 				A->SHM->C[cpu].FixedPerfCounter.EN2_Usr=1;
 				if(A->SHM->P.PerCore)
-				{
+				{	// Not available but keep it as a workarround.
 					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN1=1;
 					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN2=1;
 				}
@@ -257,7 +257,7 @@ Bool32	Init_MSR_Nehalem(void *uArg)
 		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
-		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
+		rc=((retval=Read_MSR(tmpFD, IA32_EFER,         (EXT_FEATURE_ENABLE *) &A->SHM->P.ExtFeature)) != -1);
 		close(tmpFD);
 
 		A->SHM->P.Boost[0]=A->SHM->P.PlatformInfo.MinimumRatio;
@@ -427,7 +427,7 @@ Bool32	Refresh_SHM(void *uArg)
 		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
 		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
 		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
-		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_EFER,         (EXT_FEATURE *) &A->SHM->P.ExtFeature)) != -1);
+		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_EFER,         (EXT_FEATURE_ENABLE *) &A->SHM->P.ExtFeature)) != -1);
 
 	}
 	for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
@@ -448,6 +448,19 @@ static __inline__ unsigned long long int RDTSC(void)
 	__asm__ volatile
 	(
 		"rdtsc"
+		:"=a" (Lo),
+		 "=d" (Hi)
+	);
+	return ((unsigned long long int) Lo) | (((unsigned long long int) Hi) << 32);
+}
+
+static __inline__ unsigned long long int RDTSCP(void)
+{
+	unsigned Hi, Lo;
+
+	__asm__ volatile
+	(
+		"rdtscp"
 		:"=a" (Lo),
 		 "=d" (Hi)
 	);
@@ -607,9 +620,9 @@ void	*uCycle_GenuineIntel(void *uA, int cpu, int T)
 	Read_MSR(A->SHM->C[cpu].FD, IA32_MPERF, (unsigned long long int *) &A->SHM->C[cpu].Cycles.C0[T].URC);
 	// TSC.
 	Read_MSR(A->SHM->C[cpu].FD, IA32_TIME_STAMP_COUNTER, (unsigned long long int *) &A->SHM->C[cpu].Cycles.TSC[T]);
-	// C-States.
-	// ToDo
-
+	// Derive C1
+	A->SHM->C[cpu].Cycles.C1[T]=(A->SHM->C[cpu].Cycles.TSC[T] > A->SHM->C[cpu].Cycles.C0[T].URC) ?
+					A->SHM->C[cpu].Cycles.TSC[T] - A->SHM->C[cpu].Cycles.C0[T].URC : 0;
 	return(NULL);
 }
 
@@ -622,9 +635,9 @@ void	*uCycle_Core(void *uA, int cpu, int T)
 	Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR2, (unsigned long long int *) &A->SHM->C[cpu].Cycles.C0[T].URC);
 	// TSC.
 	Read_MSR(A->SHM->C[cpu].FD, IA32_TIME_STAMP_COUNTER, (unsigned long long int *) &A->SHM->C[cpu].Cycles.TSC[T]);
-	// C-States.
-	// ToDo
-
+	// Derive C1
+	A->SHM->C[cpu].Cycles.C1[T]=(A->SHM->C[cpu].Cycles.TSC[T] > A->SHM->C[cpu].Cycles.C0[T].URC) ?
+					A->SHM->C[cpu].Cycles.TSC[T] - A->SHM->C[cpu].Cycles.C0[T].URC : 0;
 	return(NULL);
 }
 
@@ -648,6 +661,9 @@ void	*uCycle_Nehalem(void *uA, int cpu, int T)
 	// C-States.
 	Read_MSR(A->SHM->C[cpu].FD, MSR_CORE_C3_RESIDENCY, (unsigned long long int *) &A->SHM->C[cpu].Cycles.C3[T]);
 	Read_MSR(A->SHM->C[cpu].FD, MSR_CORE_C6_RESIDENCY, (unsigned long long int *) &A->SHM->C[cpu].Cycles.C6[T]);
+	// Derive C1
+	register unsigned long long int Cx=A->SHM->C[cpu].Cycles.C6[T] + A->SHM->C[cpu].Cycles.C3[T] + A->SHM->C[cpu].Cycles.C0[T].URC;
+	A->SHM->C[cpu].Cycles.C1[T]=(A->SHM->C[cpu].Cycles.TSC[T] > Cx) ?  A->SHM->C[cpu].Cycles.TSC[T] - Cx : 0;
 
 	return(NULL);
 }
@@ -690,6 +706,15 @@ double	Compute_ExtClock(int Coef)
 	TSC[0]=RDTSC();
 	usleep(IDLE_BASE_USEC * Coef);
 	TSC[1]=RDTSC();
+	return((double) (TSC[1] - TSC[0]) / (IDLE_BASE_USEC * Coef));
+}
+
+double	Compute64_ExtClock(int Coef)
+{
+	unsigned long long int TSC[2];
+	TSC[0]=RDTSCP();
+	usleep(IDLE_BASE_USEC * Coef);
+	TSC[1]=RDTSCP();
 	return((double) (TSC[1] - TSC[0]) / (IDLE_BASE_USEC * Coef));
 }
 
@@ -1084,6 +1109,12 @@ void	SelectBaseClock(uARG *A)
 				A->SHM->P.ClockSrc=SRC_TSC;
 				break;
 			}
+		case SRC_TSC_AUX:	// Base Clock = 64-bit TSC divided by the maximum ratio (without Turbo).
+			if(A->SHM->CPL.MSR && A->SHM->P.Features.InvariantTSC && A->SHM->P.Features.ExtFunc.DX.RDTSCP) {
+				A->SHM->P.ClockSpeed=Compute64_ExtClock(IDLE_COEF_DEF) / A->SHM->P.Boost[1];
+				A->SHM->P.ClockSrc=SRC_TSC_AUX;
+				break;
+			}
 		case SRC_BIOS:	// Read the Bus Clock Frequency in SmBIOS (DMI).
 			if(A->SHM->CPL.SMBIOS) {
 				A->SHM->P.ClockSpeed=A->SHM->B->Proc->Attrib->Clock;
@@ -1101,10 +1132,11 @@ void	SelectBaseClock(uARG *A)
 				A->SHM->P.ClockSrc=SRC_ROM;
 				break;
 			}
-		case SRC_USER: {	// Set the Base Clock from the first row in the architecture array.
-			A->SHM->P.ClockSpeed=A->Arch[0].ClockSpeed();
-			A->SHM->P.ClockSrc=SRC_USER;
-		}
+			else	// Set the Base Clock from the first row in the architecture array.
+			{
+				A->SHM->P.ClockSpeed=A->Arch[0].ClockSpeed();
+				A->SHM->P.ClockSrc=SRC_SPEC;
+			}
 		break;
 	}
 }
@@ -1324,6 +1356,10 @@ static void *uCycle(void *uApic)
 
 	A->SHM->C[cpu].Delta.TSC=	A->SHM->C[cpu].Cycles.TSC[1] - A->SHM->C[cpu].Cycles.TSC[0];
 
+	A->SHM->C[cpu].Delta.C1=	(A->SHM->C[cpu].Cycles.C1[0] > A->SHM->C[cpu].Cycles.C1[1]) ?
+					 A->SHM->C[cpu].Cycles.C1[0] - A->SHM->C[cpu].Cycles.C1[1]
+					:A->SHM->C[cpu].Cycles.C1[1] - A->SHM->C[cpu].Cycles.C1[0];
+
 	// Compute Turbo State per Cycles Delta. (Protect against a division by zero)
 	A->SHM->C[cpu].State.Turbo=(double) (A->SHM->C[cpu].Delta.C0.URC != 0) ?
 					(double) (A->SHM->C[cpu].Delta.C0.UCC) / (double) A->SHM->C[cpu].Delta.C0.URC
@@ -1332,6 +1368,7 @@ static void *uCycle(void *uApic)
 	A->SHM->C[cpu].State.C0=(double) (A->SHM->C[cpu].Delta.C0.URC) / (double) (A->SHM->C[cpu].Delta.TSC);
 	A->SHM->C[cpu].State.C3=(double) (A->SHM->C[cpu].Delta.C3)  / (double) (A->SHM->C[cpu].Delta.TSC);
 	A->SHM->C[cpu].State.C6=(double) (A->SHM->C[cpu].Delta.C6)  / (double) (A->SHM->C[cpu].Delta.TSC);
+	A->SHM->C[cpu].State.C1=(double) (A->SHM->C[cpu].Delta.C1)  / (double) (A->SHM->C[cpu].Delta.TSC);
 
 	A->SHM->C[cpu].RelativeRatio=A->SHM->C[cpu].State.Turbo * A->SHM->C[cpu].State.C0 * (double) A->SHM->P.Boost[1];
 
@@ -1346,6 +1383,7 @@ static void *uCycle(void *uApic)
 	// Save also the C-State Reference Cycles.
 	A->SHM->C[cpu].Cycles.C3[0]=A->SHM->C[cpu].Cycles.C3[1];
 	A->SHM->C[cpu].Cycles.C6[0]=A->SHM->C[cpu].Cycles.C6[1];
+	A->SHM->C[cpu].Cycles.C1[0]=A->SHM->C[cpu].Cycles.C1[1];
 
 	// Update the Digital Thermal Sensor.
 	if( (Read_MSR(A->SHM->C[cpu].FD, IA32_THERM_STATUS, (THERM_STATUS *) &A->SHM->C[cpu].ThermStat)) == -1)
@@ -1579,6 +1617,14 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 		case ID_TSC:
 			{
 				A->SHM->P.ClockSrc=SRC_TSC;
+				SelectBaseClock(A);
+				XChange->Map.Arg=XChange->Map.ID;
+				XChange->Map.ID=ID_DONE;
+			}
+			break;
+		case ID_TSC_AUX:
+			{
+				A->SHM->P.ClockSrc=SRC_TSC_AUX;
 				SelectBaseClock(A);
 				XChange->Map.Arg=XChange->Map.ID;
 				XChange->Map.ID=ID_DONE;
@@ -2027,7 +2073,7 @@ int main(int argc, char *argv[])
 							fJoinDumpThread=(pthread_create(&A.TID_Dump, NULL, uDump, &A) == 0);
 
 						// Reset C-States average and max Temperature.
-						A.SHM->P.Avg.Turbo=A.SHM->P.Avg.C0=A.SHM->P.Avg.C3=A.SHM->P.Avg.C6=0;
+						A.SHM->P.Avg.Turbo=A.SHM->P.Avg.C0=A.SHM->P.Avg.C3=A.SHM->P.Avg.C6=A.SHM->P.Avg.C1=0;
 						unsigned int maxFreq=0, maxTemp=A.SHM->C[0].TjMax.Target;
 
 						// Fire C-States threads.
@@ -2049,6 +2095,7 @@ int main(int argc, char *argv[])
 								A.SHM->P.Avg.C0+=A.SHM->C[cpu].State.C0;
 								A.SHM->P.Avg.C3+=A.SHM->C[cpu].State.C3;
 								A.SHM->P.Avg.C6+=A.SHM->C[cpu].State.C6;
+								A.SHM->P.Avg.C1+=A.SHM->C[cpu].State.C1;
 
 								// Index the Top CPU speed.
 								if(maxFreq < A.SHM->C[cpu].RelativeFreq)
@@ -2073,6 +2120,7 @@ int main(int argc, char *argv[])
 						A.SHM->P.Avg.C0/=A.SHM->P.OnLine;
 						A.SHM->P.Avg.C3/=A.SHM->P.OnLine;
 						A.SHM->P.Avg.C6/=A.SHM->P.OnLine;
+						A.SHM->P.Avg.C1/=A.SHM->P.OnLine;
 
 						if(fJoinDumpThread == TRUE)
 							A.SHM->D.Monitor=(pthread_join(A.TID_Dump, NULL) == 0);

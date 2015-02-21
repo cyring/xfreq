@@ -902,6 +902,7 @@ void	CloseWidgets(uARG *A)
 	}
 	free(A->L.WB.String);
 	free(A->L.Usage.C0);
+	free(A->L.Usage.C1);
 	free(A->L.Usage.C3);
 	free(A->L.Usage.C6);
 	free(A->L.Play.showTemp);
@@ -946,6 +947,7 @@ int	OpenWidgets(uARG *A)
 
 	// Allocate memory for chart elements.
 	A->L.Usage.C0=calloc(A->SHM->P.CPU, sizeof(XRectangle));
+	A->L.Usage.C1=calloc(A->SHM->P.CPU, sizeof(XRectangle));
 	A->L.Usage.C3=calloc(A->SHM->P.CPU, sizeof(XRectangle));
 	A->L.Usage.C6=calloc(A->SHM->P.CPU, sizeof(XRectangle));
 
@@ -1485,6 +1487,7 @@ int	OpenWidgets(uARG *A)
 								{.ID=ID_WALLBOARD, .RSC={.Text=RSC_WALLBOARD}, {Button_State, &A->L.Play.wallboard}},
 								{.ID=ID_INCLOOP,   .RSC={.Text=RSC_INCLOOP},   {NULL, NULL}},
 								{.ID=ID_TSC,       .RSC={.Text=RSC_TSC},       {TSC_State,  NULL}},
+								{.ID=ID_TSC_AUX,   .RSC={.Text=RSC_TSC_AUX},   {TSC_AUX_State,  NULL}},
 								{.ID=ID_BIOS,      .RSC={.Text=RSC_BIOS},      {BIOS_State, NULL}},
 								{.ID=ID_SPEC,      .RSC={.Text=RSC_SPEC},      {SPEC_State, NULL}},
 								{.ID=ID_ROM,       .RSC={.Text=RSC_ROM},       {ROM_State,  NULL}},
@@ -2034,7 +2037,7 @@ void	BuildLayout(uARG *A, int G)
 				char 		*items=calloc(8192, 1);
 				#define		powered(bit) ((bit == 1) ? 'Y' : 'N')
 				#define		enabled(bit) ((bit == 1) ? "ON" : "OFF")
-				const char	*ClockSrcStr[SRC_COUNT]={"TSC", "BIOS", "SPEC", "ROM", "USER"};
+				const char	*ClockSrcStr[SRC_COUNT]={"TSC", "BIOS", "SPEC", "ROM", "AUX"};
 
 				sprintf(items, PROC_FORMAT,
 					A->SHM->P.Features.BrandString,
@@ -2118,10 +2121,12 @@ void	BuildLayout(uARG *A, int G)
 					powered(A->SHM->P.Features.Std.CX.F16C),
 					powered(A->SHM->P.Features.Std.CX.RDRAND),
 					powered(A->SHM->P.Features.ExtFunc.CX.LAHFSAHF),
-					powered(A->SHM->P.Features.ExtFunc.DX.SYSCALL),		enabled(A->SHM->P.ExtFeature.SYSCALL),
 					powered(A->SHM->P.Features.ExtFunc.DX.RDTSCP),
 					powered(A->SHM->P.Features.ExtFunc.DX.IA64),
-					powered(A->SHM->P.Features.ExtFeature.BX.BMI1), powered(A->SHM->P.Features.ExtFeature.BX.BMI2));
+					powered(A->SHM->P.Features.ExtFeature.BX.BMI1), powered(A->SHM->P.Features.ExtFeature.BX.BMI2),
+					powered(A->SHM->P.Features.ExtFunc.DX.SYSCALL),		enabled(A->SHM->P.ExtFeature.SCE),
+					(A->SHM->P.ExtFeature.LMA) ? "ON" : "DIS",
+					(A->SHM->P.ExtFeature.NXE) ? "ON" : "DIS");
 
 				char *buf[2]={malloc(1024), malloc(1024)};
 				sprintf(buf[0], TOPOLOGY_SECTION, A->SHM->P.OnLine);
@@ -2430,12 +2435,14 @@ void	DrawLayout(uARG *A, int G)
 
 					if(A->L.Play.cycleValues)
 					{
+						useconds_t LoopTime=IDLE_BASE_USEC * A->SHM->P.IdleTime;
 						sprintf(str,	CORE_DELTA,
-								A->SHM->C[cpu].Delta.C0.UCC / (IDLE_BASE_USEC * A->SHM->P.IdleTime),
-								A->SHM->C[cpu].Delta.C0.URC / (IDLE_BASE_USEC * A->SHM->P.IdleTime),
-								A->SHM->C[cpu].Delta.C3 / (IDLE_BASE_USEC * A->SHM->P.IdleTime),
-								A->SHM->C[cpu].Delta.C6 / (IDLE_BASE_USEC * A->SHM->P.IdleTime),
-								A->SHM->C[cpu].Delta.TSC / (IDLE_BASE_USEC * A->SHM->P.IdleTime));
+								A->SHM->C[cpu].Delta.C0.UCC / LoopTime,
+								A->SHM->C[cpu].Delta.C0.URC / LoopTime,
+								A->SHM->C[cpu].Delta.C1 / LoopTime,
+								A->SHM->C[cpu].Delta.C3 / LoopTime,
+								A->SHM->C[cpu].Delta.C6 / LoopTime,
+								A->SHM->C[cpu].Delta.TSC / LoopTime);
 						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 								One_Char_Width(G) * 13,
@@ -2537,26 +2544,34 @@ void	DrawLayout(uARG *A, int G)
 					A->L.Usage.C0[cpu].x=Half_Char_Width(G) + ((cpu * CSTATES_TEXT_SPACING) * One_Half_Char_Width(G));
 					A->L.Usage.C0[cpu].y=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->SHM->C[cpu].State.C0);
-					A->L.Usage.C0[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 3;
+					A->L.Usage.C0[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 4;
 					A->L.Usage.C0[cpu].height=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->SHM->C[cpu].State.C0;
+					// Prepare the C1 chart.
+					A->L.Usage.C1[cpu].x=Half_Char_Width(G) + A->L.Usage.C0[cpu].x + A->L.Usage.C0[cpu].width;
+					A->L.Usage.C1[cpu].y=One_Char_Height(G)
+								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->SHM->C[cpu].State.C1);
+					A->L.Usage.C1[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 4;
+					A->L.Usage.C1[cpu].height=One_Char_Height(G)
+								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->SHM->C[cpu].State.C1;
 					// Prepare the C3 chart.
-					A->L.Usage.C3[cpu].x=Half_Char_Width(G) + A->L.Usage.C0[cpu].x + A->L.Usage.C0[cpu].width;
+					A->L.Usage.C3[cpu].x=Half_Char_Width(G) + A->L.Usage.C1[cpu].x + A->L.Usage.C1[cpu].width;
 					A->L.Usage.C3[cpu].y=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->SHM->C[cpu].State.C3);
-					A->L.Usage.C3[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 3;
+					A->L.Usage.C3[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 4;
 					A->L.Usage.C3[cpu].height=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->SHM->C[cpu].State.C3;
 					// Prepare the C6 chart.
 					A->L.Usage.C6[cpu].x=Half_Char_Width(G) + A->L.Usage.C3[cpu].x + A->L.Usage.C3[cpu].width;
 					A->L.Usage.C6[cpu].y=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->SHM->C[cpu].State.C6);
-					A->L.Usage.C6[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 3;
+					A->L.Usage.C6[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 4;
 					A->L.Usage.C6[cpu].height=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->SHM->C[cpu].State.C6;
 				}			// Display the C-State averages.
 			sprintf(str, CSTATES_AVERAGE,	100.f * A->SHM->P.Avg.Turbo,
 							100.f * A->SHM->P.Avg.C0,
+							100.f * A->SHM->P.Avg.C1,
 							100.f * A->SHM->P.Avg.C3,
 							100.f * A->SHM->P.Avg.C6);
 			XDrawString(A->display, A->W[G].pixmap.F, A->W[G].gc,
@@ -2568,8 +2583,9 @@ void	DrawLayout(uARG *A, int G)
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH1].RGB);
 			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C0, A->SHM->P.CPU);
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH2].RGB);
-			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C3, A->SHM->P.CPU);
+			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C1, A->SHM->P.CPU);
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH3].RGB);
+			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C3, A->SHM->P.CPU);
 			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C6, A->SHM->P.CPU);
 
 			if(A->L.Play.cStatePercent)
@@ -2586,6 +2602,7 @@ void	DrawLayout(uARG *A, int G)
 						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 						sprintf(str, CSTATES_PERCENT,	100.f * A->SHM->C[cpu].State.Turbo,
 										100.f * A->SHM->C[cpu].State.C0,
+										100.f * A->SHM->C[cpu].State.C1,
 										100.f * A->SHM->C[cpu].State.C3,
 										100.f * A->SHM->C[cpu].State.C6);
 
@@ -2816,7 +2833,7 @@ void	UpdateWidgetName(uARG *A, int G)
 		case CSTATES:
 			if(!_IS_MDI_)
 			{
-				sprintf(str, TITLE_CSTATES_FMT, 100 * A->SHM->P.Avg.C0, 100 * (A->SHM->P.Avg.C3 + A->SHM->P.Avg.C6));
+				sprintf(str, TITLE_CSTATES_FMT, 100 * A->SHM->P.Avg.C0, 100 * (A->SHM->P.Avg.C1 + A->SHM->P.Avg.C3 + A->SHM->P.Avg.C6));
 				SetWidgetName(A, G, str);
 			}
 			break;
@@ -2848,6 +2865,11 @@ Bool32	SCHED_State(uARG *A, WBUTTON *wButton)
 Bool32	TSC_State(uARG *A, WBUTTON *wButton)
 {
 	return(A->SHM->P.ClockSrc == SRC_TSC);
+}
+
+Bool32	TSC_AUX_State(uARG *A, WBUTTON *wButton)
+{
+	return(A->SHM->P.ClockSrc == SRC_TSC_AUX);
 }
 
 Bool32	BIOS_State(uARG *A, WBUTTON *wButton)
@@ -3084,6 +3106,7 @@ void	Play(uARG *A, int G, char ID, XCHG_MAP *XChange)
 		case ID_DECLOOP:
 		case ID_SCHED:
 		case ID_TSC:
+		case ID_TSC_AUX:
 		case ID_BIOS:
 		case ID_SPEC:
 		case ID_ROM:
@@ -3563,6 +3586,7 @@ void	Server(uARG *A, int G, XCHG_MAP *XChange)
 		case ID_DECLOOP:
 		case ID_SCHED:
 		case ID_TSC:
+		case ID_TSC_AUX:
 		case ID_BIOS:
 		case ID_SPEC:
 		case ID_ROM:

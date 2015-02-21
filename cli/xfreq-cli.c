@@ -48,7 +48,7 @@ void	Play(uARG *A, char ID)
 	}
 }
 
-static void *uRead(void *uArg)
+static void *uRead_Freq(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
 	pthread_setname_np(A->TID_Read, "xfreq-cli-read");
@@ -74,10 +74,48 @@ static void *uRead(void *uArg)
 						A->SHM->C[cpu].Task[1].comm, A->SHM->C[cpu].Task[1].pid);
 
 			printf(	"\nAverage C-states\n" \
-				"Turbo\t  C0\t  C3\t  C6\n" \
-				"%6.2f%%\t%6.2f%%\t%6.2f\t%6.2f%%\n",
+				"Turbo\t  C0\t  C1\t  C3\t  C6\n" \
+				"%6.2f%%\t%6.2f%%\t%6.2f%%\t%6.2f\t%6.2f%%\n",
 				100.f * A->SHM->P.Avg.Turbo,
 				100.f * A->SHM->P.Avg.C0,
+				100.f * A->SHM->P.Avg.C1,
+				100.f * A->SHM->P.Avg.C3,
+				100.f * A->SHM->P.Avg.C6);
+		}
+		else
+			Play(A, ID_QUIT);
+	return(NULL);
+}
+
+static void *uRead_Cycle(void *uArg)
+{
+	uARG *A=(uARG *) uArg;
+	pthread_setname_np(A->TID_Read, "xfreq-cli-read");
+
+	long int idleRemaining;
+	while(A->LOOP)
+		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + IDLE_COEF_DEF + IDLE_COEF_MIN)))
+		{
+			printf("\nCPU#         UCC : URC          C1           C3           C6           TSC\n");
+
+			int cpu=0;
+			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+				if(A->SHM->C[cpu].T.Offline != TRUE)
+					printf(	"%-3d %012lld : %012lld %012lld %012lld %012lld %012lld\n",
+						cpu,
+						A->SHM->C[cpu].Delta.C0.UCC,
+						A->SHM->C[cpu].Delta.C0.URC,
+						A->SHM->C[cpu].Delta.C1,
+						A->SHM->C[cpu].Delta.C3,
+						A->SHM->C[cpu].Delta.C6,
+						A->SHM->C[cpu].Delta.TSC);
+
+			printf(	"\nAverage C-states\n" \
+				"Turbo\t  C0\t  C1\t  C3\t  C6\n" \
+				"%6.2f%%\t%6.2f%%\t%6.2f%%\t%6.2f\t%6.2f%%\n",
+				100.f * A->SHM->P.Avg.Turbo,
+				100.f * A->SHM->P.Avg.C0,
+				100.f * A->SHM->P.Avg.C1,
 				100.f * A->SHM->P.Avg.C3,
 				100.f * A->SHM->P.Avg.C6);
 		}
@@ -280,7 +318,7 @@ int main(int argc, char *argv[])
 						A.SHM->B, \
 						&A.SHM->C);
 #endif
-			if(!pthread_create(&A.TID_Read, NULL, uRead, &A))
+			if(!pthread_create(&A.TID_Read, NULL, uRead_Freq, &A))
 			{
 				printf("\n%s Ready with [%s]\n\n", _APPNAME, A.SHM->AppName);
 

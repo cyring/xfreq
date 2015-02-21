@@ -12,7 +12,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "45"
+#define _NIGHTLY "46"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #if defined(Linux)
@@ -24,7 +24,7 @@
 #endif
 
 
-enum	{SRC_TSC, SRC_BIOS, SRC_SPEC, SRC_ROM, SRC_USER, SRC_COUNT};
+enum	{SRC_TSC, SRC_BIOS, SRC_SPEC, SRC_ROM, SRC_TSC_AUX, SRC_COUNT};
 
 typedef struct
 {
@@ -456,14 +456,14 @@ typedef	struct
 typedef	struct
 {
 	unsigned long long int
-		SYSCALL		:  1-0,
+		SCE		:  1-0,
 		ReservedBits1	:  8-1,
 		LME		:  9-8,
 		ReservedBits2	: 10-9,
 		LMA		: 11-10,
 		NXE		: 12-11,
 		ReservedBits3	: 64-12;
-} EXT_FEATURE;
+} EXT_FEATURE_ENABLE;
 
 typedef struct
 {
@@ -541,7 +541,7 @@ typedef struct
 	PERF_CONTROL			PerfControl;
 	MISC_PROC_FEATURES		MiscFeatures;
 	MTRR_DEF_TYPE			MTRRdefType;
-	EXT_FEATURE			ExtFeature;
+	EXT_FEATURE_ENABLE		ExtFeature;
 	PLATFORM_INFO			PlatformInfo;
 	TURBO				Turbo;
 	POWER				Power;
@@ -555,7 +555,8 @@ typedef struct
 		double			Turbo,
 					C0,
 					C3,
-					C6;
+					C6,
+					C1;
 	} Avg;
 	unsigned int			Top,
 					Hot,
@@ -718,7 +719,8 @@ typedef	struct {
 		unsigned long long int
 				C3[2],
 				C6[2],
-				TSC[2];
+				TSC[2],
+				C1[2];
 	} Cycles;
 	struct {
 		struct
@@ -730,13 +732,15 @@ typedef	struct {
 		unsigned long long int
 				C3,
 				C6,
-				TSC;
+				TSC,
+				C1;
 	} Delta;
 	struct {
 		double		Turbo,
 				C0,
 				C3,
-				C6;
+				C6,
+				C1;
 	} State;
 	double			RelativeRatio,
 				RelativeFreq;
@@ -814,7 +818,7 @@ typedef	struct
 #define	ID_BIOS		'b'
 #define	ID_SPEC		'a'
 #define	ID_ROM		'o'
-#define	ID_USER		'u'
+#define	ID_TSC_AUX	'u'
 #define	ID_REFRESH	'h'
 #define	ID_INCLOOP	'<'
 #define	ID_DECLOOP	'>'
