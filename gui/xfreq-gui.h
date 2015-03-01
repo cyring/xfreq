@@ -108,8 +108,11 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 #define	ID_STOP		'&'
 #define	ID_RESUME	'!'
 #define	ID_CHART	'c'
-#define	ID_FREQ		'z'
 #define	ID_CYCLE	'Y'
+#define	ID_IPS		'j'
+#define	ID_IPC		'J'
+#define	ID_CPI		'i'
+#define	ID_FREQ		'z'
 #define	ID_RATIO	'R'
 #define	ID_SCHED	'T'
 #define	ID_CSTATE	'P'
@@ -118,11 +121,14 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 
 #define	RSC_PAUSE	"Pause"
 #define	RSC_RESET	"Reset"
-#define	RSC_FREQ	"Freq"
+#define	RSC_FREQ	"Hz"
 #define	RSC_CYCLE	"Cycle"
-#define	RSC_CSTATE	"States"
+#define	RSC_IPS		"IPS"
+#define	RSC_IPC		"IPC"
+#define	RSC_CPI		"CPI"
 #define	RSC_RATIO	"Ratio"
 #define	RSC_SCHED	"Task"
+#define	RSC_CSTATE	"States"
 #define	RSC_TSC		"TSC"
 #define	RSC_TSC_AUX	"AUX"
 #define	RSC_BIOS	"BIOS"
@@ -329,12 +335,14 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CORE_NUM	"#%-2d"
 #define	CORE_FREQ	"%4.0fMHz"
 #define	CORE_CYCLES	"%016llu:%016llu"
-#define	CORE_DELTA	"%04llu:%04llu %04llu %04llu %04llu / %04llu"
+#define	CORE_IPS	"%5.2f"
+#define	CORE_DELTA	"%04llu %04llu:%04llu %04llu / %04llu"
+
 #define	CORE_TASK	"%s"
 #define	CORE_RATIO	"%-3.1f"
 #define	CSTATES_PERCENT	"%6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%"
 #define	CSTATES_AVERAGE	"%6.2f      %6.2f      %6.2f      %6.2f      %6.2f"
-#define	CSTATES_FOOTER	"~      % Ta        % C0        % C1        % C3        % C6"
+#define	CSTATES_FOOTER	"~      % TB        % C0        % C1        % C3        % C6"
 #define	OVERCLOCK	"%s [%4.0f MHz]"
 #define	TEMPERATURE	"%3d"
 
@@ -526,11 +534,14 @@ typedef struct
 	struct {
 		Bool32		fillGraphics,
 				freqHertz,
-				cycleValues,
-				ratioValues,
+				showCycles,
+				showIPS,
+				showIPC,
+				showCPI,
+				showRatios,
 				showSchedule,
 				cStatePercent,
-				*showTemp,
+				*showTemps,
 				wallboard,
 				flashCursor,
 				alwaysOnTop,
@@ -591,12 +602,15 @@ typedef struct
 #define	XDB_KEY_PLAY_GRAPHICS	"FillGraphics"
 #define	XDB_KEY_PLAY_FREQ	"PlayFrequency"
 #define	XDB_KEY_PLAY_CYCLES	"PlayCycles"
+#define	XDB_KEY_PLAY_IPS	"PlayIPS"
+#define	XDB_KEY_PLAY_IPC	"PlayIPC"
+#define	XDB_KEY_PLAY_CPI	"PlayCPI"
 #define	XDB_KEY_PLAY_RATIOS	"PlayRatios"
 #define	XDB_KEY_PLAY_SCHEDULE	"PlaySchedule"
 #define	XDB_KEY_PLAY_CSTATES	"PlayCStates"
 #define	XDB_KEY_PLAY_WALLBOARD	"PlayBrand"
 
-#define	OPTIONS_COUNT	19
+#define	OPTIONS_COUNT	22
 typedef struct
 {
 	char		*argument;
@@ -624,14 +638,14 @@ typedef	struct
 	{"restart", NULL, Proc_Restart},		\
 	{"version", NULL, Proc_Release},		\
 	{"history", NULL, Proc_History},		\
-	{"get color ", "%d", Get_Color},		\
-	{"set color ", "%d %x", Set_Color},		\
-	{"set font ", "%s", Set_Font},			\
-	{"dump msr ", "%x %hu %hhu", Svr_Dump_MSR},	\
-	{"read msr ", "%x %hu", Svr_Read_MSR},		\
-	{"write msr ", "%x %hu %llx", Svr_Write_MSR},	\
-	{"enable ", "%ms", Svr_Enable_Feature},		\
-	{"disable ", "%ms", Svr_Disable_Feature}	\
+	{"get color", "%d", Get_Color},			\
+	{"set color", "%d %x", Set_Color},		\
+	{"set font", "%s", Set_Font},			\
+	{"dump msr", "%x %hu %hhu", Svr_Dump_MSR},	\
+	{"read msr", "%x %hu", Svr_Read_MSR},		\
+	{"write msr", "%x %hu %llx", Svr_Write_MSR},	\
+	{"enable", "%ms", Svr_Enable_Feature},		\
+	{"disable", "%ms", Svr_Disable_Feature}		\
 }
 
 typedef	struct

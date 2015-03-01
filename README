@@ -174,7 +174,16 @@
  *
  * [HISTORY]
  *
- * R 2.1.16: 02/21/2015
+ * R 2.1.47: 03/01/2015
+ *         - Fixed few GUI issues and README file.
+ *         - New counters & ratios outputs are available in xfreq-cli.
+ *         - Added 3 performance ratios:
+ *           IPS (Instructions Per Second),
+ *           IPC (Instructions Per Cycle),
+ *           CPI (Cycles Per Instruction),
+ *         - Programmed the Instructions Retired counter. (Nehalem and above)
+ *
+ * R 2.1.46: 02/21/2015
  *         - Derive C1 state from others.
  *         - 64-bit Aux TSC can be now selected as a source to estimate clock frequency.
  *

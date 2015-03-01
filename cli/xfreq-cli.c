@@ -57,21 +57,19 @@ static void *uRead_Freq(void *uArg)
 	while(A->LOOP)
 		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + IDLE_COEF_DEF + IDLE_COEF_MIN)))
 		{
-			if(A->SHM->CPL.SMBIOS == TRUE)
-				printf("\nCPU# Freq. Ratio x [%lld] Temps\tTask scheduling\n", A->SHM->B->Proc->Attrib->Clock);
-			else
-				printf("\nCPU# Freq. Ratio x [%.0f] Temps\tTask scheduling\n", A->SHM->P.ClockSpeed);
+			printf("\nCPU#  F=Rx[%6.2f]  Temp   IPS   IPC   CPI\tTask scheduling\n", A->SHM->P.ClockSpeed);
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
 				if(A->SHM->C[cpu].T.Offline != TRUE)
-					printf(	"%3d %7.2f%6.2f %6.2f %3d\t%15s(%5ld) %15s(%5ld)\n",
+					printf(	"%3d  %7.2f %5.2f  %3d  %5.2f %5.2f %5.2f %15s(%5ld)\n",
 						cpu,
 						A->SHM->C[cpu].RelativeFreq,
 						A->SHM->C[cpu].RelativeRatio,
-						A->SHM->P.ClockSpeed,
 						A->SHM->C[cpu].TjMax.Target - A->SHM->C[cpu].ThermStat.DTS,
-						A->SHM->C[cpu].Task[0].comm, A->SHM->C[cpu].Task[0].pid,
-						A->SHM->C[cpu].Task[1].comm, A->SHM->C[cpu].Task[1].pid);
+						A->SHM->C[cpu].IPS,
+						A->SHM->C[cpu].IPC,
+						A->SHM->C[cpu].CPI,
+						A->SHM->C[cpu].Task[0].comm, A->SHM->C[cpu].Task[0].pid);
 
 			printf(	"\nAverage C-states\n" \
 				"Turbo\t  C0\t  C1\t  C3\t  C6\n" \
@@ -87,7 +85,7 @@ static void *uRead_Freq(void *uArg)
 	return(NULL);
 }
 
-static void *uRead_Cycle(void *uArg)
+static void *uRead_States(void *uArg)
 {
 	uARG *A=(uARG *) uArg;
 	pthread_setname_np(A->TID_Read, "xfreq-cli-read");
@@ -96,12 +94,12 @@ static void *uRead_Cycle(void *uArg)
 	while(A->LOOP)
 		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + IDLE_COEF_DEF + IDLE_COEF_MIN)))
 		{
-			printf("\nCPU#         UCC : URC          C1           C3           C6           TSC\n");
+			printf("\nCPU#                 UCC                  URC                   C1                   C3                   C6                  TSC\n");
 
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
 				if(A->SHM->C[cpu].T.Offline != TRUE)
-					printf(	"%-3d %012lld : %012lld %012lld %012lld %012lld %012lld\n",
+					printf(	"%-3d %20lld %20lld %20lld %20lld %20lld %20lld\n",
 						cpu,
 						A->SHM->C[cpu].Delta.C0.UCC,
 						A->SHM->C[cpu].Delta.C0.URC,
@@ -109,15 +107,32 @@ static void *uRead_Cycle(void *uArg)
 						A->SHM->C[cpu].Delta.C3,
 						A->SHM->C[cpu].Delta.C6,
 						A->SHM->C[cpu].Delta.TSC);
+		}
+		else
+			Play(A, ID_QUIT);
+	return(NULL);
+}
 
-			printf(	"\nAverage C-states\n" \
-				"Turbo\t  C0\t  C1\t  C3\t  C6\n" \
-				"%6.2f%%\t%6.2f%%\t%6.2f%%\t%6.2f\t%6.2f%%\n",
-				100.f * A->SHM->P.Avg.Turbo,
-				100.f * A->SHM->P.Avg.C0,
-				100.f * A->SHM->P.Avg.C1,
-				100.f * A->SHM->P.Avg.C3,
-				100.f * A->SHM->P.Avg.C6);
+static void *uRead_Inst(void *uArg)
+{
+	uARG *A=(uARG *) uArg;
+	pthread_setname_np(A->TID_Read, "xfreq-cli-read");
+
+	long int idleRemaining;
+	while(A->LOOP)
+		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + IDLE_COEF_DEF + IDLE_COEF_MIN)))
+		{
+			printf("\nCPU#                INST                  UCC                  URC                  TSC\n");
+
+			int cpu=0;
+			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+				if(A->SHM->C[cpu].T.Offline != TRUE)
+					printf(	"%-3d %20lld %20lld %20lld %20lld\n",
+						cpu,
+						A->SHM->C[cpu].Delta.INST,
+						A->SHM->C[cpu].Delta.C0.UCC,
+						A->SHM->C[cpu].Delta.C0.URC,
+						A->SHM->C[cpu].Delta.TSC);
 		}
 		else
 			Play(A, ID_QUIT);
@@ -247,20 +262,15 @@ int main(int argc, char *argv[])
 			.FD={.Shm=0, .SmBIOS=0}, .SHM=MAP_FAILED, .SmBIOS=MAP_FAILED,
 			.TID_SigHandler=0,
 			.TID_Read=0,
+			.iFunc=0,
+			.uFunc=uRead_Freq,
 			.LOOP=TRUE,
 			.Options=
 			{
-				{"-S", "%u", NULL,	"Clock source (Int)\n"							\
-							"\t\t  argument is one of the [0]TSC [1]BIOS [2]SPEC [3]ROM [4]USER"	},
-				{"-M", "%x", NULL,	"ROM address of the Base Clock (Hex)\n"					\
-							"\t\t  argument is the BCLK memory address to read from"		},
-				{"-s", "%u", NULL,	"Idle time multiplier (Int)\n"						\
-							"\t\t  argument is a coefficient multiplied by 50000 usec"		},
-				{"-t", "%x", NULL,	"Task scheduling monitoring sorted by 0x{R}0{N} (Hex)\n"		\
-							"\t\t  where {R} bit:8 is set to reverse sorting\n"			\
-							"\t\t  and {N} is one '/proc/sched_debug' field# from [0x1] to [0xb]"	},
-				{"-B", "%s", NULL,	"Print the SmBIOS tree (Bool) [0/1]"					},
-				{"-l", "%s", NULL,	"Log to a file (String)\n"						\
+				{"-f", "%u", &A.iFunc,	"Function thread (Int)\n"						\
+							"\t\t  argument is one of the [0]Freq [1]States [2]Inst"		},
+				{"-B", "%s", NULL,	"(n/a) Print the SmBIOS tree (Bool) [0/1]"					},
+				{"-l", "%s", NULL,	"(n/a) Log to a file (String)\n"						\
 							"\t\t  argument is the log file path"					},
 			}
 		};
@@ -271,6 +281,19 @@ int main(int argc, char *argv[])
 
 	if(ScanOptions(&A, argc, argv))
 	{
+		switch(A.iFunc)
+		{
+			case 2:
+				A.uFunc=uRead_Inst;
+			break;
+			case 1:
+				A.uFunc=uRead_States;
+			break;
+			case 0:
+			default:
+				A.uFunc=uRead_Freq;
+			break;
+		}
 		sigemptyset(&A.Signal);
 		sigaddset(&A.Signal, SIGINT);	// [CTRL] + [C]
 		sigaddset(&A.Signal, SIGQUIT);
@@ -318,7 +341,7 @@ int main(int argc, char *argv[])
 						A.SHM->B, \
 						&A.SHM->C);
 #endif
-			if(!pthread_create(&A.TID_Read, NULL, uRead_Freq, &A))
+			if(!pthread_create(&A.TID_Read, NULL, A.uFunc, &A))
 			{
 				printf("\n%s Ready with [%s]\n\n", _APPNAME, A.SHM->AppName);
 

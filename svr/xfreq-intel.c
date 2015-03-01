@@ -297,6 +297,7 @@ Bool32	Init_MSR_Nehalem(void *uArg)
 					tracerr(warning);
 				}
 #endif
+				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR0=1;
 				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1=1;
 				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR2=1;
 				rc=((retval=Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
@@ -304,16 +305,20 @@ Bool32	Init_MSR_Nehalem(void *uArg)
 				// - Set the fixed counter bits
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->SHM->C[cpu].FixedPerfCounter)) != -1);
 				A->SaveArea[cpu].FixedPerfCounter=A->SHM->C[cpu].FixedPerfCounter;
+				A->SHM->C[cpu].FixedPerfCounter.EN0_OS=1;
 				A->SHM->C[cpu].FixedPerfCounter.EN1_OS=1;
 				A->SHM->C[cpu].FixedPerfCounter.EN2_OS=1;
+				A->SHM->C[cpu].FixedPerfCounter.EN0_Usr=1;
 				A->SHM->C[cpu].FixedPerfCounter.EN1_Usr=1;
 				A->SHM->C[cpu].FixedPerfCounter.EN2_Usr=1;
 				if(A->SHM->P.PerCore)
 				{
+					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN0=1;
 					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN1=1;
 					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN2=1;
 				}
 				else {
+					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN0=0;
 					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN1=0;
 					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN2=0;
 				}
@@ -323,6 +328,12 @@ Bool32	Init_MSR_Nehalem(void *uArg)
 				GLOBAL_PERF_STATUS Overflow={0};
 				GLOBAL_PERF_OVF_CTRL OvfControl={0};
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_STATUS, (GLOBAL_PERF_STATUS *) &Overflow)) != -1);
+				if(Overflow.Overflow_CTR0)
+				{
+					sprintf(warning, "Remark CPU#%02d: INST Counter #0 is overflowed", cpu);
+					tracerr(warning);
+					OvfControl.Clear_Ovf_CTR0=1;
+				}
 				if(Overflow.Overflow_CTR1)
 				{
 					sprintf(warning, "Remark CPU#%02d: UCC Counter #1 is overflowed", cpu);
@@ -335,7 +346,7 @@ Bool32	Init_MSR_Nehalem(void *uArg)
 					tracerr(warning);
 					OvfControl.Clear_Ovf_CTR2=1;
 				}
-				if(Overflow.Overflow_CTR1|Overflow.Overflow_CTR2)
+				if(Overflow.Overflow_CTR0|Overflow.Overflow_CTR1|Overflow.Overflow_CTR2)
 				{
 					sprintf(warning, "Remark CPU#%02d: Resetting Counters", cpu);
 					tracerr(warning);
@@ -390,12 +401,16 @@ Bool32	Close_MSR_Counters(void *uArg)
 			// Reset the fixed and the global counters.
 			if(A->SHM->CPL.RESET == TRUE)
 			{
+				A->SaveArea[cpu].FixedPerfCounter.EN0_Usr=0;
 				A->SaveArea[cpu].FixedPerfCounter.EN1_Usr=0;
 				A->SaveArea[cpu].FixedPerfCounter.EN2_Usr=0;
+				A->SaveArea[cpu].FixedPerfCounter.EN0_OS=0;
 				A->SaveArea[cpu].FixedPerfCounter.EN1_OS=0;
 				A->SaveArea[cpu].FixedPerfCounter.EN2_OS=0;
+				A->SaveArea[cpu].FixedPerfCounter.AnyThread_EN0=0;
 				A->SaveArea[cpu].FixedPerfCounter.AnyThread_EN1=0;
 				A->SaveArea[cpu].FixedPerfCounter.AnyThread_EN2=0;
+				A->SaveArea[cpu].GlobalPerfCounter.EN_FIXED_CTR0=0;
 				A->SaveArea[cpu].GlobalPerfCounter.EN_FIXED_CTR1=0;
 				A->SaveArea[cpu].GlobalPerfCounter.EN_FIXED_CTR2=0;
 			}
@@ -653,6 +668,8 @@ double	ClockSpeed_Nehalem_Bloomfield()
 void	*uCycle_Nehalem(void *uA, int cpu, int T)
 {
 	uARG *A=(uARG *) uA;
+	// Instructions Retired
+	Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR0, (unsigned long long int *) &A->SHM->C[cpu].Cycles.INST[T]);
 	// Unhalted Core & Reference Cycles.
 	Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR1, (unsigned long long int *) &A->SHM->C[cpu].Cycles.C0[T].UCC);
 	Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR2, (unsigned long long int *) &A->SHM->C[cpu].Cycles.C0[T].URC);
@@ -1343,6 +1360,8 @@ static void *uCycle(void *uApic)
 	pthread_setname_np(pApic->TID, comm);
 
 	A->Arch[A->SHM->P.ArchID].uCycle(A, cpu, 1);
+	// Compute Delta of Instructions Retired = Current[1] - Previous[0].
+	A->SHM->C[cpu].Delta.INST=	A->SHM->C[cpu].Cycles.INST[1] - A->SHM->C[cpu].Cycles.INST[0];
 	// Compute the absolute Delta of Unhalted (Core & Ref) C0 Cycles = Current[1] - Previous[0].
 	A->SHM->C[cpu].Delta.C0.UCC=	(A->SHM->C[cpu].Cycles.C0[0].UCC > A->SHM->C[cpu].Cycles.C0[1].UCC) ?
 					 A->SHM->C[cpu].Cycles.C0[0].UCC - A->SHM->C[cpu].Cycles.C0[1].UCC
@@ -1360,6 +1379,17 @@ static void *uCycle(void *uApic)
 					 A->SHM->C[cpu].Cycles.C1[0] - A->SHM->C[cpu].Cycles.C1[1]
 					:A->SHM->C[cpu].Cycles.C1[1] - A->SHM->C[cpu].Cycles.C1[0];
 
+	// Compute IPS=Instructions per TSC
+	A->SHM->C[cpu].IPS=(double) (A->SHM->C[cpu].Delta.INST) / (double) (A->SHM->C[cpu].Delta.TSC);
+	// Compute IPC=Instructions per non-halted cycle. (Protect against a division by zero)
+	A->SHM->C[cpu].IPC=(double) (A->SHM->C[cpu].Delta.C0.UCC != 0) ?
+					(double) (A->SHM->C[cpu].Delta.INST) / (double) A->SHM->C[cpu].Delta.C0.UCC
+						: 0.0f;
+	// Compute CPI=Non-halted cycles per instruction. (Protect against a division by zero)
+	A->SHM->C[cpu].CPI=(double) (A->SHM->C[cpu].Delta.INST != 0) ?
+					(double) A->SHM->C[cpu].Delta.C0.UCC / (double) (A->SHM->C[cpu].Delta.INST)
+						: 0.0f;
+
 	// Compute Turbo State per Cycles Delta. (Protect against a division by zero)
 	A->SHM->C[cpu].State.Turbo=(double) (A->SHM->C[cpu].Delta.C0.URC != 0) ?
 					(double) (A->SHM->C[cpu].Delta.C0.UCC) / (double) A->SHM->C[cpu].Delta.C0.URC
@@ -1375,6 +1405,8 @@ static void *uCycle(void *uApic)
 	// Relative Frequency = Relative Ratio x Bus Clock Frequency
 	A->SHM->C[cpu].RelativeFreq=A->SHM->C[cpu].RelativeRatio * A->SHM->P.ClockSpeed;
 
+	// Save the Instructions counter.
+	A->SHM->C[cpu].Cycles.INST[0]=A->SHM->C[cpu].Cycles.INST[1];
 	// Save TSC.
 	A->SHM->C[cpu].Cycles.TSC[0]=A->SHM->C[cpu].Cycles.TSC[1];
 	// Save the Unhalted Core & Reference Cycles for next iteration.

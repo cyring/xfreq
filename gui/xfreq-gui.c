@@ -905,7 +905,7 @@ void	CloseWidgets(uARG *A)
 	free(A->L.Usage.C1);
 	free(A->L.Usage.C3);
 	free(A->L.Usage.C6);
-	free(A->L.Play.showTemp);
+	free(A->L.Play.showTemps);
 
 	int cpu=0;
 	for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
@@ -1189,8 +1189,11 @@ int	OpenWidgets(uARG *A)
 							WBSTATE		WBState;
 						} Loader[]={	{.ID=ID_PAUSE, .RSC={.Text=RSC_PAUSE}, {Button_State, &A->PAUSE[G]}},
 								{.ID=ID_FREQ , .RSC={.Text=RSC_FREQ},  {Button_State, &A->L.Play.freqHertz}},
-								{.ID=ID_CYCLE, .RSC={.Text=RSC_CYCLE}, {Button_State, &A->L.Play.cycleValues}},
-								{.ID=ID_RATIO, .RSC={.Text=RSC_RATIO}, {Button_State, &A->L.Play.ratioValues}},
+								{.ID=ID_CYCLE, .RSC={.Text=RSC_CYCLE}, {Button_State, &A->L.Play.showCycles}},
+								{.ID=ID_IPS, .  RSC={.Text=RSC_IPS}, {Button_State, &A->L.Play.showIPS}},
+								{.ID=ID_IPC, .  RSC={.Text=RSC_IPC}, {Button_State, &A->L.Play.showIPC}},
+								{.ID=ID_CPI, .  RSC={.Text=RSC_CPI}, {Button_State, &A->L.Play.showCPI}},
+								{.ID=ID_RATIO, .RSC={.Text=RSC_RATIO}, {Button_State, &A->L.Play.showRatios}},
 								{.ID=ID_SCHED, .RSC={.Text=RSC_SCHED}, {Button_State, &A->SHM->S.Monitor}},
 								{.ID=ID_NULL , .RSC={.Text=NULL},      {NULL, NULL}}
 							};
@@ -1309,7 +1312,7 @@ int	OpenWidgets(uARG *A)
 
 						unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
 
-						A->L.Play.showTemp=calloc(A->SHM->P.CPU, sizeof(Bool32));
+						A->L.Play.showTemps=calloc(A->SHM->P.CPU, sizeof(Bool32));
 						A->L.Temps=calloc(A->SHM->P.CPU, sizeof(struct NXSEGMENT));
 
 						WBSTATE WBState={Button_State, NULL};
@@ -1319,7 +1322,7 @@ int	OpenWidgets(uARG *A)
 						for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
 						{
 							if(A->SHM->C[cpu].T.Thread_ID == 0)
-								A->L.Play.showTemp[cpu]=TRUE;
+								A->L.Play.showTemps[cpu]=TRUE;
 
 							A->L.Temps[cpu].N=TEMPS_TEXT_WIDTH;
 							A->L.Temps[cpu].Segment=calloc(A->L.Temps[cpu].N, sizeof(XSegment));
@@ -1332,7 +1335,7 @@ int	OpenWidgets(uARG *A)
 								A->L.Temps[cpu].Segment[i].y2=A->L.Temps[cpu].Segment[i].y1;
 							}
 							sprintf(RSC.Text, "%2d", cpu);
-							WBState.Key=&A->L.Play.showTemp[cpu];
+							WBState.Key=&A->L.Play.showTemps[cpu];
 
 							CreateButton(	A, TEXT, ID_TEMP, G,
 									(One_Char_Width(G) * 5) + Quarter_Char_Width(G) + (cpu << 1) * Twice_Char_Width(G),
@@ -2433,27 +2436,32 @@ void	DrawLayout(uARG *A, int G)
 								str, strlen(str) );
 					}
 
-					if(A->L.Play.cycleValues)
+					if(A->L.Play.showCycles)
 					{
+						if(!A->L.Play.showIPS
+						&& !A->L.Play.showIPC
+						&& !A->L.Play.showCPI)
+						{
 						useconds_t LoopTime=IDLE_BASE_USEC * A->SHM->P.IdleTime;
+
 						sprintf(str,	CORE_DELTA,
+								A->SHM->C[cpu].Delta.INST / LoopTime,
 								A->SHM->C[cpu].Delta.C0.UCC / LoopTime,
 								A->SHM->C[cpu].Delta.C0.URC / LoopTime,
-								A->SHM->C[cpu].Delta.C1 / LoopTime,
-								A->SHM->C[cpu].Delta.C3 / LoopTime,
-								A->SHM->C[cpu].Delta.C6 / LoopTime,
+								(A->SHM->C[cpu].Delta.C1+A->SHM->C[cpu].Delta.C3+A->SHM->C[cpu].Delta.C6) / LoopTime,
 								A->SHM->C[cpu].Delta.TSC / LoopTime);
 						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 								One_Char_Width(G) * 13,
 								One_Char_Height(G) * (cpu + 1 + 1),
 								str, strlen(str) );
+						}
 					}
 					else
 					{
 						if(A->SHM->S.Monitor)
 						{
-							if(!A->L.Play.ratioValues)
+							if(!A->L.Play.showRatios)
 							{
 								if(A->SHM->C[cpu].Task[0].pid > 0)
 								{
@@ -2467,6 +2475,10 @@ void	DrawLayout(uARG *A, int G)
 											str, l );
 								}
 							}
+							if(!A->L.Play.showIPS
+							&& !A->L.Play.showIPC
+							&& !A->L.Play.showCPI)
+							{
 							XRectangle R[]=
 							{ {
 								.x=One_Char_Width(G) * 13,
@@ -2499,12 +2511,16 @@ void	DrawLayout(uARG *A, int G)
 							while(depth < TASK_PIPE_DEPTH) ;
 
 							XSetClipMask(A->display, A->W[G].gc, None);
+							}
 						}
-						else if(!A->L.Play.ratioValues)
+						else if(!A->L.Play.showRatios
+						&&	!A->L.Play.showIPS
+						&&	!A->L.Play.showIPC
+						&&	!A->L.Play.showCPI)
 						{
 							sprintf(str,	CORE_CYCLES,
-								A->SHM->C[cpu].Cycles.C0[1].UCC,
-								A->SHM->C[cpu].Cycles.C0[1].URC);
+									A->SHM->C[cpu].Cycles.C0[1].UCC,
+									A->SHM->C[cpu].Cycles.C0[1].URC);
 							XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 							XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 									One_Char_Width(G) * 13,
@@ -2512,7 +2528,34 @@ void	DrawLayout(uARG *A, int G)
 									str, strlen(str) );
 						}
 					}
-					if(A->L.Play.ratioValues)
+					if(A->L.Play.showIPS)
+					{
+						sprintf(str, CORE_IPS, A->SHM->C[cpu].IPS);
+						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
+						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+								One_Char_Width(G) * 15,
+								One_Char_Height(G) * (cpu + 1 + 1),
+								str, strlen(str) );
+					}
+					if(A->L.Play.showIPC)
+					{
+						sprintf(str, CORE_IPS, A->SHM->C[cpu].IPC);
+						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
+						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+								One_Char_Width(G) * 23,
+								One_Char_Height(G) * (cpu + 1 + 1),
+								str, strlen(str) );
+					}
+					if(A->L.Play.showCPI)
+					{
+						sprintf(str, CORE_IPS, A->SHM->C[cpu].CPI);
+						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
+						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
+								One_Char_Width(G) * 31,
+								One_Char_Height(G) * (cpu + 1 + 1),
+								str, strlen(str) );
+					}
+					if(A->L.Play.showRatios)
 					{
 						sprintf(str, CORE_RATIO, A->SHM->C[cpu].RelativeRatio);
 						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
@@ -2643,7 +2686,7 @@ void	DrawLayout(uARG *A, int G)
 										| fROR32(0x01010011, A->SHM->C[cpu].T.APIC_ID)
 										| fROL32(0x80808080, A->SHM->C[cpu].T.Core_ID)
 										| fROR32(0x01010100, A->SHM->C[cpu].T.Thread_ID));
-					if(A->L.Play.showTemp[cpu] == TRUE)
+					if(A->L.Play.showTemps[cpu] == TRUE)
 						XDrawSegments(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Temps[cpu].Segment, A->L.Temps[cpu].N);
 
 					sprintf(str, TEMPERATURE, A->SHM->C[cpu].TjMax.Target - A->SHM->C[cpu].ThermStat.DTS);
@@ -3079,12 +3122,27 @@ void	Play(uARG *A, int G, char ID, XCHG_MAP *XChange)
 			break;
 		case ID_CYCLE:
 			{
-				A->L.Play.cycleValues=!A->L.Play.cycleValues;
+				A->L.Play.showCycles=!A->L.Play.showCycles;
+			}
+			break;
+		case ID_IPS:
+			{
+				A->L.Play.showIPS=!A->L.Play.showIPS;
+			}
+			break;
+		case ID_IPC:
+			{
+				A->L.Play.showIPC=!A->L.Play.showIPC;
+			}
+			break;
+		case ID_CPI:
+			{
+				A->L.Play.showCPI=!A->L.Play.showCPI;
 			}
 			break;
 		case ID_RATIO:
 			{
-				A->L.Play.ratioValues=!A->L.Play.ratioValues;
+				A->L.Play.showRatios=!A->L.Play.showRatios;
 			}
 			break;
 		case ID_CSTATE:
@@ -3504,7 +3562,7 @@ void	CallBackTemps(uARG *A, WBUTTON *wButton)
 {
 	int cpu=atoi(wButton->Resource.Text);
 
-	A->L.Play.showTemp[cpu]=!A->L.Play.showTemp[cpu];
+	A->L.Play.showTemps[cpu]=!A->L.Play.showTemps[cpu];
 }
 
 void	CallBackSave(uARG *A, WBUTTON *wButton)
@@ -4556,8 +4614,8 @@ int main(int argc, char *argv[])
 				.Play={
 					.fillGraphics=TRUE,
 					.freqHertz=TRUE,
-					.cycleValues=FALSE,
-					.ratioValues=TRUE,
+					.showCycles=FALSE,
+					.showRatios=TRUE,
 					.showSchedule=FALSE,
 					.cStatePercent=FALSE,
 					.wallboard=FALSE,
@@ -4604,14 +4662,17 @@ int main(int argc, char *argv[])
 				{"-f", "%x",  &A.L.globalForeground,   "Foreground color (Hex) {RGB}",                                         NULL                                       },
 				{"-l", "%u",  &A.L.Play.fillGraphics,  "Fill or not the graphics (Bool) [0/1]",                                XDB_CLASS_CORES"."XDB_KEY_PLAY_GRAPHICS    },
 				{"-z", "%u",  &A.L.Play.freqHertz,     "Show the Core frequency (Bool) [0/1]",                                 XDB_CLASS_CORES"."XDB_KEY_PLAY_FREQ        },
-				{"-y", "%u",  &A.L.Play.cycleValues,   "Show the Core Cycles (Bool) [0/1]",                                    XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
-				{"-r", "%u",  &A.L.Play.ratioValues,   "Show the Core Ratio (Bool) [0/1]",                                     XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
+				{"-y", "%u",  &A.L.Play.showCycles,    "Show the Core Cycles (Bool) [0/1]",                                    XDB_CLASS_CORES"."XDB_KEY_PLAY_CYCLES      },
+				{"-j", "%u",  &A.L.Play.showIPS,       "Show the Instructions Per Second (Bool) [0/1]",                        XDB_CLASS_CORES"."XDB_KEY_PLAY_IPS         },
+				{"-J", "%u",  &A.L.Play.showIPC,       "Show the Instructions Per Cycle (Bool) [0/1]",                         XDB_CLASS_CORES"."XDB_KEY_PLAY_IPC         },
+				{"-i", "%u",  &A.L.Play.showCPI,       "Show the Cycles Per Instructions (Bool) [0/1]",                        XDB_CLASS_CORES"."XDB_KEY_PLAY_CPI         },
+				{"-r", "%u",  &A.L.Play.showRatios,    "Show the Core Ratio (Bool) [0/1]",                                     XDB_CLASS_CORES"."XDB_KEY_PLAY_RATIOS      },
 				{"-p", "%u",  &A.L.Play.cStatePercent, "Show the Core C-State percentage (Bool) [0/1]",                        XDB_CLASS_CSTATES"."XDB_KEY_PLAY_CSTATES   },
 				{"-w", "%u",  &A.L.Play.wallboard,     "Scroll the Processor brand wallboard (Bool) [0/1]",                    XDB_CLASS_SYSINFO"."XDB_KEY_PLAY_WALLBOARD },
 				{"-o", "%u",  &A.L.Play.alwaysOnTop,   "Keep the Widgets always on top of the screen (Bool) [0/1]",            NULL                                       },
 				{"-n", "%u",  &A.L.Play.noDecorations, "Remove the Window Manager decorations (Bool) [0/1]",                   NULL                                       },
 				{"-N", "%u",  &A.L.Play.skipTaskbar,   "Remove the Widgets title name from the WM taskbar (Bool) [0/1]",       NULL                                       },
-				{"-i", "%hx", &A.Splash.attributes,    "Splash screen attributes 0x{H}{NNN} (Hex)\n" \
+				{"-I", "%hx", &A.Splash.attributes,    "Splash screen attributes 0x{H}{NNN} (Hex)\n" \
 				                                       "\t\t  where {H} bit:13 hides Splash and {NNN} (usec) defers start-up", NULL                                       },
 			},
 			.Commands=COMMANDS_LIST

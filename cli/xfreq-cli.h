@@ -12,7 +12,7 @@
 #define	pthread_tryjoin_np(t, r) pthread_timedjoin_np(t, r, 0)
 #endif
 
-#define	OPTIONS_COUNT	6
+#define	OPTIONS_COUNT	3
 typedef struct
 {
 	char		*argument;
@@ -37,6 +37,9 @@ typedef struct
 			TID_Read;
 
 	unsigned int	Room;
+
+	unsigned int	iFunc;
+	void		*(*uFunc)(void *uArg);
 
 	Bool32		LOOP;
 	OPTIONS		Options[OPTIONS_COUNT];

@@ -12,7 +12,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "46"
+#define _NIGHTLY "47"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #if defined(Linux)
@@ -269,6 +269,7 @@ typedef struct
 #define	IA32_PKG_THERM_STATUS		0x1b1
 #define	IA32_PKG_THERM_INTERRUPT 	0x1b2
 #define	IA32_MTRR_DEF_TYPE		0x2ff
+#define	IA32_FIXED_CTR0			0x309
 #define	IA32_FIXED_CTR1			0x30a
 #define	IA32_FIXED_CTR2			0x30b
 #define	IA32_FIXED_CTR_CTRL		0x38d
@@ -396,7 +397,9 @@ typedef struct
 	unsigned long long int
 		EN_PMC0		:  1-0,
 		EN_PMC1		:  2-1,
-		ReservedBits1	: 32-2,
+		EN_PMC2		:  3-2,
+		EN_PMC3		:  4-3,
+		EN_PMCn		: 32-4,
 		EN_FIXED_CTR0	: 33-32,
 		EN_FIXED_CTR1	: 34-33,
 		EN_FIXED_CTR2	: 35-34,
@@ -428,7 +431,7 @@ typedef struct
 		Overflow_PMC1	:  2-1,
 		Overflow_PMC2	:  3-2,
 		Overflow_PMC3	:  4-3,
-		ReservedBits1	: 32-4,
+		Overflow_PMCn	: 32-4,
 		Overflow_CTR0	: 33-32,
 		Overflow_CTR1	: 34-33,
 		Overflow_CTR2	: 35-34,
@@ -443,7 +446,9 @@ typedef	struct
 	unsigned long long int
 		Clear_Ovf_PMC0	:  1-0,
 		Clear_Ovf_PMC1	:  2-1,
-		ReservedBits1	: 32-2,
+		Clear_Ovf_PMC2	:  3-2,
+		Clear_Ovf_PMC3	:  4-3,
+		Clear_Ovf_PMCn	: 32-2,
 		Clear_Ovf_CTR0 	: 33-32,
 		Clear_Ovf_CTR1	: 34-33,
 		Clear_Ovf_CTR2	: 35-34,
@@ -710,6 +715,8 @@ typedef	struct {
 	GLOBAL_PERF_COUNTER	GlobalPerfCounter;
 	FIXED_PERF_COUNTER	FixedPerfCounter;
 	struct {
+		unsigned long long int
+				INST[2];
 		struct
 		{
 		unsigned long long int
@@ -723,6 +730,8 @@ typedef	struct {
 				C1[2];
 	} Cycles;
 	struct {
+		unsigned long long int
+				INST;
 		struct
 		{
 		unsigned long long int
@@ -735,6 +744,9 @@ typedef	struct {
 				TSC,
 				C1;
 	} Delta;
+	double			IPS,
+				IPC,
+				CPI;
 	struct {
 		double		Turbo,
 				C0,
