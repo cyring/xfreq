@@ -1381,13 +1381,13 @@ static void *uCycle(void *uApic)
 
 	// Compute IPS=Instructions per TSC
 	A->SHM->C[cpu].IPS=(double) (A->SHM->C[cpu].Delta.INST) / (double) (A->SHM->C[cpu].Delta.TSC);
-	// Compute IPC=Instructions per non-halted cycle. (Protect against a division by zero)
-	A->SHM->C[cpu].IPC=(double) (A->SHM->C[cpu].Delta.C0.UCC != 0) ?
-					(double) (A->SHM->C[cpu].Delta.INST) / (double) A->SHM->C[cpu].Delta.C0.UCC
+	// Compute IPC=Instructions per non-halted reference cycle. (Protect against a division by zero)
+	A->SHM->C[cpu].IPC=(double) (A->SHM->C[cpu].Delta.C0.URC != 0) ?
+					(double) (A->SHM->C[cpu].Delta.INST) / (double) A->SHM->C[cpu].Delta.C0.URC
 						: 0.0f;
-	// Compute CPI=Non-halted cycles per instruction. (Protect against a division by zero)
+	// Compute CPI=Non-halted reference cycles per instruction. (Protect against a division by zero)
 	A->SHM->C[cpu].CPI=(double) (A->SHM->C[cpu].Delta.INST != 0) ?
-					(double) A->SHM->C[cpu].Delta.C0.UCC / (double) (A->SHM->C[cpu].Delta.INST)
+					(double) A->SHM->C[cpu].Delta.C0.URC / (double) (A->SHM->C[cpu].Delta.INST)
 						: 0.0f;
 
 	// Compute Turbo State per Cycles Delta. (Protect against a division by zero)
