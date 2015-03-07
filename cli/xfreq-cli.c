@@ -72,13 +72,14 @@ static void *uRead_Freq(void *uArg)
 						A->SHM->C[cpu].Task[0].comm, A->SHM->C[cpu].Task[0].pid);
 
 			printf(	"\nAverage C-states\n" \
-				"Turbo\t  C0\t  C1\t  C3\t  C6\n" \
-				"%6.2f%%\t%6.2f%%\t%6.2f%%\t%6.2f\t%6.2f%%\n",
+				"Turbo\t  C0\t  C1\t  C3\t  C6\t  C7\n" \
+				"%6.2f%%\t%6.2f%%\t%6.2f%%\t%6.2f\t%6.2f%%\t%6.2f%%\n",
 				100.f * A->SHM->P.Avg.Turbo,
 				100.f * A->SHM->P.Avg.C0,
 				100.f * A->SHM->P.Avg.C1,
 				100.f * A->SHM->P.Avg.C3,
-				100.f * A->SHM->P.Avg.C6);
+				100.f * A->SHM->P.Avg.C6,
+				100.f * A->SHM->P.Avg.C7);
 		}
 		else
 			Play(A, ID_QUIT);
@@ -94,18 +95,19 @@ static void *uRead_States(void *uArg)
 	while(A->LOOP)
 		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + IDLE_COEF_DEF + IDLE_COEF_MIN)))
 		{
-			printf("\nCPU#                 UCC                  URC                   C1                   C3                   C6                  TSC\n");
+			printf("\nCPU#                 UCC                  URC                   C1                   C3                   C6                   C7                  TSC\n");
 
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
 				if(A->SHM->C[cpu].T.Offline != TRUE)
-					printf(	"%-3d %20lld %20lld %20lld %20lld %20lld %20lld\n",
+					printf(	"%-3d %20lld %20lld %20lld %20lld %20lld %20lld %20lld\n",
 						cpu,
 						A->SHM->C[cpu].Delta.C0.UCC,
 						A->SHM->C[cpu].Delta.C0.URC,
 						A->SHM->C[cpu].Delta.C1,
 						A->SHM->C[cpu].Delta.C3,
 						A->SHM->C[cpu].Delta.C6,
+						A->SHM->C[cpu].Delta.C7,
 						A->SHM->C[cpu].Delta.TSC);
 		}
 		else

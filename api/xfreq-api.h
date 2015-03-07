@@ -12,7 +12,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "47-a"
+#define _NIGHTLY "48"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #if defined(Linux)
@@ -279,6 +279,7 @@ typedef struct
 #define	IA32_EFER			0xc0000080
 #define	MSR_CORE_C3_RESIDENCY		0x3fc
 #define	MSR_CORE_C6_RESIDENCY		0x3fd
+#define	MSR_CORE_C7_RESIDENCY		0x3fe
 #define	MSR_FSB_FREQ			0xcd
 #define	MSR_PLATFORM_INFO		0xce
 #define	MSR_TURBO_RATIO_LIMIT		0x1ad
@@ -561,6 +562,7 @@ typedef struct
 					C0,
 					C3,
 					C6,
+					C7,
 					C1;
 	} Avg;
 	unsigned int			Top,
@@ -726,6 +728,7 @@ typedef	struct {
 		unsigned long long int
 				C3[2],
 				C6[2],
+				C7[2],
 				TSC[2],
 				C1[2];
 	} Cycles;
@@ -741,6 +744,7 @@ typedef	struct {
 		unsigned long long int
 				C3,
 				C6,
+				C7,
 				TSC,
 				C1;
 	} Delta;
@@ -752,6 +756,7 @@ typedef	struct {
 				C0,
 				C3,
 				C6,
+				C7,
 				C1;
 	} State;
 	double			RelativeRatio,

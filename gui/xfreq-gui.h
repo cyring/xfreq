@@ -277,7 +277,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CORES_TEXT_WIDTH	MAX(A->SHM->P.Boost[9], A->L.Page[CORES].Geometry.cols)
 #define	CORES_TEXT_HEIGHT	(A->SHM->P.CPU)
 
-#define	CSTATES_TEXT_SPACING	5
+#define	CSTATES_TEXT_SPACING	6
 #define	CSTATES_TEXT_WIDTH	(MAX(A->SHM->P.CPU, A->L.Page[CSTATES].Geometry.cols) * CSTATES_TEXT_SPACING)
 #define	CSTATES_TEXT_HEIGHT	MAX(GEOMETRY_CSTATES_ROWS, A->L.Page[CSTATES].Geometry.rows)
 
@@ -290,8 +290,8 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	DUMP_HEX16_STR		16
 // BIN64: 16 x 4 digits + '\0'
 #define DUMP_BIN64_STR		(16 * 4) + 1
-// PRE_TEXT: ##' 'Addr[5]' 'Name&Padding[24]'['
-#define DUMP_PRE_TEXT		(2 + 1 + 5 + 1 + DUMP_REG_ALIGN + 1)
+// PRE_TEXT: ##' 'Addr[8+1]' 'Name&Padding[24]'['
+#define DUMP_PRE_TEXT		(2 + 1 + (8+1) + 1 + DUMP_REG_ALIGN + 1)
 // Columns: PRE_TEXT + BIN64 w/ 15 interspaces + '] ' + CoreNum + ScrollButtons
 #define	GEOMETRY_DUMP_COLS	(DUMP_PRE_TEXT + DUMP_BIN64_STR + 15 + 2 + 3 + 3)
 #define	GEOMETRY_DUMP_ROWS	(DUMP_ARRAY_DIMENSION + 2)
@@ -340,9 +340,9 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 
 #define	CORE_TASK	"%s"
 #define	CORE_RATIO	"%-3.1f"
-#define	CSTATES_PERCENT	"%6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%"
-#define	CSTATES_AVERAGE	"%6.2f      %6.2f      %6.2f      %6.2f      %6.2f"
-#define	CSTATES_FOOTER	"~      % TB        % C0        % C1        % C3        % C6"
+#define	CSTATES_PERCENT	"%6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%"
+#define	CSTATES_AVERAGE	"%6.2f      %6.2f      %6.2f      %6.2f      %6.2f      %6.2f"
+#define	CSTATES_FOOTER	"~      % TB        % C0        % C1        % C3        % C6        % C7"
 #define	OVERCLOCK	"%s [%4.0f MHz]"
 #define	TEMPERATURE	"%3d"
 
@@ -458,10 +458,10 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	SMBIOS17_FORMAT	"        |- %s:%s  %lld MB @ %lld MHz\n"
 
 #define	SYSINFO_SECTION	"System Information"
-//                       ## 12345 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234]
-#define	DUMP_SECTION	"#  Addr.     Register               60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0 Core"
+//                       .# 123456789 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234] #00
+#define	DUMP_SECTION	" #  Address          Register           60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0 Core"
 #define	REG_HEXVAL	"%016llX"
-#define	REG_FORMAT_BOL	"%02d %05X %s%%%zdc["
+#define	REG_FORMAT_BOL	"%02d %09X %s%%%zdc["
 #define	REG_FORMAT_EOL	"] "CORE_NUM"\n"
 
 #define	TASK_SECTION	"Task Scheduling"
@@ -558,7 +558,8 @@ typedef struct
 		XRectangle	*C0,
 				*C1,
 				*C3,
-				*C6;
+				*C6,
+				*C7;
 	} Usage;
 	struct NXSEGMENT {;
 		int		N;

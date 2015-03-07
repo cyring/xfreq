@@ -174,6 +174,12 @@
  *
  * [HISTORY]
  *
+ * R 2.1.48: 03/07/2015
+ *         - Added header strings in CORE Widget.
+ *         - Increase the MSR address field length in DUMP Widget.
+ *         - Implemented the C7 state in Sandy Bridge and above. (remain ZERO with others).
+ *         - Implemented the INST counter in Core architecture.
+ *
  * R 2.1.47-a: 03/05/2015
  *         - Corrected IPC & CPI formulas using Non-halted reference cycles [URC] counter.
  *

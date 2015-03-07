@@ -173,6 +173,7 @@ Bool32	Init_MSR_Core(void *uArg)
 					tracerr(warning);
 				}
 #endif
+				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR0=1;
 				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1=1;
 				A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR2=1;
 				rc=((retval=Write_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
@@ -180,16 +181,20 @@ Bool32	Init_MSR_Core(void *uArg)
 				// - Set the fixed counter bits
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR_CTRL, (FIXED_PERF_COUNTER *) &A->SHM->C[cpu].FixedPerfCounter)) != -1);
 				A->SaveArea[cpu].FixedPerfCounter=A->SHM->C[cpu].FixedPerfCounter;
+				A->SHM->C[cpu].FixedPerfCounter.EN0_OS=1;
 				A->SHM->C[cpu].FixedPerfCounter.EN1_OS=1;
 				A->SHM->C[cpu].FixedPerfCounter.EN2_OS=1;
+				A->SHM->C[cpu].FixedPerfCounter.EN0_Usr=1;
 				A->SHM->C[cpu].FixedPerfCounter.EN1_Usr=1;
 				A->SHM->C[cpu].FixedPerfCounter.EN2_Usr=1;
 				if(A->SHM->P.PerCore)
 				{	// Not available but keep it as a workarround.
+					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN0=1;
 					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN1=1;
 					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN2=1;
 				}
 				else {
+					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN0=0;
 					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN1=0;
 					A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN2=0;
 				}
@@ -199,6 +204,12 @@ Bool32	Init_MSR_Core(void *uArg)
 				GLOBAL_PERF_STATUS Overflow={0};
 				GLOBAL_PERF_OVF_CTRL OvfControl={0};
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_STATUS, (GLOBAL_PERF_STATUS *) &Overflow)) != -1);
+				if(Overflow.Overflow_CTR0)
+				{
+					sprintf(warning, "Remark CPU#%02d: INST Counter #0 is overflowed", cpu);
+					tracerr(warning);
+					OvfControl.Clear_Ovf_CTR0=1;
+				}
 				if(Overflow.Overflow_CTR1)
 				{
 					sprintf(warning, "Remark CPU#%02d: UCC Counter #1 is overflowed", cpu);
@@ -211,7 +222,7 @@ Bool32	Init_MSR_Core(void *uArg)
 					tracerr(warning);
 					OvfControl.Clear_Ovf_CTR2=1;
 				}
-				if(Overflow.Overflow_CTR1|Overflow.Overflow_CTR2)
+				if(Overflow.Overflow_CTR0|Overflow.Overflow_CTR1|Overflow.Overflow_CTR2)
 				{
 					sprintf(warning, "Remark CPU#%02d: Resetting Counters", cpu);
 					tracerr(warning);
@@ -286,6 +297,11 @@ Bool32	Init_MSR_Nehalem(void *uArg)
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
 				A->SaveArea[cpu].GlobalPerfCounter=A->SHM->C[cpu].GlobalPerfCounter;
 #if defined(DEBUG)
+				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR0 != 0)
+				{
+					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #0 is already activated", cpu);
+					tracerr(warning);
+				}
 				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1 != 0)
 				{
 					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #1 is already activated", cpu);
@@ -645,6 +661,8 @@ void	*uCycle_GenuineIntel(void *uA, int cpu, int T)
 void	*uCycle_Core(void *uA, int cpu, int T)
 {
 	uARG *A=(uARG *) uA;
+	// Instructions Retired
+	Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR0, (unsigned long long int *) &A->SHM->C[cpu].Cycles.INST[T]);
 	// Unhalted Core & the Reference Cycles.
 	Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR1, (unsigned long long int *) &A->SHM->C[cpu].Cycles.C0[T].UCC);
 	Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR2, (unsigned long long int *) &A->SHM->C[cpu].Cycles.C0[T].URC);
@@ -699,6 +717,27 @@ double	ClockSpeed_SandyBridge_EP()
 	return(100.00f);
 };
 #define	ClockSpeed_SandyBridge	ClockSpeed_SandyBridge_EP
+
+void	*uCycle_SandyBridge(void *uA, int cpu, int T)
+{
+	uARG *A=(uARG *) uA;
+	// Instructions Retired
+	Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR0, (unsigned long long int *) &A->SHM->C[cpu].Cycles.INST[T]);
+	// Unhalted Core & Reference Cycles.
+	Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR1, (unsigned long long int *) &A->SHM->C[cpu].Cycles.C0[T].UCC);
+	Read_MSR(A->SHM->C[cpu].FD, IA32_FIXED_CTR2, (unsigned long long int *) &A->SHM->C[cpu].Cycles.C0[T].URC);
+	// TSC in relation to the Logical Core.
+	Read_MSR(A->SHM->C[cpu].FD, IA32_TIME_STAMP_COUNTER, (unsigned long long int *) &A->SHM->C[cpu].Cycles.TSC[T]);
+	// C-States.
+	Read_MSR(A->SHM->C[cpu].FD, MSR_CORE_C3_RESIDENCY, (unsigned long long int *) &A->SHM->C[cpu].Cycles.C3[T]);
+	Read_MSR(A->SHM->C[cpu].FD, MSR_CORE_C6_RESIDENCY, (unsigned long long int *) &A->SHM->C[cpu].Cycles.C6[T]);
+	Read_MSR(A->SHM->C[cpu].FD, MSR_CORE_C7_RESIDENCY, (unsigned long long int *) &A->SHM->C[cpu].Cycles.C7[T]);
+	// Derive C1
+	register unsigned long long int Cx=A->SHM->C[cpu].Cycles.C7[T] + A->SHM->C[cpu].Cycles.C6[T] + A->SHM->C[cpu].Cycles.C3[T] + A->SHM->C[cpu].Cycles.C0[T].URC;
+	A->SHM->C[cpu].Cycles.C1[T]=(A->SHM->C[cpu].Cycles.TSC[T] > Cx) ?  A->SHM->C[cpu].Cycles.TSC[T] - Cx : 0;
+
+	return(NULL);
+}
 
 // [IvyBridge]
 double	ClockSpeed_IvyBridge()
@@ -1368,11 +1407,9 @@ static void *uCycle(void *uApic)
 					:A->SHM->C[cpu].Cycles.C0[1].UCC - A->SHM->C[cpu].Cycles.C0[0].UCC;
 
 	A->SHM->C[cpu].Delta.C0.URC=	A->SHM->C[cpu].Cycles.C0[1].URC - A->SHM->C[cpu].Cycles.C0[0].URC;
-
 	A->SHM->C[cpu].Delta.C3=	A->SHM->C[cpu].Cycles.C3[1] - A->SHM->C[cpu].Cycles.C3[0];
-
 	A->SHM->C[cpu].Delta.C6=	A->SHM->C[cpu].Cycles.C6[1] - A->SHM->C[cpu].Cycles.C6[0];
-
+	A->SHM->C[cpu].Delta.C7=	A->SHM->C[cpu].Cycles.C7[1] - A->SHM->C[cpu].Cycles.C7[0];
 	A->SHM->C[cpu].Delta.TSC=	A->SHM->C[cpu].Cycles.TSC[1] - A->SHM->C[cpu].Cycles.TSC[0];
 
 	A->SHM->C[cpu].Delta.C1=	(A->SHM->C[cpu].Cycles.C1[0] > A->SHM->C[cpu].Cycles.C1[1]) ?
@@ -1398,6 +1435,7 @@ static void *uCycle(void *uApic)
 	A->SHM->C[cpu].State.C0=(double) (A->SHM->C[cpu].Delta.C0.URC) / (double) (A->SHM->C[cpu].Delta.TSC);
 	A->SHM->C[cpu].State.C3=(double) (A->SHM->C[cpu].Delta.C3)  / (double) (A->SHM->C[cpu].Delta.TSC);
 	A->SHM->C[cpu].State.C6=(double) (A->SHM->C[cpu].Delta.C6)  / (double) (A->SHM->C[cpu].Delta.TSC);
+	A->SHM->C[cpu].State.C7=(double) (A->SHM->C[cpu].Delta.C7)  / (double) (A->SHM->C[cpu].Delta.TSC);
 	A->SHM->C[cpu].State.C1=(double) (A->SHM->C[cpu].Delta.C1)  / (double) (A->SHM->C[cpu].Delta.TSC);
 
 	A->SHM->C[cpu].RelativeRatio=A->SHM->C[cpu].State.Turbo * A->SHM->C[cpu].State.C0 * (double) A->SHM->P.Boost[1];
@@ -1415,6 +1453,7 @@ static void *uCycle(void *uApic)
 	// Save also the C-State Reference Cycles.
 	A->SHM->C[cpu].Cycles.C3[0]=A->SHM->C[cpu].Cycles.C3[1];
 	A->SHM->C[cpu].Cycles.C6[0]=A->SHM->C[cpu].Cycles.C6[1];
+	A->SHM->C[cpu].Cycles.C7[0]=A->SHM->C[cpu].Cycles.C7[1];
 	A->SHM->C[cpu].Cycles.C1[0]=A->SHM->C[cpu].Cycles.C1[1];
 
 	// Update the Digital Thermal Sensor.
@@ -1853,14 +1892,14 @@ int main(int argc, char *argv[])
 			{ _Westmere,             2,  ClockSpeed_Westmere,             "Westmere",                  uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
 			{ _Westmere_EP,          6,  ClockSpeed_Westmere_EP,          "Westmere/EP",               uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
 			{ _Westmere_EX,         10,  ClockSpeed_Westmere_EX,          "Westmere/eXtreme",          uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
-			{ _SandyBridge,          4,  ClockSpeed_SandyBridge,          "SandyBridge",               uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
-			{ _SandyBridge_EP,       6,  ClockSpeed_SandyBridge_EP,       "SandyBridge/eXtreme.EP",    uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
-			{ _IvyBridge,            4,  ClockSpeed_IvyBridge,            "IvyBridge",                 uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
-			{ _IvyBridge_EP,         6,  ClockSpeed_IvyBridge_EP,         "IvyBridge/EP",              uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
-			{ _Haswell_DT,           4,  ClockSpeed_Haswell_DT,           "Haswell/Desktop",           uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
-			{ _Haswell_MB,           4,  ClockSpeed_Haswell_MB,           "Haswell/Mobile",            uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
-			{ _Haswell_ULT,          2,  ClockSpeed_Haswell_ULT,          "Haswell/Ultra Low TDP",     uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
-			{ _Haswell_ULX,          2,  ClockSpeed_Haswell_ULX,          "Haswell/Ultra Low eXtreme", uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _SandyBridge,          4,  ClockSpeed_SandyBridge,          "SandyBridge",               uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _SandyBridge_EP,       6,  ClockSpeed_SandyBridge_EP,       "SandyBridge/eXtreme.EP",    uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _IvyBridge,            4,  ClockSpeed_IvyBridge,            "IvyBridge",                 uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _IvyBridge_EP,         6,  ClockSpeed_IvyBridge_EP,         "IvyBridge/EP",              uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Haswell_DT,           4,  ClockSpeed_Haswell_DT,           "Haswell/Desktop",           uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Haswell_MB,           4,  ClockSpeed_Haswell_MB,           "Haswell/Mobile",            uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Haswell_ULT,          2,  ClockSpeed_Haswell_ULT,          "Haswell/Ultra Low TDP",     uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Haswell_ULX,          2,  ClockSpeed_Haswell_ULX,          "Haswell/Ultra Low eXtreme", uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
 		},
 		.Loader={.Monitor=TRUE, .Array=REGISTERS_LIST},
 		.LOOP=TRUE,
@@ -2105,7 +2144,7 @@ int main(int argc, char *argv[])
 							fJoinDumpThread=(pthread_create(&A.TID_Dump, NULL, uDump, &A) == 0);
 
 						// Reset C-States average and max Temperature.
-						A.SHM->P.Avg.Turbo=A.SHM->P.Avg.C0=A.SHM->P.Avg.C3=A.SHM->P.Avg.C6=A.SHM->P.Avg.C1=0;
+						A.SHM->P.Avg.Turbo=A.SHM->P.Avg.C0=A.SHM->P.Avg.C3=A.SHM->P.Avg.C6=A.SHM->P.Avg.C7=A.SHM->P.Avg.C1=0;
 						unsigned int maxFreq=0, maxTemp=A.SHM->C[0].TjMax.Target;
 
 						// Fire C-States threads.
@@ -2127,6 +2166,7 @@ int main(int argc, char *argv[])
 								A.SHM->P.Avg.C0+=A.SHM->C[cpu].State.C0;
 								A.SHM->P.Avg.C3+=A.SHM->C[cpu].State.C3;
 								A.SHM->P.Avg.C6+=A.SHM->C[cpu].State.C6;
+								A.SHM->P.Avg.C6+=A.SHM->C[cpu].State.C7;
 								A.SHM->P.Avg.C1+=A.SHM->C[cpu].State.C1;
 
 								// Index the Top CPU speed.
@@ -2152,6 +2192,7 @@ int main(int argc, char *argv[])
 						A.SHM->P.Avg.C0/=A.SHM->P.OnLine;
 						A.SHM->P.Avg.C3/=A.SHM->P.OnLine;
 						A.SHM->P.Avg.C6/=A.SHM->P.OnLine;
+						A.SHM->P.Avg.C7/=A.SHM->P.OnLine;
 						A.SHM->P.Avg.C1/=A.SHM->P.OnLine;
 
 						if(fJoinDumpThread == TRUE)

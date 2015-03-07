@@ -905,6 +905,7 @@ void	CloseWidgets(uARG *A)
 	free(A->L.Usage.C1);
 	free(A->L.Usage.C3);
 	free(A->L.Usage.C6);
+	free(A->L.Usage.C7);
 	free(A->L.Play.showTemps);
 
 	int cpu=0;
@@ -950,6 +951,7 @@ int	OpenWidgets(uARG *A)
 	A->L.Usage.C1=calloc(A->SHM->P.CPU, sizeof(XRectangle));
 	A->L.Usage.C3=calloc(A->SHM->P.CPU, sizeof(XRectangle));
 	A->L.Usage.C6=calloc(A->SHM->P.CPU, sizeof(XRectangle));
+	A->L.Usage.C7=calloc(A->SHM->P.CPU, sizeof(XRectangle));
 
 	XRectangle iconRect={.x=0, .y=0, .width=48, .height=48};
 	XIconSize *xics=NULL;
@@ -1931,6 +1933,72 @@ void	BuildLayout(uARG *A, int G)
 					One_Char_Width(G) * ((A->SHM->P.Boost[9] + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					&str[4], 2);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
+					if(A->L.Play.showCycles)
+					{
+						if(!A->L.Play.showIPS
+						&& !A->L.Play.showIPC
+						&& !A->L.Play.showCPI)
+						{
+						XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+								One_Char_Width(G) * 13,
+								One_Char_Height(G),
+								"INST  UCC:URC  C-ST / TSC ", 26);
+						}
+					}
+					else
+					{
+						if(A->SHM->S.Monitor)
+						{
+							if(!A->L.Play.showRatios)
+							{
+							XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+									One_Char_Width(G) * 37,
+									One_Char_Height(G),
+									"[PID]", 5);
+							}
+							if(!A->L.Play.showIPS
+							&& !A->L.Play.showIPC
+							&& !A->L.Play.showCPI)
+							{
+							XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+									One_Char_Width(G) * 17,
+									One_Char_Height(G),
+									"TASK SCHEDULING", 15);
+							}
+						}
+						else if(!A->L.Play.showRatios
+						&&	!A->L.Play.showIPS
+						&&	!A->L.Play.showIPC
+						&&	!A->L.Play.showCPI)
+						{
+							XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+									One_Char_Width(G) * 26,
+									One_Char_Height(G),
+									"UCC:URC", 7);
+						}
+					}
+					if(A->L.Play.showIPS)
+					{
+						XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+								One_Char_Width(G) * 15,
+								One_Char_Height(G),
+								"IPS", 3);
+					}
+					if(A->L.Play.showIPC)
+					{
+						XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+								One_Char_Width(G) * 23,
+								One_Char_Height(G),
+								"IPC", 3);
+					}
+					if(A->L.Play.showCPI)
+					{
+						XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+								One_Char_Width(G) * 31,
+								One_Char_Height(G),
+								"CPI", 3);
+					}
 		}
 			break;
 		case CSTATES:
@@ -2448,7 +2516,7 @@ void	DrawLayout(uARG *A, int G)
 								A->SHM->C[cpu].Delta.INST / LoopTime,
 								A->SHM->C[cpu].Delta.C0.UCC / LoopTime,
 								A->SHM->C[cpu].Delta.C0.URC / LoopTime,
-								(A->SHM->C[cpu].Delta.C1+A->SHM->C[cpu].Delta.C3+A->SHM->C[cpu].Delta.C6) / LoopTime,
+								(A->SHM->C[cpu].Delta.C1+A->SHM->C[cpu].Delta.C3+A->SHM->C[cpu].Delta.C6+A->SHM->C[cpu].Delta.C7) / LoopTime,
 								A->SHM->C[cpu].Delta.TSC / LoopTime);
 						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
@@ -2587,36 +2655,44 @@ void	DrawLayout(uARG *A, int G)
 					A->L.Usage.C0[cpu].x=Half_Char_Width(G) + ((cpu * CSTATES_TEXT_SPACING) * One_Half_Char_Width(G));
 					A->L.Usage.C0[cpu].y=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->SHM->C[cpu].State.C0);
-					A->L.Usage.C0[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 4;
+					A->L.Usage.C0[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 5;
 					A->L.Usage.C0[cpu].height=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->SHM->C[cpu].State.C0;
 					// Prepare the C1 chart.
 					A->L.Usage.C1[cpu].x=Half_Char_Width(G) + A->L.Usage.C0[cpu].x + A->L.Usage.C0[cpu].width;
 					A->L.Usage.C1[cpu].y=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->SHM->C[cpu].State.C1);
-					A->L.Usage.C1[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 4;
+					A->L.Usage.C1[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 5;
 					A->L.Usage.C1[cpu].height=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->SHM->C[cpu].State.C1;
 					// Prepare the C3 chart.
 					A->L.Usage.C3[cpu].x=Half_Char_Width(G) + A->L.Usage.C1[cpu].x + A->L.Usage.C1[cpu].width;
 					A->L.Usage.C3[cpu].y=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->SHM->C[cpu].State.C3);
-					A->L.Usage.C3[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 4;
+					A->L.Usage.C3[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 5;
 					A->L.Usage.C3[cpu].height=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->SHM->C[cpu].State.C3;
 					// Prepare the C6 chart.
 					A->L.Usage.C6[cpu].x=Half_Char_Width(G) + A->L.Usage.C3[cpu].x + A->L.Usage.C3[cpu].width;
 					A->L.Usage.C6[cpu].y=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->SHM->C[cpu].State.C6);
-					A->L.Usage.C6[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 4;
+					A->L.Usage.C6[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 5;
 					A->L.Usage.C6[cpu].height=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->SHM->C[cpu].State.C6;
+					// Prepare the C7 chart.
+					A->L.Usage.C7[cpu].x=Half_Char_Width(G) + A->L.Usage.C6[cpu].x + A->L.Usage.C6[cpu].width;
+					A->L.Usage.C7[cpu].y=One_Char_Height(G)
+								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * (1 - A->SHM->C[cpu].State.C7);
+					A->L.Usage.C7[cpu].width=(One_Char_Width(G) * CSTATES_TEXT_SPACING) / 5;
+					A->L.Usage.C7[cpu].height=One_Char_Height(G)
+								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->SHM->C[cpu].State.C7;
 				}			// Display the C-State averages.
 			sprintf(str, CSTATES_AVERAGE,	100.f * A->SHM->P.Avg.Turbo,
 							100.f * A->SHM->P.Avg.C0,
 							100.f * A->SHM->P.Avg.C1,
 							100.f * A->SHM->P.Avg.C3,
-							100.f * A->SHM->P.Avg.C6);
+							100.f * A->SHM->P.Avg.C6,
+							100.f * A->SHM->P.Avg.C7);
 			XDrawString(A->display, A->W[G].pixmap.F, A->W[G].gc,
 						Twice_Char_Width(G),
 						One_Char_Height(G) + (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT + 1)),
@@ -2630,6 +2706,7 @@ void	DrawLayout(uARG *A, int G)
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH3].RGB);
 			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C3, A->SHM->P.CPU);
 			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C6, A->SHM->P.CPU);
+			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C7, A->SHM->P.CPU);
 
 			if(A->L.Play.cStatePercent)
 				for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
@@ -2647,7 +2724,8 @@ void	DrawLayout(uARG *A, int G)
 										100.f * A->SHM->C[cpu].State.C0,
 										100.f * A->SHM->C[cpu].State.C1,
 										100.f * A->SHM->C[cpu].State.C3,
-										100.f * A->SHM->C[cpu].State.C6);
+										100.f * A->SHM->C[cpu].State.C6,
+										100.f * A->SHM->C[cpu].State.C7);
 
 						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 								One_Char_Width(G) << 2,
@@ -2876,7 +2954,7 @@ void	UpdateWidgetName(uARG *A, int G)
 		case CSTATES:
 			if(!_IS_MDI_)
 			{
-				sprintf(str, TITLE_CSTATES_FMT, 100 * A->SHM->P.Avg.C0, 100 * (A->SHM->P.Avg.C1 + A->SHM->P.Avg.C3 + A->SHM->P.Avg.C6));
+				sprintf(str, TITLE_CSTATES_FMT, 100 * A->SHM->P.Avg.C0, 100 * (A->SHM->P.Avg.C1 + A->SHM->P.Avg.C3 + A->SHM->P.Avg.C6 + A->SHM->P.Avg.C7));
 				SetWidgetName(A, G, str);
 			}
 			break;
@@ -3123,26 +3201,31 @@ void	Play(uARG *A, int G, char ID, XCHG_MAP *XChange)
 		case ID_CYCLE:
 			{
 				A->L.Play.showCycles=!A->L.Play.showCycles;
+				BuildLayout(A, CORES);
 			}
 			break;
 		case ID_IPS:
 			{
 				A->L.Play.showIPS=!A->L.Play.showIPS;
+				BuildLayout(A, CORES);
 			}
 			break;
 		case ID_IPC:
 			{
 				A->L.Play.showIPC=!A->L.Play.showIPC;
+				BuildLayout(A, CORES);
 			}
 			break;
 		case ID_CPI:
 			{
 				A->L.Play.showCPI=!A->L.Play.showCPI;
+				BuildLayout(A, CORES);
 			}
 			break;
 		case ID_RATIO:
 			{
 				A->L.Play.showRatios=!A->L.Play.showRatios;
+				BuildLayout(A, CORES);
 			}
 			break;
 		case ID_CSTATE:
@@ -4630,7 +4713,7 @@ int main(int argc, char *argv[])
 					.Length=0,
 					.String=NULL,
 				},
-				.Usage={.C0=NULL, .C3=NULL, .C6=NULL},
+				.Usage={.C0=NULL, .C3=NULL, .C6=NULL, .C7=NULL},
 				.Axes={{0, NULL}},
 				// Design the TextCursor
 				.TextCursor={	{.x=+0, .y=+0},
