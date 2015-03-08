@@ -206,7 +206,7 @@ typedef int __kernel_pid_t;
 #define	SCHED_PID_FORMAT	"  .%-30s: %%ld\n"
 #define	SCHED_TASK_SECTION	"runnable tasks:"
 #define	TASK_SECTION		"Task Scheduling"
-#define	TASK_STATE_FMT		"%1s"
+#define	TASK_STATE_FMT		"%c"
 #define	TASK_COMM_FMT		"%15s"
 #define	TASK_TIME_FMT		"%9Ld.%06Ld"
 #define	TASK_CTXSWITCH_FMT	"%9Ld"

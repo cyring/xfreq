@@ -128,7 +128,7 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 #define	RSC_CPI		"CPI"
 #define	RSC_RATIO	"Ratio"
 #define	RSC_SCHED	"Task"
-#define	RSC_CSTATE	"States"
+#define	RSC_CSTATE	"C-States"
 #define	RSC_TSC		"TSC"
 #define	RSC_TSC_AUX	"AUX"
 #define	RSC_BIOS	"BIOS"
@@ -342,7 +342,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CORE_RATIO	"%-3.1f"
 #define	CSTATES_PERCENT	"%6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%"
 #define	CSTATES_AVERAGE	"%6.2f      %6.2f      %6.2f      %6.2f      %6.2f      %6.2f"
-#define	CSTATES_FOOTER	"~      % TB        % C0        % C1        % C3        % C6        % C7"
+#define	CSTATES_FOOTER	"~      % Uh        % C0        % C1        % C3        % C6        % C7"
 #define	OVERCLOCK	"%s [%4.0f MHz]"
 #define	TEMPERATURE	"%3d"
 

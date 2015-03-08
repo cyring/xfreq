@@ -1934,71 +1934,71 @@ void	BuildLayout(uARG *A, int G)
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					&str[4], 2);
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
-					if(A->L.Play.showCycles)
+			if(A->L.Play.showCycles)
+			{
+				if(!A->L.Play.showIPS
+				&& !A->L.Play.showIPC
+				&& !A->L.Play.showCPI)
+				{
+				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+						One_Char_Width(G) * 13,
+						One_Char_Height(G),
+						"INST  UCC:URC  C-ST / TSC ", 26);
+				}
+			}
+			else
+			{
+				if(A->SHM->S.Monitor)
+				{
+					if(!A->L.Play.showRatios)
 					{
-						if(!A->L.Play.showIPS
-						&& !A->L.Play.showIPC
-						&& !A->L.Play.showCPI)
-						{
-						XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
-								One_Char_Width(G) * 13,
-								One_Char_Height(G),
-								"INST  UCC:URC  C-ST / TSC ", 26);
-						}
+					XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+							One_Char_Width(G) * 37,
+							One_Char_Height(G),
+							"w/PID", 5);
 					}
-					else
-					{
-						if(A->SHM->S.Monitor)
-						{
-							if(!A->L.Play.showRatios)
-							{
-							XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
-									One_Char_Width(G) * 37,
-									One_Char_Height(G),
-									"[PID]", 5);
-							}
-							if(!A->L.Play.showIPS
-							&& !A->L.Play.showIPC
-							&& !A->L.Play.showCPI)
-							{
-							XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
-									One_Char_Width(G) * 17,
-									One_Char_Height(G),
-									"TASK SCHEDULING", 15);
-							}
-						}
-						else if(!A->L.Play.showRatios
-						&&	!A->L.Play.showIPS
-						&&	!A->L.Play.showIPC
-						&&	!A->L.Play.showCPI)
-						{
-							XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
-									One_Char_Width(G) * 26,
-									One_Char_Height(G),
-									"UCC:URC", 7);
-						}
-					}
-					if(A->L.Play.showIPS)
+					if(!A->L.Play.showIPS
+					&& !A->L.Play.showIPC
+					&& !A->L.Play.showCPI)
 					{
 						XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
-								One_Char_Width(G) * 15,
+								One_Char_Width(G) * 17,
 								One_Char_Height(G),
-								"IPS", 3);
+								TASK_SECTION, sizeof(TASK_SECTION)-1);
 					}
-					if(A->L.Play.showIPC)
-					{
-						XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
-								One_Char_Width(G) * 23,
-								One_Char_Height(G),
-								"IPC", 3);
-					}
-					if(A->L.Play.showCPI)
-					{
-						XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
-								One_Char_Width(G) * 31,
-								One_Char_Height(G),
-								"CPI", 3);
-					}
+				}
+				else if(!A->L.Play.showRatios
+				&&	!A->L.Play.showIPS
+				&&	!A->L.Play.showIPC
+				&&	!A->L.Play.showCPI)
+				{
+					XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+							One_Char_Width(G) * 26,
+							One_Char_Height(G),
+							"UCC:URC", 7);
+				}
+			}
+			if(A->L.Play.showIPS)
+			{
+				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+						One_Char_Width(G) * 15,
+						One_Char_Height(G),
+						"IPS", 3);
+			}
+			if(A->L.Play.showIPC)
+			{
+				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+						One_Char_Width(G) * 23,
+						One_Char_Height(G),
+						"IPC", 3);
+			}
+			if(A->L.Play.showCPI)
+			{
+				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+						One_Char_Width(G) * 31,
+						One_Char_Height(G),
+						"CPI", 3);
+			}
 		}
 			break;
 		case CSTATES:
@@ -2645,7 +2645,7 @@ void	DrawLayout(uARG *A, int G)
 			break;
 		case CSTATES:
 		{
-			char *str=calloc(64, 1);
+			char *str=calloc(72, 1);
 			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
@@ -2698,7 +2698,7 @@ void	DrawLayout(uARG *A, int G)
 						One_Char_Height(G) + (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT + 1)),
 						str, strlen(str) );
 
-			// Draw C0, C3 & C6 states.
+			// Draw C0 to C7 states.
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH1].RGB);
 			XFillRectangles(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Usage.C0, A->SHM->P.CPU);
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH2].RGB);
@@ -2872,17 +2872,17 @@ void	DrawLayout(uARG *A, int G)
 			// Dump the built in array then add the user specified registers.
 			int Rows=DUMP_ARRAY_DIMENSION, row=0;
 
-			char *items=calloc(Rows, DUMP_TEXT_WIDTH);
-			char *mask=calloc(DUMP_PRE_TEXT, 1), *str=calloc(DUMP_PRE_TEXT, 1);
+			char *items=calloc(Rows, 128);
+			char *mask=calloc(128, 1), *str=calloc(128, 1);
 			char *binStr=calloc(DUMP_BIN64_STR + 1, 1);
 			for(row=0; row < Rows; row++)
 			{
 				DumpRegister(A->SHM->D.Array[row].Value, NULL, binStr);
 
 				sprintf(mask, REG_FORMAT_BOL, row,
-							A->SHM->D.Array[row].Addr,
-							A->SHM->D.Array[row].Name,
-							DUMP_REG_ALIGN - strlen(A->SHM->D.Array[row].Name));
+					A->SHM->D.Array[row].Addr,
+					A->SHM->D.Array[row].Name,
+					DUMP_REG_ALIGN - strlen(A->SHM->D.Array[row].Name));
 				sprintf(str, mask, 0x20);
 				strcat(items, str);
 
