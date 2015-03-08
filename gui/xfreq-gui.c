@@ -3560,10 +3560,10 @@ void	Ctl_Feature_Help(char *items)
 void	Svr_Enable_Feature(uARG *A, int cmd)
 {
 	XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_NULL}};
-	char *str=NULL;
+	char *str=malloc(16);
 	Bool32 noerr=TRUE;
 
-	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &str) == 1) && (str != NULL))
+	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, str) == 1) && (str != NULL))
 	{
 		XChange.Map.Arg=CTL_ENABLE;
 
@@ -3571,7 +3571,6 @@ void	Svr_Enable_Feature(uARG *A, int cmd)
 			Play(A, MAIN, ID_CTLFEATURE, &XChange);
 		else
 			noerr=FALSE;
-		free(str);
 	}
 	else noerr=FALSE;
 
@@ -3586,15 +3585,16 @@ void	Svr_Enable_Feature(uARG *A, int cmd)
 		Output(A, items);
 		free(items);
 	}
+	free(str);
 }
 
 void	Svr_Disable_Feature(uARG *A, int cmd)
 {
 	XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_NULL}};
-	char *str=NULL;
+	char *str=malloc(16);
 	Bool32 noerr=TRUE;
 
-	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &str) == 1) && (str != NULL))
+	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, str) == 1) && (str != NULL))
 	{
 		XChange.Map.Arg=CTL_DISABLE;
 
@@ -3602,7 +3602,6 @@ void	Svr_Disable_Feature(uARG *A, int cmd)
 			Play(A, MAIN, ID_CTLFEATURE, &XChange);
 		else
 			noerr=FALSE;
-		free(str);
 	}
 	else noerr=FALSE;
 
@@ -3617,6 +3616,7 @@ void	Svr_Disable_Feature(uARG *A, int cmd)
 		Output(A, items);
 		free(items);
 	}
+	free(str);
 }
 
 // Process the commands language.

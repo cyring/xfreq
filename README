@@ -78,11 +78,11 @@
  * 1- the following kernel modules and file systems are prerequisites to run XFreq
  *
  * +---------------------------+-----------+--------------------------------------+
- * | msr.ko                    | mandatory | model specific registers (1)         |
+ * | msr.ko                    | mandatory | model specific registers driver (1)  |
  * +---------------------------+-----------+--------------------------------------+
- * | dmi-sysfs.ko              | optional  | DMI tables (2)                       |
+ * | dmi-sysfs.ko              | optional  | DMI tables driver (2)                |
  * +---------------------------+-----------+--------------------------------------+
- * | acpi-cpufreq.ko           | optional  | ACPI Processor P-States Driver       |
+ * | acpi-cpufreq.ko           | optional  | ACPI Processor P-States driver       |
  * +---------------------------+-----------+--------------------------------------+
  * | /proc/sched_debug         | optional  | reference: kernel/sched/debug.c      |
  * +---------------------------+-----------+--------------------------------------+
@@ -97,7 +97,7 @@
  * ./svr/bin/xfreq-intel
  *
  *
- * 3- as a regular, start one of the XFreq clients (GUI, console)
+ * 3- as a regular user, start one of the XFreq clients (GUI, console)
  *
  * ./gui/bin/xfreq-gui
  *
@@ -155,7 +155,7 @@
  * + power energy Widget using a slider to:
  *     select a Policy Preference in IA32_ENERGY_PERF_BIAS , MSR_MISC_PWR_MGMT(0x1aa),
  *     set On-Demand Clock Modulation in IA32_CLOCK_MODULATION(0x19a) (duplicated for each Thread),
- *     enable / disable C1E in MSR_POWER_CTL(0x1fc),
+ *     enable / disable C1E in MSR_POWER_CTL(0x1fc): Done,
  *     C-State auto demotion with MSR_PKG_CST_CONFIG_CONTROL(0xe2).
  * + some button-switchs & sliders to enable/disable/set the PKG/Core features in the System Info Widget.
  * + full transparency & opacity.
@@ -173,6 +173,10 @@
  *
  *
  * [HISTORY]
+ *
+ * R 2.1.48-b: 03/08/2015
+ *         - Because of FreeBSD, sscanf("%ms") are changed to "%s"
+ *         - Modified the header in xfreq-cli
  *
  * R 2.1.48-a: 03/07/2015
  *         - Server: realigned the sched_debug parsing.

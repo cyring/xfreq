@@ -57,7 +57,7 @@ static void *uRead_Freq(void *uArg)
 	while(A->LOOP)
 		if((idleRemaining=Sync_Wait(A->Room, &A->SHM->Sync, IDLE_COEF_MAX + IDLE_COEF_DEF + IDLE_COEF_MIN)))
 		{
-			printf("\nCPU#  F=Rx[%6.2f]  Temp   IPS   IPC   CPI\tTask scheduling\n", A->SHM->P.ClockSpeed);
+			printf("\nCPU#  F=%6.2f x R  Temp   IPS   IPC   CPI\tTask scheduling\n", A->SHM->P.ClockSpeed);
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
 				if(A->SHM->C[cpu].T.Offline != TRUE)

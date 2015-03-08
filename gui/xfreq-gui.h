@@ -645,8 +645,8 @@ typedef	struct
 	{"dump msr", "%x %hu %hhu", Svr_Dump_MSR},	\
 	{"read msr", "%x %hu", Svr_Read_MSR},		\
 	{"write msr", "%x %hu %llx", Svr_Write_MSR},	\
-	{"enable", "%ms", Svr_Enable_Feature},		\
-	{"disable", "%ms", Svr_Disable_Feature}		\
+	{"enable", "%s", Svr_Enable_Feature},		\
+	{"disable", "%s", Svr_Disable_Feature}		\
 }
 
 typedef	struct
