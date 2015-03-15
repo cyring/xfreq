@@ -216,7 +216,7 @@ typedef int __kernel_pid_t;
 
 #define	TASK_STRUCT_FORMAT	TASK_STATE_FMT""TASK_COMM_FMT" "TASK_PID_FMT" "TASK_TIME_FMT" "TASK_CTXSWITCH_FMT" "TASK_PRIORITY_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_NODE_FMT" "TASK_GROUP_FMT
 
-#define	OPTIONS_COUNT	7
+#define	OPTIONS_COUNT	8
 typedef struct
 {
 	char		*argument;
@@ -228,18 +228,19 @@ typedef struct
 #define	OPTIONS_LIST												\
 {														\
 	{"-c", "%d",   NULL,	"Pick up an architecture # (Int)\n"						\
-				"\t\t  refer to the '-A' option"                                       },	\
+				"\t\t  refer to the '-A' option"					},	\
 	{"-S", "%u",   NULL,	"Clock source (Int)\n"								\
-				"\t\t  argument is one of the [0]TSC [1]BIOS [2]SPEC [3]ROM [4]USER"   },	\
+				"\t\t  argument is one of the [0]TSC [1]BIOS [2]SPEC [3]ROM [4]USER"	},	\
 	{"-M", "%x",   NULL, 	"ROM address of the Base Clock (Hex)\n"						\
-				"\t\t  argument is the BCLK memory address to read from"               },	\
+				"\t\t  argument is the BCLK memory address to read from"		},	\
 	{"-s", "%u",   NULL,	"Idle time multiplier (Int)\n"							\
-				"\t\t  argument is a coefficient multiplied by 50000 usec"             },	\
-	{"-d", "%hhu", NULL,	"Registers dump enablement (Bool)"			               },	\
+				"\t\t  argument is a coefficient multiplied by 50000 usec"		},	\
+	{"-d", "%hhu", NULL,	"Registers dump enablement (Bool)"					},	\
 	{"-t", "%x",   NULL,	"Task scheduling monitoring sorted by 0x{R}0{N} (Hex)\n"			\
 				"\t\t  where {R} bit:8 is set to reverse sorting\n"				\
-				"\t\t  and {N} is one '/proc/sched_debug' field# from [0x1] to [0xb]"  },	\
-	{"-z", "%hhu", NULL,	"Reset the MSR counters (Bool)"			                       },	\
+				"\t\t  and {N} is one '/proc/sched_debug' field# from [0x1] to [0xb]"	},	\
+	{"-z", "%hhu", NULL,	"Reset the MSR counters (Bool)"						},	\
+	{"-B", "%hhu", NULL,	"Enable SmBIOS (Bool)"							},	\
 }
 
 typedef	struct
@@ -306,7 +307,7 @@ typedef struct
 	ARCH		Arch[ARCHITECTURES];
 const	DUMP_STRUCT	Loader;
 
-	Bool64		LOOP;
+	Bool64		LOOP, fSmBIOS;
 	OPTIONS		Options[OPTIONS_COUNT];
 
 	sigset_t	Signal;

@@ -2142,7 +2142,7 @@ void	BuildLayout(uARG *A, int G)
 					powered(A->SHM->P.Features.Std.CX.DS_CPL),
 					powered(A->SHM->P.Features.Std.CX.VMX),
 					powered(A->SHM->P.Features.Std.CX.SMX),
-					enabled(A->SHM->P.PowerControl.C1E), powered(A->SHM->P.Features.Std.CX.EIST), enabled(A->SHM->P.MiscFeatures.EIST),
+					powered(A->SHM->P.Features.Std.CX.EIST),		enabled(A->SHM->P.MiscFeatures.EIST),
 					powered(A->SHM->P.Features.Std.CX.CNXT_ID),
 					powered(A->SHM->P.Features.Std.CX.FMA),
 					powered(A->SHM->P.Features.Std.CX.xTPR),		enabled(!A->SHM->P.MiscFeatures.xTPR),
@@ -2208,6 +2208,11 @@ void	BuildLayout(uARG *A, int G)
 						powered(!A->SHM->P.Features.Perf_Monitoring_Leaf.BX.LLC_Misses),
 						powered(!A->SHM->P.Features.Perf_Monitoring_Leaf.BX.BranchRetired),
 						powered(!A->SHM->P.Features.Perf_Monitoring_Leaf.BX.BranchMispred),
+						enabled(A->SHM->P.PowerControl.C1E),
+						enabled(A->SHM->P.CStateConfig.C1autoDemotion),
+						enabled(A->SHM->P.CStateConfig.C3autoDemotion),
+						enabled(A->SHM->P.CStateConfig.C1undemotion),
+						enabled(A->SHM->P.CStateConfig.C3undemotion),
 						A->SHM->P.Features.MONITOR_MWAIT_Leaf.DX.Num_C0_MWAIT,
 						A->SHM->P.Features.MONITOR_MWAIT_Leaf.DX.Num_C1_MWAIT,
 						A->SHM->P.Features.MONITOR_MWAIT_Leaf.DX.Num_C2_MWAIT,
@@ -2264,6 +2269,7 @@ void	BuildLayout(uARG *A, int G)
 
 					sprintf(str, SMBIOS4_FORMAT,
 						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Proc, A->SHM->B->Proc->Attrib->Version),
+						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Proc, A->SHM->B->Proc->Attrib->Manufacturer),
 						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Proc, A->SHM->B->Proc->Attrib->Socket),
 						A->SHM->B->Proc->Attrib->Voltage.Mode ? \
 							A->SHM->B->Proc->Attrib->Voltage.Tension / 10.0f \
@@ -2277,8 +2283,6 @@ void	BuildLayout(uARG *A, int G)
 							A->SHM->B->Cache[ix]->Attrib->Installed_Size, ix < 2 ? "     " : "");
 						strcat(items, str);
 					}
-					sprintf(str, "        |- manufactured by %s\n", Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Proc, A->SHM->B->Proc->Attrib->Manufacturer));
-					strcat(items, str);
 
 					sprintf(str, SMBIOS2_FORMAT,
 						Smb_Find_String((struct STRUCTINFO*) A->SHM->B->Board, A->SHM->B->Board->Attrib->Product),
@@ -4013,10 +4017,11 @@ static void *uLoop(uARG *A)
 						break;
 					case XK_Up:
 					case XK_KP_Up:
-						if(E.xkey.state & ShiftMask)
-							Play(A, G, ID_NORTH, NULL);
-						else
-							if((G == MAIN) && (A->L.Input.Top > 0))
+						if(G == MAIN)
+						{
+							if(E.xkey.state & ShiftMask)
+								Play(A, G, ID_NORTH, NULL);
+							else if(A->L.Input.Top > 0)
 							{
 								A->L.Input.Browse=(A->L.Input.Browse > 0) ? A->L.Input.Browse - 1 : (A->L.Input.Top - 1);
 								A->L.Input.KeyInsert=A->L.Input.KeyLength=A->L.Input.History[A->L.Input.Browse].KeyLength;
@@ -4025,13 +4030,17 @@ static void *uLoop(uARG *A)
 
 								fDraw(MAIN, FALSE, TRUE);
 							}
+						}
+						else
+							Play(A, G, ID_NORTH, NULL);
 						break;
 					case XK_Down:
 					case XK_KP_Down:
-						if(E.xkey.state & ShiftMask)
-							Play(A, G, ID_SOUTH, NULL);
-						else
-							if((G == MAIN) && (A->L.Input.Top > 0))
+						if(G == MAIN)
+						{
+							if(E.xkey.state & ShiftMask)
+								Play(A, G, ID_SOUTH, NULL);
+							else if(A->L.Input.Top > 0)
 							{
 								A->L.Input.Browse=(A->L.Input.Browse < (A->L.Input.Top - 1)) ? A->L.Input.Browse + 1 : 0;
 								A->L.Input.KeyInsert=A->L.Input.KeyLength=A->L.Input.History[A->L.Input.Browse].KeyLength;
@@ -4040,41 +4049,50 @@ static void *uLoop(uARG *A)
 
 								fDraw(MAIN, FALSE, TRUE);
 							}
+						}
+						else
+							Play(A, G, ID_SOUTH, NULL);
 						break;
 					case XK_Right:
 					case XK_KP_Right:
-						if(E.xkey.state & ShiftMask)
-							Play(A, G, ID_EAST, NULL);
-						else
-							if((G == MAIN) && (A->L.Input.KeyInsert < A->L.Input.KeyLength))
+						if(G == MAIN)
+						{
+							if(E.xkey.state & ShiftMask)
+								Play(A, G, ID_EAST, NULL);
+							else if(A->L.Input.KeyInsert < A->L.Input.KeyLength)
 							{
 								A->L.Input.KeyInsert++;
 								A->L.Input.Expand.KeyLength=0;
 
 								fDraw(MAIN, FALSE, TRUE);
 							}
+						}
+						else
+							Play(A, G, ID_EAST, NULL);
 						break;
 					case XK_Left:
 					case XK_KP_Left:
-						if(E.xkey.state & ShiftMask)
-							Play(A, G, ID_WEST, NULL);
-						else
-							if((G == MAIN) && (A->L.Input.KeyInsert > 0))
+						if(G == MAIN)
+						{
+							if(E.xkey.state & ShiftMask)
+								Play(A, G, ID_WEST, NULL);
+							else if(A->L.Input.KeyInsert > 0)
 							{
 								A->L.Input.KeyInsert--;
 								A->L.Input.Expand.KeyLength=0;
 
 								fDraw(MAIN, FALSE, TRUE);
 							}
+						}
+						else
+							Play(A, G, ID_WEST, NULL);
 						break;
 					case XK_Page_Up:
 					case XK_KP_Page_Up:
-						if(E.xkey.state & ShiftMask)
 							Play(A, G, ID_PGUP, NULL);
 						break;
 					case XK_Page_Down:
 					case XK_KP_Page_Down:
-						if(E.xkey.state & ShiftMask)
 							Play(A, G, ID_PGDW, NULL);
 						break;
 					case XK_Home:

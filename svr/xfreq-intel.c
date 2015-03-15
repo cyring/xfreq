@@ -1966,6 +1966,7 @@ int main(int argc, char *argv[])
 		},
 		.Loader={.Monitor=TRUE, .Array=DUMP_LOADER},
 		.LOOP=TRUE,
+		.fSmBIOS=FALSE,
 		.Options=OPTIONS_LIST,
 		.TID_SigHandler=0,
 		.TID_Read=0,
@@ -1973,17 +1974,11 @@ int main(int argc, char *argv[])
 	};
 	uid_t	UID=geteuid();
 	Bool32	ROOT=(UID == 0),	// Check root access.
-		fEmergencyThread=FALSE,
-		fSmBIOS=FALSE;
+		fEmergencyThread=FALSE;
 	int	rc=0;
 
 	if(ROOT == TRUE)
 	{
-		// Read the SMBIOS tree and return its size
-		memset(&A.SmbTmpStorage, 0, sizeof(SMBIOS_TREE));
-		if((fSmBIOS=Init_SMBIOS(&A.SmbTmpStorage)) == FALSE)
-			tracerr("Warning: cannot read the SmBIOS tree\nCheck if 'dmi' kernel module is loaded");
-
 		// Read the CPU Features.
 		memset(&A.Features, 0, sizeof(FEATURES));
 		Read_Features(&A.Features);
@@ -2041,9 +2036,16 @@ int main(int argc, char *argv[])
 			A.Options[4].pointer=&A.SHM->D.Monitor;
 			A.Options[5].pointer=&A.SHM->S.Attributes;
 			A.Options[6].pointer=&A.SHM->CPL.RESET;
+			A.Options[7].pointer=&A.fSmBIOS;
 
 			if(ScanOptions(&A, argc, argv))
 			{
+				if(A.fSmBIOS)
+				{	// Read the SMBIOS tree and return its size
+					memset(&A.SmbTmpStorage, 0, sizeof(SMBIOS_TREE));
+					if((A.fSmBIOS=Init_SMBIOS(&A.SmbTmpStorage)) == FALSE)
+						tracerr("Warning: cannot read the SmBIOS tree\nCheck if 'dmi' kernel module is loaded");
+				}
 				if(A.SHM->P.IdleTime < IDLE_COEF_MIN)	A.SHM->P.IdleTime=IDLE_COEF_MIN;
 				if(A.SHM->P.IdleTime > IDLE_COEF_MAX)	A.SHM->P.IdleTime=IDLE_COEF_MAX;
 
@@ -2065,7 +2067,7 @@ int main(int argc, char *argv[])
 					tracerr("Remark: cannot start the signal handler");
 
 				// Copy & Map the SMBIOS tree
-				if(fSmBIOS) {	// @ a SHM fixed offset address.
+				if(A.fSmBIOS) {	// @ a SHM fixed offset address.
 					A.SHM->B=(SMBIOS_TREE *) A.SHM;
 					A.SHM->B+=A.Size.Shm;
 					A.Size.SmBIOS=PAGE_SIZE * ((A.SmbTmpStorage.Node.MemSum / PAGE_SIZE) + ((A.SmbTmpStorage.Node.MemSum % PAGE_SIZE) ? 1 : 0));
@@ -2077,7 +2079,7 @@ int main(int argc, char *argv[])
 					else
 						tracerr("Error: creating the SmBIOS shared memory");
 
-					fSmBIOS=!Close_SMBIOS(&A.SmbTmpStorage);
+					A.fSmBIOS=!Close_SMBIOS(&A.SmbTmpStorage);
 				}
 
 				// Find or force the Architecture specifications.
@@ -2301,7 +2303,7 @@ int main(int argc, char *argv[])
 			else
 				rc=1;
 
-			if(fSmBIOS)
+			if(A.fSmBIOS)
 				if(Close_SMBIOS(&A.SmbTmpStorage) == FALSE)
 					tracerr("Error: freeing the temporary SmBIOS tree");
 			if(A.SmBIOS != MAP_FAILED)

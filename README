@@ -174,6 +174,11 @@
  *
  * [HISTORY]
  *
+ * R 2.1.50: 03/16/2015
+ *         - New '-B' argument to enable SmBIOS. (default is disable in the server).
+ *         - Redesigned the System Information as a tree.
+ *         - Added C-States Auto Demotion & UnDemotion states into the SysInfo widget.
+ *
  * R 2.1.49: 03/15/2015
  *         - Added Performance Monitoring details into the SYSINFO widget.
  *         - Implemented the CPUID MONITOR MWAIT Leaf.

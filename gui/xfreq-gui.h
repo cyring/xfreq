@@ -302,34 +302,34 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	GEOMETRY_FORMAT	"%d:%dx%d%+d%+d,"
 #define	GEOMETRY_SIZE	strlen("0:640x360+5120+2880,")
 
-#define	MENU_FORMAT	"[F1]      Help             [F2]     Core\n"               \
-			"[F3]      C-States         [F4]     Temps \n"             \
-			"[F5]      System Info      [F6]     Dump\n"               \
-			"KeyPad[+] Faster Loop     KeyPad[-] Slower Loop\n"        \
-			"[Pause]   Suspend/Resume display\n"                       \
-			"\nWith the [Shift] key :\n"                               \
-			"                                  [Up]\n"                 \
-			"  Page Scrolling           [Left]      [Right]\n"         \
-			"                                 [Down]\n\n"              \
-			"[PgDw]   Page Down         [PgUp]   Page Up\n"            \
-			"[Home]   Line Begin        [End]    Line End\n"           \
-			"\nWith the [Control] key:\n"                              \
-			"[Home]   Page start        [End]    Page end\n"           \
-			"[L][l]   Refresh page      [Q][q]   Quit\n"               \
-			"[Y][y]   Cycles            [W][w]   Wallboard\n"          \
-			"[Z][z]   Frequency Hz      [P][p]   C-States %\n"         \
-			"[R][r]   Ratio values      [T][t]   Task schedule\n\n"    \
-			"Command keys:\n"                                          \
-			"[Left] | [Right] | [Home] | [End] Move the cursor insertion\n"  \
-			"[Up] | [Down]  Browse forward, backward the commands history\n" \
-			"[F12] Substitute command line using the history index\n"        \
-			"[Backspace] Remove the character before the cursor\n"           \
-			"[Erase]     Remove the character under the cursor\n"            \
-			"[Escape]    Cancel the full command line\n"                     \
-			"[Enter]     Submit the command line\n"                          \
-			"[Tab]       Expand the command line\n\n"                        \
-			"Mouse buttons:\n"                                         \
-			"[Left]  Activate Button    [Right] Grab & Move Widget\n"  \
+#define	MENU_FORMAT	"[F1]      Help             [F2]     Core\n"			\
+			"[F3]      C-States         [F4]     Temps \n"			\
+			"[F5]      System Info      [F6]     Dump\n"			\
+			"KeyPad[+] Faster Loop     KeyPad[-] Slower Loop\n"		\
+			"[Pause]   Suspend/Resume display\n"				\
+			"\nw/[Shift] key:\n"						\
+			"                                  [Up]\n"			\
+			"  Page Scrolling           [Left]      [Right]\n"		\
+			"                                 [Down]\n\n"			\
+			"[PgDw]   Page Down         [PgUp]   Page Up\n"			\
+			"[Home]   Line Begin        [End]    Line End\n"		\
+			"\nw/[Control] key:\n"						\
+			"[Home]   Page start        [End]    Page end\n"		\
+			"[L][l]   Refresh page      [Q][q]   Quit\n"			\
+			"[Y][y]   Cycles            [W][w]   Wallboard\n"		\
+			"[Z][z]   Frequency Hz      [P][p]   C-States %\n"		\
+			"[R][r]   Ratio values      [T][t]   Task schedule\n\n"		\
+			"Command keys:\n"						\
+			"[Left] | [Right] | [Home] | [End] Move the cursor insertion\n"	\
+			"[Up] | [Down]  Browse forward, backward the commands history\n"\
+			"[F12] Substitute command line using the history index\n"	\
+			"[Backspace] Remove the character before the cursor\n"		\
+			"[Erase]     Remove the character under the cursor\n"		\
+			"[Escape]    Cancel the full command line\n"			\
+			"[Enter]     Submit the command line\n"				\
+			"[Tab]       Expand the command line\n\n"			\
+			"Mouse buttons:\n"						\
+			"[Left]  Activate Button    [Right] Grab & Move Widget\n"	\
 			"[Wheel Down] Page Down     [Wheel Up] Page Up\n"
 
 #define	CORE_NUM	"#%-2d"
@@ -356,112 +356,127 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"\n"											\
 			"Architecture [%s]\n"									\
 			"\n"											\
-			"Boot Processor features:\n"								\
-			"Virtual Mode Extension                                        VME [%c]\n"		\
-			"Debugging Extension                                            DE [%c]\n"		\
-			"Page Size Extension                                           PSE [%c]\n"		\
-			"Time Stamp Counter                                [%9s] TSC [%c]\n"			\
-			"Model Specific Registers                                      MSR [%c]   [%3s]\n"	\
-			"Physical Address Extension                                    PAE [%c]\n"		\
-			"Advanced Programmable Interrupt Controller                   APIC [%c]\n"		\
-			"Memory Type Range Registers                                  MTRR [%c]   [%3s]\n"	\
-			"Page Global Enable                                            PGE [%c]\n"		\
-			"Machine-Check Architecture                                    MCA [%c]\n"		\
-			"Page Attribute Table                                          PAT [%c]\n"		\
-			"36-bit Page Size Extension                                  PSE36 [%c]\n"		\
-			"Processor Serial Number                                       PSN [%c]\n"		\
-			"Debug Store & Precise Event Based Sampling               DS, PEBS [%c]   [%3s]\n"	\
-			"Advanced Configuration & Power Interface                     ACPI [%c]\n"		\
-			"Self-Snoop                                                     SS [%c]\n"		\
-			"Hyper-Threading                                               HTT [%c]   [%3s]\n"	\
-			"Thermal Monitor                        TM#1 [%c]  [%3s]       TM#2 [%c]   [%3s]\n"	\
-			"Pending Break Enable                                          PBE [%c]\n"		\
-			"64-Bit Debug Store                                         DTES64 [%c]\n"		\
-			"CPL Qualified Debug Store                                  DS-CPL [%c]\n"		\
-			"Virtual Machine Extensions                                    VMX [%c]\n"		\
-			"Safer Mode Extensions                                         SMX [%c]\n"		\
-			"SpeedStep                              C1E [%3s]             EIST [%c]   [%3s]\n"	\
-			"L1 Data Cache Context ID                                  CNXT-ID [%c]\n"		\
-			"Fused Multiply Add                                            FMA [%c]\n"		\
-			"xTPR Update Control                                          xTPR [%c]   [%3s]\n"	\
-			"Perfmon and Debug Capability                                 PDCM [%c]\n"		\
-			"Process Context Identifiers                                  PCID [%c]\n"		\
-			"Direct Cache Access                                           DCA [%c]\n"		\
-			"Extended xAPIC Support                                     x2APIC [%c]\n"		\
-			"Time Stamp Counter Deadline                          TSC-DEADLINE [%c]\n"		\
-			"XSAVE/XSTOR States                                          XSAVE [%c]\n"		\
-			"OS-Enabled Ext. State Management                          OSXSAVE [%c]\n"		\
-			"Execution Disable Bit Support          w/PAE [%3s]         XD-Bit [%c]   [%3s]\n"	\
-			"1 GB Pages Support                                      1GB-PAGES [%c]\n"		\
-			"Hardware Lock Elision                                         HLE [%c]\n"		\
-			"Restricted Transactional Memory                               RTM [%c]\n"		\
-			"Fast-Strings                                      REP MOVSB/STOSB [%c]   [%3s]\n"	\
-			"Digital Thermal Sensor                                        DTS [%c]\n"		\
-			"Automatic Thermal Control Circuit Enable                      TCC       [%3s]\n"	\
-			"Performance Monitoring Available                               PM       [%3s]\n"	\
-			"Branch Trace Storage Unavailable                              BTS       [%3s]\n"	\
-			"Limit CPUID Maxval                                    Limit-CPUID       [%3s]\n"	\
-			"Turbo Boost Technology/Dynamic Acceleration             TURBO/IDA [%c]   [%3s]\n"	\
+			"Boot Processor features\n"								\
+			"|- Virtual Mode Extension                                     VME [%c]\n"		\
+			"|- Debugging Extension                                         DE [%c]\n"		\
+			"|- Page Size Extension                                        PSE [%c]\n"		\
+			"|- Time Stamp Counter                             [%9s] TSC [%c]\n"			\
+			"|- Model Specific Registers                                   MSR [%c]   [%3s]\n"	\
+			"|- Physical Address Extension                                 PAE [%c]\n"		\
+			"|- Advanced Programmable Interrupt Controller                APIC [%c]\n"		\
+			"|- Memory Type Range Registers                               MTRR [%c]   [%3s]\n"	\
+			"|- Page Global Enable                                         PGE [%c]\n"		\
+			"|- Machine-Check Architecture                                 MCA [%c]\n"		\
+			"|- Page Attribute Table                                       PAT [%c]\n"		\
+			"|- 36-bit Page Size Extension                               PSE36 [%c]\n"		\
+			"|- Processor Serial Number                                    PSN [%c]\n"		\
+			"|- Debug Store & Precise Event Based Sampling            DS, PEBS [%c]   [%3s]\n"	\
+			"|- Advanced Configuration & Power Interface                  ACPI [%c]\n"		\
+			"|- Self-Snoop                                                  SS [%c]\n"		\
+			"|- Hyper-Threading                                            HTT [%c]   [%3s]\n"	\
+			"|- Thermal Monitor                     TM#1 [%c]  [%3s]       TM#2 [%c]   [%3s]\n"	\
+			"|- Pending Break Enable                                       PBE [%c]\n"		\
+			"|- 64-Bit Debug Store                                      DTES64 [%c]\n"		\
+			"|- CPL Qualified Debug Store                               DS-CPL [%c]\n"		\
+			"|- Virtual Machine Extensions                                 VMX [%c]\n"		\
+			"|- Safer Mode Extensions                                      SMX [%c]\n"		\
+			"|- SpeedStep                                                 EIST [%c]   [%3s]\n"	\
+			"|- L1 Data Cache Context ID                               CNXT-ID [%c]\n"		\
+			"|- Fused Multiply Add                                         FMA [%c]\n"		\
+			"|- xTPR Update Control                                       xTPR [%c]   [%3s]\n"	\
+			"|- Perfmon and Debug Capability                              PDCM [%c]\n"		\
+			"|- Process Context Identifiers                               PCID [%c]\n"		\
+			"|- Direct Cache Access                                        DCA [%c]\n"		\
+			"|- Extended xAPIC Support                                  x2APIC [%c]\n"		\
+			"|- Time Stamp Counter Deadline                       TSC-DEADLINE [%c]\n"		\
+			"|- XSAVE/XSTOR States                                       XSAVE [%c]\n"		\
+			"|- OS-Enabled Ext. State Management                       OSXSAVE [%c]\n"		\
+			"|- Execution Disable Bit Support       w/PAE [%3s]         XD-Bit [%c]   [%3s]\n"	\
+			"|- 1 GB Pages Support                                   1GB-PAGES [%c]\n"		\
+			"|- Hardware Lock Elision                                      HLE [%c]\n"		\
+			"|- Restricted Transactional Memory                            RTM [%c]\n"		\
+			"|- Fast-Strings                                   REP MOVSB/STOSB [%c]   [%3s]\n"	\
+			"|- Digital Thermal Sensor                                     DTS [%c]\n"		\
+			"|- Automatic Thermal Control Circuit Enable                   TCC       [%3s]\n"	\
+			"|- Performance Monitoring Available                            PM       [%3s]\n"	\
+			"|- Branch Trace Storage Unavailable                           BTS       [%3s]\n"	\
+			"|- Limit CPUID Maxval                                 Limit-CPUID       [%3s]\n"	\
+			"|- Turbo Boost Technology/Dynamic Acceleration          TURBO/IDA [%c]   [%3s]\n"	\
 			"\n"											\
 			"Ratio Boost:   Min   Max    8C    7C    6C    5C    4C    3C    2C    1C\n"		\
 			"               %3d   %3d   %3d   %3d   %3d   %3d   %3d   %3d   %3d   %3d\n"		\
 			"\n"											\
-			"Instruction set:\n"									\
-			"FPU       [%c]           CX8 [%c]          SEP [%c]             CMOV [%c]\n"		\
-			"CLFSH     [%c]           MMX [%c]         FXSR [%c]              SSE [%c]\n"		\
-			"SSE2      [%c]          SSE3 [%c]        SSSE3 [%c]           SSE4.1 [%c]\n"		\
-			"SSE4.2    [%c]      PCLMULDQ [%c]      MONITOR [%c][%3s]        CX16 [%c]\n"		\
-			"MOVBE     [%c]        POPCNT [%c]          AES [%c]         AVX/AVX2 [%c/%c]\n"	\
-			"F16C      [%c]        RDRAND [%c]\n"							\
+			"Instruction set\n"									\
+			"|- FPU       [%c]          CX8 [%c]         SEP [%c]            CMOV [%c]\n"		\
+			"|- CLFSH     [%c]          MMX [%c]        FXSR [%c]             SSE [%c]\n"		\
+			"|- SSE2      [%c]         SSE3 [%c]       SSSE3 [%c]          SSE4.1 [%c]\n"		\
+			"|- SSE4.2    [%c]     PCLMULDQ [%c]     MONITOR [%c][%3s]       CX16 [%c]\n"		\
+			"|- MOVBE     [%c]       POPCNT [%c]         AES [%c]        AVX/AVX2 [%c/%c]\n"	\
+			"|- F16C      [%c]       RDRAND [%c]\n"							\
 			"\n"											\
-			"Extended Feature:\n"									\
-			"LAHF/SAHF [%c]        RDTSCP [%c]         IA64 [%c]          BM1/BM2 [%c/%c]\n"	\
-			"SYSCALL   [%c][%3s]                      IA32e[%3s]\n"	\
+			"Extended Feature\n"									\
+			"|- LAHF/SAHF [%c]       RDTSCP [%c]        IA64 [%c]         BM1/BM2 [%c/%c]\n"	\
+			"|- SYSCALL   [%c][%3s]                    IA32e[%3s]\n"				\
 			"\n"
 
-#define	TOPOLOGY_SECTION "Processor Topology:                                          %3u x CPU Online\n"	\
-			"CPU#    APIC    Core  Thread   State\n"
-#define	TOPOLOGY_FORMAT	"%03u %8u%8u%8u   [%3s]\n"
+#define	TOPOLOGY_SECTION "Processor Topology                                           %3u x CPU Online\n"	\
+			"|- CPU#    APIC    Core  Thread   State\n"
+#define	TOPOLOGY_FORMAT	"   %03u %8u%8u%8u   [%3s]\n"
 
 #define	PERF_SECTION	"\n"											\
-			"Performance Monitoring:                                    Version %-3d\n"								\
-			"Core Cycles                                                       [%c]\n"		\
-			"Instructions Retired                                              [%c]\n"		\
-			"Reference Cycles                                                  [%c]\n"		\
-			"Last Level Cache References                                       [%c]\n"		\
-			"Last Level Cache Misses                                           [%c]\n"		\
-			"Branch Instructions Retired                                       [%c]\n"		\
-			"Branch Mispredicts Retired                                        [%c]\n"		\
-			"MWAIT # of sub C-States      %-2dx C0   %-2dx C1   %-2dx C2   %-2dx C3   %-2dx C4\n"	\
-			"General Counters                                               %3u x%3u bits\n"	\
-			"Fixed Counters                                                 %3u x%3u bits\n"	\
-			"\n"											\
-			"CPU         Counter#0                Counter#1                Counter#2\n"		\
-			" #      OS  User  AnyThread      OS  User  AnyThread      OS  User  AnyThread\n"
-#define	PERF_FORMAT	"%03u      %1d     %1d     %1d            %1d     %1d     %1d            %1d     %1d     %1d\n"
+			"Performance Monitoring\n"								\
+			"|- Version                                                      [%3d]\n"		\
+			"|- Core Cycles                                                    [%c]\n"		\
+			"|- Instructions Retired                                           [%c]\n"		\
+			"|- Reference Cycles                                               [%c]\n"		\
+			"|- Last Level Cache References                                    [%c]\n"		\
+			"|- Last Level Cache Misses                                        [%c]\n"		\
+			"|- Branch Instructions Retired                                    [%c]\n"		\
+			"|- Branch Mispredicts Retired                                     [%c]\n"		\
+			"|- C-States\n"										\
+			"|     |- Enhanced Halt State                                C1E [%3s]\n"		\
+			"|     |- C1 Auto Demotion                                   C1A [%3s]\n"		\
+			"|     |- C3 Auto Demotion                                   C3A [%3s]\n"		\
+			"|     |- C1 UnDemotion                                      C1U [%3s]\n"		\
+			"|     |- C3 UnDemotion                                      C3U [%3s]\n"		\
+			"|     |\n"										\
+			"|     |- MWAIT # of sub-states    C0      C1      C2      C3      C4\n"		\
+			"|                                 %2d      %2d      %2d      %2d      %2d\n"		\
+			"|\n"											\
+			"|- Counters                       General                 Fixed\n"			\
+			"   |                            %3u x%3u bits           %3u x%3u bits\n"		\
+			"   |\n"										\
+			"   |- CPU     Counter#0               Counter#1               Counter#2\n"		\
+			"       #  OS  User  AnyThread     OS  User  AnyThread     OS  User  AnyThread\n"
+#define	PERF_FORMAT	"      %03u  %1d     %1d     %1d           %1d     %1d    %1d            %1d     %1d     %1d\n"
 
 #define	RAM_SECTION	"\n"											\
-			"Memory Controler:\n"
-#define	CHA_FORMAT	"Channel   tCL   tRCD  tRP   tRAS  tRRD  tRFC  tWR   tRTPr tWTPr tFAW  B2B\n"
-#define	CAS_FORMAT	"   #%1i   |%4d%6d%6d%6d%6d%6d%6d%6d%6d%6d%6d\n"
+			"Memory Controler\n"
+#define	CHA_FORMAT	"|- Channel   tCL   tRCD  tRP   tRAS  tRRD  tRFC  tWR   tRTPr tWTPr tFAW  B2B\n"
+#define	CAS_FORMAT	"      #%1i   |%4d%6d%6d%6d%6d%6d%6d%6d%6d%6d%6d\n"
 
 #define	SMBIOS_SECTION	"\n"											\
-			"System Management BIOS:\n"
-#define	SMBIOS4_FORMAT	"Processor [%s]\n"									\
-			"        |- socket %s\n"								\
-			"        |- tension %.1f V\n"
-#define	SMBIOS7_FORMAT	"        |- %s [%4lld]%s\n"
-#define	SMBIOS2_FORMAT	"    Board [%s]\n"									\
-			"        |- version %s\n"								\
-			"        |- manufactured by %s\n"							\
-			"        |- serial [%s]\n"
-#define	SMBIOS0_FORMAT	"    BIOS  [%s]\n"									\
-			"        |- version %s\n"								\
-			"        |- released date %s\n"								\
-			"        |- revision %lld.%lld\n"							\
-			"        |- ROM Size %lld KB at 0x%04llX\n"
-#define	SMBIOS16_FORMAT	"    RAM   [%lld/%lld MB]\n"
-#define	SMBIOS17_FORMAT	"        |- %s:%s  %lld MB @ %lld MHz\n"
+			"System Management BIOS\n"
+#define	SMBIOS4_FORMAT	"|- Processor\n"									\
+			"|     |- product [%s]\n"								\
+			"|     |- manufactured by %s\n"								\
+			"|     |- socket %s\n"									\
+			"|     |- tension %.1f V\n"
+#define	SMBIOS7_FORMAT	"|     |- %s [%4lld]%s\n"
+#define	SMBIOS2_FORMAT	"|-  Board\n"										\
+			"|     |- product [%s]\n"								\
+			"|     |- version %s\n"									\
+			"|     |- manufactured by %s\n"								\
+			"|     |- serial [%s]\n"
+#define	SMBIOS0_FORMAT	"|-  BIOS\n"										\
+			"|     |- product [%s]\n"								\
+			"|     |- version %s\n"									\
+			"|     |- released date %s\n"								\
+			"|     |- revision %lld.%lld\n"								\
+			"|     |- ROM Size %lld KB at 0x%04llX\n"
+#define	SMBIOS16_FORMAT	"|-  RAM\n"										\
+			"      |- Capacity [%lld/%lld MB]\n"
+#define	SMBIOS17_FORMAT	"            |- %s:%s  %lld MB @ %lld MHz\n"
 
 #define	SYSINFO_SECTION	"System Information"
 //                       .# 12345678 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234] #00
