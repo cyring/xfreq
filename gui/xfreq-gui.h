@@ -48,22 +48,22 @@ enum {
 	COLOR_COUNT
 };
 
-#define	_BACKGROUND_GLOBAL	0x11114c
+#define	_BACKGROUND_GLOBAL	0x2a0308
 #define	_FOREGROUND_GLOBAL	0x8fcefa
 #define	_BACKGROUND_SPLASH	0x000000
 #define	_FOREGROUND_SPLASH	0x8fcefa
 
-#define	_BACKGROUND_MAIN	0x11114c
+#define	_BACKGROUND_MAIN	0x2a0308
 #define	_FOREGROUND_MAIN	0x8fcefa
-#define	_BACKGROUND_CORES	0x191970
+#define	_BACKGROUND_CORES	0x2a0308
 #define	_FOREGROUND_CORES	0x8fcefa
-#define	_BACKGROUND_CSTATES	0x191970
+#define	_BACKGROUND_CSTATES	0x2a0308
 #define	_FOREGROUND_CSTATES	0x8fcefa
-#define	_BACKGROUND_TEMPS	0x191970
+#define	_BACKGROUND_TEMPS	0x2a0308
 #define	_FOREGROUND_TEMPS	0x8fcefa
-#define	_BACKGROUND_SYSINFO	0x191970
+#define	_BACKGROUND_SYSINFO	0x2a0308
 #define	_FOREGROUND_SYSINFO	0x8fcefa
-#define	_BACKGROUND_DUMP	0x191970
+#define	_BACKGROUND_DUMP	0x2a0308
 #define	_FOREGROUND_DUMP	0x8fcefa
 
 #define	_COLOR_AXES		0x404040
@@ -291,7 +291,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 // BIN64: 16 x 4 digits + '\0'
 #define DUMP_BIN64_STR		(16 * 4) + 1
 // PRE_TEXT: ##' 'Addr[8+1]' 'Name&Padding[24]'['
-#define DUMP_PRE_TEXT		(2 + 1 + (8+1) + 1 + DUMP_REG_ALIGN + 1)
+#define DUMP_PRE_TEXT		(2 + 1 + (8+0) + 1 + DUMP_REG_ALIGN + 1)
 // Columns: PRE_TEXT + BIN64 w/ 15 interspaces + '] ' + CoreNum + ScrollButtons
 #define	GEOMETRY_DUMP_COLS	(DUMP_PRE_TEXT + DUMP_BIN64_STR + 15 + 2 + 3 + 3)
 #define	GEOMETRY_DUMP_ROWS	(DUMP_ARRAY_DIMENSION + 2)
@@ -348,11 +348,11 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 
 #define	PROC_FORMAT	"Processor  [%s]\n"									\
 			"\n"											\
-			"Base Clock [%5.2f MHz]                                 Source [%s]\n"			\
+			"Base Clock [%5.2f MHz]                                  Source [%s]\n"			\
 			"\n"											\
-			" Family               Model             Stepping             Max# of\n"		\
-			"  Code                 No.                 ID                Threads\n"		\
-			"[%6X]            [%6X]            [%6d]            [%6d]\n"				\
+			" Family               Model             Stepping              Max# of\n"		\
+			"  Code                 No.                 ID                 Threads\n"		\
+			"[%6X]            [%6X]            [%6d]             [%6d]\n"				\
 			"\n"											\
 			"Architecture [%s]\n"									\
 			"\n"											\
@@ -391,7 +391,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"Time Stamp Counter Deadline                          TSC-DEADLINE [%c]\n"		\
 			"XSAVE/XSTOR States                                          XSAVE [%c]\n"		\
 			"OS-Enabled Ext. State Management                          OSXSAVE [%c]\n"		\
-			"Execution Disable Bit Support                              XD-Bit [%c]   [%3s]\n"	\
+			"Execution Disable Bit Support          w/PAE [%3s]         XD-Bit [%c]   [%3s]\n"	\
 			"1 GB Pages Support                                      1GB-PAGES [%c]\n"		\
 			"Hardware Lock Elision                                         HLE [%c]\n"		\
 			"Restricted Transactional Memory                               RTM [%c]\n"		\
@@ -416,19 +416,25 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"\n"											\
 			"Extended Feature:\n"									\
 			"LAHF/SAHF [%c]        RDTSCP [%c]         IA64 [%c]          BM1/BM2 [%c/%c]\n"	\
-			"SYSCALL/SYSRET                                                SCE [%c]   [%3s]\n"	\
-			"IA32e mode active                                             LMA       [%3s]\n"	\
-			"XD-Bit enable                                                 NXE       [%3s]\n"	\
+			"SYSCALL   [%c][%3s]                      IA32e[%3s]\n"	\
 			"\n"
 
-#define	TOPOLOGY_SECTION "Processor topology:                                       %-3ux CPU Online\n"		\
+#define	TOPOLOGY_SECTION "Processor Topology:                                          %3u x CPU Online\n"	\
 			"CPU#    APIC    Core  Thread   State\n"
 #define	TOPOLOGY_FORMAT	"%03u %8u%8u%8u   [%3s]\n"
 
 #define	PERF_SECTION	"\n"											\
-			"Performance:\n"									\
-			"Monitoring Counters                                       %-3ux%3u bits\n"		\
-			"Fixed Counters                                            %-3ux%3u bits\n"		\
+			"Performance Monitoring:                                    Version %-3d\n"								\
+			"Core Cycles                                                       [%c]\n"		\
+			"Instructions Retired                                              [%c]\n"		\
+			"Reference Cycles                                                  [%c]\n"		\
+			"Last Level Cache References                                       [%c]\n"		\
+			"Last Level Cache Misses                                           [%c]\n"		\
+			"Branch Instructions Retired                                       [%c]\n"		\
+			"Branch Mispredicts Retired                                        [%c]\n"		\
+			"MWAIT # of sub C-States      %-2dx C0   %-2dx C1   %-2dx C2   %-2dx C3   %-2dx C4\n"	\
+			"General Counters                                               %3u x%3u bits\n"	\
+			"Fixed Counters                                                 %3u x%3u bits\n"	\
 			"\n"											\
 			"CPU         Counter#0                Counter#1                Counter#2\n"		\
 			" #      OS  User  AnyThread      OS  User  AnyThread      OS  User  AnyThread\n"
@@ -458,10 +464,10 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	SMBIOS17_FORMAT	"        |- %s:%s  %lld MB @ %lld MHz\n"
 
 #define	SYSINFO_SECTION	"System Information"
-//                       .# 123456789 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234] #00
-#define	DUMP_SECTION	" #  Address          Register           60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0 Core"
+//                       .# 12345678 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234] #00
+#define	DUMP_SECTION	" #  Address          Register          60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0 Core"
 #define	REG_HEXVAL	"%016llX"
-#define	REG_FORMAT_BOL	"%02d %09X %s%%%zdc["
+#define	REG_FORMAT_BOL	"%02d %08X %s%%%zdc["
 #define	REG_FORMAT_EOL	"] "CORE_NUM"\n"
 
 #define	TASK_SECTION	"Task Scheduling"
@@ -655,13 +661,15 @@ typedef	struct
 	unsigned int	ID;
 } CTL_FEATURES;
 
-#define	FEATURES_LIST		\
-{				\
-	{"turbo", CTL_TURBO},	\
-	{"eist", CTL_EIST},	\
-	{"c1e", CTL_C1E},	\
-	{"tcc",	CTL_TCC},	\
-	{NULL, CTL_NOP}		\
+#define	FEATURES_LIST			\
+{					\
+	{"turbo",	CTL_TURBO},	\
+	{"eist",	CTL_EIST},	\
+	{"c1e",		CTL_C1E},	\
+	{"c3a",		CTL_C3A},	\
+	{"c1a",		CTL_C1A},	\
+	{"tcc",		CTL_TCC},	\
+	{NULL,		CTL_NOP}	\
 }
 
 typedef struct

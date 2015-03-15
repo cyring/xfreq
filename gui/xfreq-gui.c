@@ -2142,7 +2142,7 @@ void	BuildLayout(uARG *A, int G)
 					powered(A->SHM->P.Features.Std.CX.DS_CPL),
 					powered(A->SHM->P.Features.Std.CX.VMX),
 					powered(A->SHM->P.Features.Std.CX.SMX),
-					enabled(A->SHM->P.Power.Control.C1E), powered(A->SHM->P.Features.Std.CX.EIST), enabled(A->SHM->P.MiscFeatures.EIST),
+					enabled(A->SHM->P.PowerControl.C1E), powered(A->SHM->P.Features.Std.CX.EIST), enabled(A->SHM->P.MiscFeatures.EIST),
 					powered(A->SHM->P.Features.Std.CX.CNXT_ID),
 					powered(A->SHM->P.Features.Std.CX.FMA),
 					powered(A->SHM->P.Features.Std.CX.xTPR),		enabled(!A->SHM->P.MiscFeatures.xTPR),
@@ -2153,7 +2153,7 @@ void	BuildLayout(uARG *A, int G)
 					powered(A->SHM->P.Features.Std.CX.TSCDEAD),
 					powered(A->SHM->P.Features.Std.CX.XSAVE),
 					powered(A->SHM->P.Features.Std.CX.OSXSAVE),
-					powered(A->SHM->P.Features.ExtFunc.DX.XD_Bit),		enabled(!A->SHM->P.MiscFeatures.XD_Bit),
+					(A->SHM->P.ExtFeature.NXE) ? "ON" : "DIS", powered(A->SHM->P.Features.ExtFunc.DX.XD_Bit), enabled(!A->SHM->P.MiscFeatures.XD_Bit),
 					powered(A->SHM->P.Features.ExtFunc.DX.PG_1GB),
 					powered(A->SHM->P.Features.ExtFeature.BX.HLE),
 					powered(A->SHM->P.Features.ExtFeature.BX.RTM),
@@ -2196,12 +2196,23 @@ void	BuildLayout(uARG *A, int G)
 					powered(A->SHM->P.Features.ExtFunc.DX.IA64),
 					powered(A->SHM->P.Features.ExtFeature.BX.BMI1), powered(A->SHM->P.Features.ExtFeature.BX.BMI2),
 					powered(A->SHM->P.Features.ExtFunc.DX.SYSCALL),		enabled(A->SHM->P.ExtFeature.SCE),
-					(A->SHM->P.ExtFeature.LMA) ? "ON" : "DIS",
-					(A->SHM->P.ExtFeature.NXE) ? "ON" : "DIS");
+					(A->SHM->P.ExtFeature.LMA) ? "ON" : "DIS");
 
-				char *buf[2]={malloc(1024), malloc(1024)};
+				char *buf[2]={malloc(1024), malloc(2048)};
 				sprintf(buf[0], TOPOLOGY_SECTION, A->SHM->P.OnLine);
-				sprintf(buf[1], PERF_SECTION,
+				sprintf(buf[1], PERF_SECTION, A->SHM->P.Features.Perf_Monitoring_Leaf.AX.Version,
+						powered(!A->SHM->P.Features.Perf_Monitoring_Leaf.BX.CoreCycles),
+						powered(!A->SHM->P.Features.Perf_Monitoring_Leaf.BX.InstrRetired),
+						powered(!A->SHM->P.Features.Perf_Monitoring_Leaf.BX.RefCycles),
+						powered(!A->SHM->P.Features.Perf_Monitoring_Leaf.BX.LLC_Ref),
+						powered(!A->SHM->P.Features.Perf_Monitoring_Leaf.BX.LLC_Misses),
+						powered(!A->SHM->P.Features.Perf_Monitoring_Leaf.BX.BranchRetired),
+						powered(!A->SHM->P.Features.Perf_Monitoring_Leaf.BX.BranchMispred),
+						A->SHM->P.Features.MONITOR_MWAIT_Leaf.DX.Num_C0_MWAIT,
+						A->SHM->P.Features.MONITOR_MWAIT_Leaf.DX.Num_C1_MWAIT,
+						A->SHM->P.Features.MONITOR_MWAIT_Leaf.DX.Num_C2_MWAIT,
+						A->SHM->P.Features.MONITOR_MWAIT_Leaf.DX.Num_C3_MWAIT,
+						A->SHM->P.Features.MONITOR_MWAIT_Leaf.DX.Num_C4_MWAIT,
 						A->SHM->P.Features.Perf_Monitoring_Leaf.AX.MonCtrs, A->SHM->P.Features.Perf_Monitoring_Leaf.AX.MonWidth,
 						A->SHM->P.Features.Perf_Monitoring_Leaf.DX.FixCtrs, A->SHM->P.Features.Perf_Monitoring_Leaf.DX.FixWidth);
 				int cpu=0;
@@ -3576,7 +3587,7 @@ void	Svr_Enable_Feature(uARG *A, int cmd)
 
 	if(noerr != TRUE)
 	{
-		char *items=calloc(80,1);
+		char *items=calloc(128,1);
 		strcpy(items,	"Usage: enable p1\n"		\
 				"Where: p1=feature (String)\n"	\
 				"and  : feature={");
@@ -3607,7 +3618,7 @@ void	Svr_Disable_Feature(uARG *A, int cmd)
 
 	if(noerr != TRUE)
 	{
-		char *items=calloc(80,1);
+		char *items=calloc(128,1);
 		strcpy(items,	"Usage: disable p1\n"	\
 				"Where: p1=feature (String)\n"	\
 				"and  : feature={");

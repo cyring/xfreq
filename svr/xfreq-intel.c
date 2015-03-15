@@ -54,7 +54,8 @@ Bool32	Init_MSR_GenuineIntel(void *uArg)
 	{
 		rc=((retval=Read_MSR(tmpFD, IA32_MISC_ENABLE,  (MISC_PROC_FEATURES *) &A->SHM->P.MiscFeatures)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_MTRR_DEF_TYPE,(MTRR_DEF_TYPE *) &A->SHM->P.MTRRdefType)) != -1);
-		rc=((retval=Read_MSR(tmpFD, MSR_POWER_CTL,     (POWER_CONTROL *) &A->SHM->P.Power.Control)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_POWER_CTL,     (POWER_CONTROL *) &A->SHM->P.PowerControl)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_PKG_CST_CONFIG_CTRL, (CSTATE_CONFIG *) &A->SHM->P.CStateConfig)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
@@ -117,7 +118,8 @@ Bool32	Init_MSR_Core(void *uArg)
 	{
 		rc=((retval=Read_MSR(tmpFD, IA32_MISC_ENABLE,  (MISC_PROC_FEATURES *) &A->SHM->P.MiscFeatures)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_MTRR_DEF_TYPE,(MTRR_DEF_TYPE *) &A->SHM->P.MTRRdefType)) != -1);
-		rc=((retval=Read_MSR(tmpFD, MSR_POWER_CTL,     (POWER_CONTROL *) &A->SHM->P.Power.Control)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_POWER_CTL,     (POWER_CONTROL *) &A->SHM->P.PowerControl)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_PKG_CST_CONFIG_CTRL, (CSTATE_CONFIG *) &A->SHM->P.CStateConfig)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
@@ -157,11 +159,16 @@ Bool32	Init_MSR_Core(void *uArg)
 			sprintf(pathname, CPU_DEV, cpu);
 			if( (rc=((A->SHM->C[cpu].FD=open(pathname, O_RDWR)) != -1)) )
 			{
-				// Enable the Performance Counters 1 and 2 :
+				// Enable the Performance Counters 0, 1 and 2 :
 				// - Set the global counter bits
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
 				A->SaveArea[cpu].GlobalPerfCounter=A->SHM->C[cpu].GlobalPerfCounter;
 #if defined(DEBUG)
+				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR0 != 0)
+				{
+					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #0 is already activated", cpu);
+					tracerr(warning);
+				}
 				if(A->SHM->C[cpu].GlobalPerfCounter.EN_FIXED_CTR1 != 0)
 				{
 					sprintf(warning, "Warning: CPU#%02d: Fixed Counter #1 is already activated", cpu);
@@ -264,7 +271,8 @@ Bool32	Init_MSR_Nehalem(void *uArg)
 		rc=((retval=Read_MSR(tmpFD, IA32_MTRR_DEF_TYPE,(MTRR_DEF_TYPE *) &A->SHM->P.MTRRdefType)) != -1);
 		rc=((retval=Read_MSR(tmpFD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1);
 		rc=((retval=Read_MSR(tmpFD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->SHM->P.Turbo)) != -1);
-		rc=((retval=Read_MSR(tmpFD, MSR_POWER_CTL,     (POWER_CONTROL *) &A->SHM->P.Power.Control)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_POWER_CTL,     (POWER_CONTROL *) &A->SHM->P.PowerControl)) != -1);
+		rc=((retval=Read_MSR(tmpFD, MSR_PKG_CST_CONFIG_CTRL, (CSTATE_CONFIG *) &A->SHM->P.CStateConfig)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
 		rc=((retval=Read_MSR(tmpFD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
@@ -292,7 +300,7 @@ Bool32	Init_MSR_Nehalem(void *uArg)
 			sprintf(pathname, CPU_DEV, cpu);
 			if( (rc=((A->SHM->C[cpu].FD=open(pathname, O_RDWR)) != -1)) )
 			{
-				// Enable the Performance Counters 1 and 2 :
+				// Enable the Performance Counters 0, 1 and 2 :
 				// - Set the global counter bits
 				rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_GLOBAL_CTRL, (GLOBAL_PERF_COUNTER *) &A->SHM->C[cpu].GlobalPerfCounter)) != -1);
 				A->SaveArea[cpu].GlobalPerfCounter=A->SHM->C[cpu].GlobalPerfCounter;
@@ -454,7 +462,8 @@ Bool32	Refresh_SHM(void *uArg)
 		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_MTRR_DEF_TYPE,(MTRR_DEF_TYPE *) &A->SHM->P.MTRRdefType)) != -1);
 		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, MSR_PLATFORM_INFO, (PLATFORM_INFO *) &A->SHM->P.PlatformInfo)) != -1);
 		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, MSR_TURBO_RATIO_LIMIT, (TURBO *) &A->SHM->P.Turbo)) != -1);
-		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, MSR_POWER_CTL, (POWER_CONTROL *) &A->SHM->P.Power.Control)) != -1);
+		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, MSR_POWER_CTL, (POWER_CONTROL *) &A->SHM->P.PowerControl)) != -1);
+		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, MSR_PKG_CST_CONFIG_CTRL, (CSTATE_CONFIG *) &A->SHM->P.CStateConfig)) != -1);
 		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PLATFORM_ID,  (PLATFORM_ID *) &A->SHM->P.PlatformId)) != -1);
 		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_STATUS,  (PERF_STATUS *) &A->SHM->P.PerfStatus)) != -1);
 		rc=((retval=Read_MSR(A->SHM->C[cpu].FD, IA32_PERF_CTL,     (PERF_CONTROL *) &A->SHM->P.PerfControl)) != -1);
@@ -487,13 +496,14 @@ static __inline__ unsigned long long int RDTSC(void)
 
 static __inline__ unsigned long long int RDTSCP(void)
 {
-	unsigned Hi, Lo;
+	unsigned Hi, Lo, Aux;
 
 	__asm__ volatile
 	(
 		"rdtscp"
 		:"=a" (Lo),
-		 "=d" (Hi)
+		 "=d" (Hi),
+		 "=c" (Aux)
 	);
 	return ((unsigned long long int) Lo) | (((unsigned long long int) Hi) << 32);
 }
@@ -831,6 +841,18 @@ void	Read_Features(FEATURES *features)
 		"add	$1, %%rax"
 		: "=a"	(features->ThreadCount)
                 : "a" (0x4)
+#if defined(FreeBSD)
+		: "rcx", "rbx"
+#endif
+	);
+	__asm__ volatile
+	(
+		"cpuid"
+		: "=a"	(features->MONITOR_MWAIT_Leaf.AX),
+		  "=b"	(features->MONITOR_MWAIT_Leaf.BX),
+		  "=c"	(features->MONITOR_MWAIT_Leaf.CX),
+		  "=d"	(features->MONITOR_MWAIT_Leaf.DX)
+                : "a" (0x5)
 #if defined(FreeBSD)
 		: "rcx", "rbx"
 #endif
@@ -1488,14 +1510,15 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 			{
 				if((XChange->Map.Core < A->SHM->P.CPU) && (XChange->Map.Core >= 0) && (XChange->Map.Arg < DUMP_ARRAY_DIMENSION) && (XChange->Map.Arg >=0))
 				{
+					MSR_LIST RegList[]=REG_LIST;
 					int finder=0;
-					for(finder=0; finder < DUMP_ARRAY_DIMENSION; finder++)
-						if(A->Loader.Array[finder].Addr == XChange->Map.Addr)
+					for(finder=0; RegList[finder].Addr != 0x0; finder++)
+						if(RegList[finder].Addr == XChange->Map.Addr)
 							break;
-					if(finder < DUMP_ARRAY_DIMENSION)
-						strncpy(A->SHM->D.Array[XChange->Map.Arg].Name, A->Loader.Array[finder].Name, DUMP_REG_ALIGN);
+					if(RegList[finder].Addr != 0x0)
+						strncpy(A->SHM->D.Array[XChange->Map.Arg].Name, RegList[finder].Name, DUMP_REG_ALIGN);
 					else
-						sprintf(A->SHM->D.Array[XChange->Map.Arg].Name, "MSR_0x%05X", XChange->Map.Addr);
+						sprintf(A->SHM->D.Array[XChange->Map.Arg].Name, "MSR_0x%08X", XChange->Map.Addr);
 
 					A->SHM->D.Array[XChange->Map.Arg].Value=0;
 					A->SHM->D.Array[XChange->Map.Arg].Addr=XChange->Map.Addr;
@@ -1536,7 +1559,7 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 				case CTL_ENABLE:
 					switch(XChange->Map.Addr)
 					{
-						case CTL_TURBO:	// Package
+						case CTL_TURBO:	// Thread
 							if(A->SHM->P.Features.Thermal_Power_Leaf.AX.TurboIDA)
 							{
 								PERF_CONTROL PerfControlMSR={0};
@@ -1557,14 +1580,34 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 								Write_MSR(A->SHM->C[0].FD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &MiscFeaturesMSR);
 							}
 						break;
-						case CTL_C1E:	// Core
+						case CTL_C1E:	// Package
 							if(A->SHM->P.Features.Std.CX.EIST)
-							{	// Package
-								POWER PowerMSR={{0}};
-								Read_MSR(A->SHM->C[0].FD, MSR_POWER_CTL, (POWER *) &PowerMSR);
-								PowerMSR.Control.C1E=1;
-								Write_MSR(A->SHM->C[0].FD, MSR_POWER_CTL, (POWER *) &PowerMSR);
+							{
+								POWER_CONTROL PowerCtrl={0};
+								Read_MSR(A->SHM->C[0].FD, MSR_POWER_CTL, (POWER_CONTROL *) &PowerCtrl);
+								PowerCtrl.C1E=1;
+								Write_MSR(A->SHM->C[0].FD, MSR_POWER_CTL, (POWER_CONTROL *) &PowerCtrl);
 							}
+						break;
+						case CTL_C3A:	// Core
+							for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+								if(A->SHM->C[cpu].T.Thread_ID == 0)
+								{
+									CSTATE_CONFIG CStateConfig={0};
+									Read_MSR(A->SHM->C[cpu].FD, MSR_PKG_CST_CONFIG_CTRL, (CSTATE_CONFIG *) &CStateConfig);
+									CStateConfig.C3autoDemotion=1;
+									Write_MSR(A->SHM->C[cpu].FD, MSR_PKG_CST_CONFIG_CTRL, (CSTATE_CONFIG *) &CStateConfig);
+								}
+						break;
+						case CTL_C1A:	// Core
+							for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+								if(A->SHM->C[cpu].T.Thread_ID == 0)
+								{
+									CSTATE_CONFIG CStateConfig={0};
+									Read_MSR(A->SHM->C[cpu].FD, MSR_PKG_CST_CONFIG_CTRL, (CSTATE_CONFIG *) &CStateConfig);
+									CStateConfig.C1autoDemotion=1;
+									Write_MSR(A->SHM->C[cpu].FD, MSR_PKG_CST_CONFIG_CTRL, (CSTATE_CONFIG *) &CStateConfig);
+								}
 						break;
 						case CTL_TCC:	// Thread
 							if(A->SHM->P.MiscFeatures.TCC)
@@ -1583,7 +1626,7 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 				case CTL_DISABLE:
 					switch(XChange->Map.Addr)
 					{
-						case CTL_TURBO:	// Package
+						case CTL_TURBO:	// Thread
 							if(A->SHM->P.Features.Thermal_Power_Leaf.AX.TurboIDA)
 							{
 								PERF_CONTROL PerfControlMSR={0};
@@ -1604,14 +1647,34 @@ void	Play(uARG *A, XCHG_MAP *XChange)
 								Write_MSR(A->SHM->C[0].FD, IA32_MISC_ENABLE, (MISC_PROC_FEATURES *) &MiscFeaturesMSR);
 							}
 						break;
-						case CTL_C1E:	// Core
+						case CTL_C1E:	// Package
 							if(A->SHM->P.Features.Std.CX.EIST)
-							{	// Package
-								POWER PowerMSR={{0}};
-								Read_MSR(A->SHM->C[0].FD, MSR_POWER_CTL, (POWER *) &PowerMSR);
-								PowerMSR.Control.C1E=0;
-								Write_MSR(A->SHM->C[0].FD, MSR_POWER_CTL, (POWER *) &PowerMSR);
+							{
+								POWER_CONTROL PowerCtrl={0};
+								Read_MSR(A->SHM->C[0].FD, MSR_POWER_CTL, (POWER_CONTROL *) &PowerCtrl);
+								PowerCtrl.C1E=0;
+								Write_MSR(A->SHM->C[0].FD, MSR_POWER_CTL, (POWER_CONTROL *) &PowerCtrl);
 							}
+						break;
+						case CTL_C3A:	// Core
+							for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+								if(A->SHM->C[cpu].T.Thread_ID == 0)
+								{
+									CSTATE_CONFIG CStateConfig={0};
+									Read_MSR(A->SHM->C[cpu].FD, MSR_PKG_CST_CONFIG_CTRL, (CSTATE_CONFIG *) &CStateConfig);
+									CStateConfig.C3autoDemotion=0;
+									Write_MSR(A->SHM->C[cpu].FD, MSR_PKG_CST_CONFIG_CTRL, (CSTATE_CONFIG *) &CStateConfig);
+								}
+						break;
+						case CTL_C1A:	// Core
+							for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
+								if(A->SHM->C[cpu].T.Thread_ID == 0)
+								{
+									CSTATE_CONFIG CStateConfig={0};
+									Read_MSR(A->SHM->C[cpu].FD, MSR_PKG_CST_CONFIG_CTRL, (CSTATE_CONFIG *) &CStateConfig);
+									CStateConfig.C1autoDemotion=0;
+									Write_MSR(A->SHM->C[cpu].FD, MSR_PKG_CST_CONFIG_CTRL, (CSTATE_CONFIG *) &CStateConfig);
+								}
 						break;
 						case CTL_TCC:	// Thread
 							if(A->SHM->P.MiscFeatures.TCC)
@@ -1901,7 +1964,7 @@ int main(int argc, char *argv[])
 			{ _Haswell_ULT,          2,  ClockSpeed_Haswell_ULT,          "Haswell/Ultra Low TDP",     uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
 			{ _Haswell_ULX,          2,  ClockSpeed_Haswell_ULX,          "Haswell/Ultra Low eXtreme", uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
 		},
-		.Loader={.Monitor=TRUE, .Array=REGISTERS_LIST},
+		.Loader={.Monitor=TRUE, .Array=DUMP_LOADER},
 		.LOOP=TRUE,
 		.Options=OPTIONS_LIST,
 		.TID_SigHandler=0,

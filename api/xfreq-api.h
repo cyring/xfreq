@@ -12,7 +12,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "48-b"
+#define _NIGHTLY "49"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #if defined(Linux)
@@ -130,6 +130,38 @@ typedef struct
 		struct
 		{
 			unsigned int
+			SmallestSize	: 16-0,
+			ReservedBits	: 32-16;
+		} AX;
+		struct
+		{
+			unsigned int
+			LargestSize	: 16-0,
+			ReservedBits	: 32-16;
+		} BX;
+		struct
+		{
+			unsigned int
+			ExtSupported	:  1-0,
+			BK_Int_MWAIT	:  2-1,
+			ReservedBits	: 32-2;
+		} CX;
+		struct
+		{
+			unsigned int
+			Num_C0_MWAIT	:  4-0,
+			Num_C1_MWAIT	:  8-4,
+			Num_C2_MWAIT	: 12-8,
+			Num_C3_MWAIT	: 16-12,
+			Num_C4_MWAIT	: 20-16,
+			ReservedBits	: 32-20;
+		} DX;
+	} MONITOR_MWAIT_Leaf;
+	struct
+	{
+		struct
+		{
+			unsigned int
 			DTS	:  1-0,
 			TurboIDA:  2-1,
 			ARAT	:  3-2,
@@ -173,14 +205,14 @@ typedef struct
 		struct
 		{
 			unsigned int
-			CoreCycl:  1-0,
-			InRetire:  2-1,
-			RefCycle:  3-2,
-			LLC_Ref	:  4-3,
-			LLC_Miss:  5-4,
-			BrInRet	:  6-5,
-			BrMispre:  7-6,
-			Unused1	: 32-7;
+			CoreCycles	:  1-0,
+			InstrRetired	:  2-1,
+			RefCycles	:  3-2,
+			LLC_Ref		:  4-3,
+			LLC_Misses	:  5-4,
+			BranchRetired	:  6-5,
+			BranchMispred	:  7-6,
+			ReservedBits	: 32-7;
 		} BX;
 		struct
 		{
@@ -282,6 +314,7 @@ typedef struct
 #define	MSR_CORE_C7_RESIDENCY		0x3fe
 #define	MSR_FSB_FREQ			0xcd
 #define	MSR_PLATFORM_INFO		0xce
+#define	MSR_PKG_CST_CONFIG_CTRL		0xe2
 #define	MSR_TURBO_RATIO_LIMIT		0x1ad
 #define	MSR_TEMPERATURE_TARGET		0x1a2
 #define	MSR_POWER_CTL			0x1fc
@@ -341,6 +374,23 @@ typedef struct
 		MinOpeRatio	: 56-48,
 		ReservedBits5	: 64-56;
 } PLATFORM_INFO;
+
+typedef struct
+{
+	unsigned long long int
+		Pkg_CST_Limit	:  3-0,
+		ReservedBits1	: 10-3,
+		IO_MWAIT_Redir	: 11-10,
+		ReservedBits2	: 15-11,
+		CFG_Lock	: 16-15,
+		ReservedBits3	: 24-16,
+		Int_Filtering	: 25-24,	// Nehalem
+		C3autoDemotion	: 26-25,
+		C1autoDemotion	: 27-26,
+		C3undemotion	: 28-27,	// Sandy Bridge
+		C1undemotion	: 29-28,	// Sandy Bridge
+		ReservedBits4	: 64-29;
+} CSTATE_CONFIG;
 
 typedef struct
 {
@@ -527,11 +577,6 @@ typedef	struct
 		ReservedBits2	: 64-2;
 } POWER_CONTROL;
 
-typedef	struct
-{
-	POWER_CONTROL	Control;
-} POWER;
-
 #define	IDLE_BASE_USEC	50000
 #define	IDLE_SCHED_DEF	19
 #define	IDLE_COEF_DEF	20
@@ -549,8 +594,9 @@ typedef struct
 	MTRR_DEF_TYPE			MTRRdefType;
 	EXT_FEATURE_ENABLE		ExtFeature;
 	PLATFORM_INFO			PlatformInfo;
+	CSTATE_CONFIG			CStateConfig;
 	TURBO				Turbo;
-	POWER				Power;
+	POWER_CONTROL			PowerControl;
 	off_t				BClockROMaddr;
 	double				ClockSpeed;
 	unsigned int			CPU,
@@ -592,7 +638,7 @@ typedef	struct
 	unsigned long long int	Value;
 } DUMP_ARRAY;
 
-#define	REGISTERS_LIST							\
+#define	DUMP_LOADER							\
 {									\
 	{ 0, "IA32_PLATFORM_ID",        IA32_PLATFORM_ID,        0},	\
 	{ 0, "MSR_PLATFORM_INFO",       MSR_PLATFORM_INFO,       0},	\
@@ -850,7 +896,9 @@ typedef	struct
 #define	CTL_TURBO	0b00000010
 #define	CTL_EIST	0b00000100
 #define	CTL_C1E		0b00001000
-#define	CTL_TCC		0b00010000
+#define	CTL_C3A		0b00010000
+#define	CTL_C1A		0b00100000
+#define	CTL_TCC		0b01000000
 
 #define	SIG_EMERGENCY_FMT	"\nShutdown(%02d)"
 #define	TASK_PID_FMT		"%5ld"
