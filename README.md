@@ -1,7 +1,6 @@
 # XFreq
 ## Purpose
-XFreq provides a GUI to monitor the Processor frequencies (including Turbo Boost), the temperatures, C-States and alter the operational features of the Intel Core i7 processor.
- 
+XFreq provides a GUI to monitor the Processor frequencies (including Turbo Boost), the temperatures, C-States; and alter the operational features of the Intel Core i7 processor.
 XFreq is also programmed for Core 2 and other Intel 64-bits architectures.
 
 ![alt text](http://blog.cyring.free.fr/images/xfreq-core-R2146.png "CORE")
@@ -12,27 +11,26 @@ XFreq is also programmed for Core 2 and other Intel 64-bits architectures.
 
 
 ### Features
-XFreq provides features to play with:
+XFreq provides functionalities to play with:
  * Core Frequencies, Ratios and *Turbo Boost*
  * CPU Cycles, IPS, IPC, CPI
  * CPU C-States `C0 C1 C3 C6`
  * Discrete Temperature per thread core
- * Processor features `[Yes]|[No]` & activation state `[ON]|[OFF]`
+ * Processor features `[Yes]|[No]` and their activation state `[ON]|[OFF]`
  * Read and write MSR registers
  * DRAM controller & timings
- * Base Clock (from TSC, BIOS, factory or any user defined ROM address)
- * State of `[de]activated` core by the OS or the BIOS
- * xAPIC Processor topology
- * Intel Performance counters
+ * Base Clock (from TSC, BIOS, factory value or a user defined Memory address)
+ * State of `[de]activated` Core by the OS or the BIOS
+ * The xAPIC topology map
+ * The Intel Performance counters
  * The Linux tasks scheduling monitoring.
 
 ### The GUI
- * Gadgets can be started as one MDI window or several Widgets, as a self window manager.
- * Provide a commands set to enable, disable processor features (`SpeedStep`, `Turbo Boost`, `Thermal Control`).
- * Able with RGB colors, font, layout.
- * Save & load configuration settings.
- * Only one right mouse button to move the Widgets on screen.
- * Push the GUI buttons to run the associated command.
+ * The GUI Gadgets can be started as one MDI window or spanned in several Widgets, using the built-in window manager:
+  * Right mouse button to move the Widgets on screen.
+  * Left, to scroll Widgets, or push the GUI buttons and run the associated command.
+ * A commands set allows to drive the Processor features, such as enabling, disabling `SpeedStep`, `Turbo Boost`, `Thermal Control`; but also, miscellaneous XFreq functionalities, such as setting RGB colors, font and layout; save and load from the configuration file.
+ * The Widgets disposal is specified with the program options. See the help below.
  * The tasks scheduled by the kernel among the CPU Cores are shown in real time.
 ![alt text](http://blog.cyring.free.fr/images/xfreq-task-scheduling.png "TASKS, lets you know what's going on in your system !")
 
@@ -168,12 +166,14 @@ Tips: you can force an architecture with the `-c` option.
 
 ### Development
 XFreq is a Clients-Server model based software.
- * API
+#### API
   A shared memory interface `[SHM]` to exchange data with the server.
- * Server
-  A daemon program which monitors the hardware and fills the `SHM` with the collected data. The server requires the superuser privileges of root.
- * Clients
-  Gui and text programs which connect to the server through the `SHM` and display the hardware activity. Clients *do not* require the root permissions.
+#### Server
+  A daemon program which monitors the hardware and fills the `SHM` with the collected data.
+  The server which requires the superuser privileges of root, receives and processes Client commands.
+#### Clients
+  Gui and text programs which connect to the server through the `SHM` and display the hardware activity.
+  Clients *do not* require the root permissions.
   
 ### Screenshots
  * Intel Processors Server
