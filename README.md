@@ -39,17 +39,17 @@ XFreq provides features to play with:
  * XFreq provides a set of commands to read, write the MSR registers, to enable, disable Processor features.
 ![alt text](http://blog.cyring.free.fr/images/xfreq-main-R2143.png "Full editor with a command line history")
 
- * Enter an address and a CPU Core, Freq will monitor its register bits.
+ * Enter an address and a CPU Core number, XFreq will monitor its register bits.
 ![alt text](http://blog.cyring.free.fr/images/xfreq-dump-R2143.png "REGISTERS")
 
 ## Build & Run
  *Prerequisites*: as root, load the MSR Kernel driver.
  - if _Linux_ then enter: 
-``` bash
+```
 modprobe msr
 ```
  - if _FreeBSD_ then enter:
-``` bash
+```
 kldload cpuctl
 ```
  1- Download the [source code](https://github.com/cyring/xfreq/archive/master.zip) into a working directory
