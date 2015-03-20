@@ -19,7 +19,7 @@ XFreq provides functionalities to play with:
  * Processor features `[Yes]|[No]` and their activation state `[ON]|[OFF]`
  * Read and write MSR registers
  * DRAM controller & timings
- * Base Clock (from TSC, BIOS, factory value or a user defined Memory address)
+ * Base Clock (from TSC, BIOS, factory value or a user defined memory address)
  * State of `[de]activated` Core by the OS or the BIOS
  * The xAPIC topology map
  * The Intel Performance counters
@@ -29,12 +29,12 @@ XFreq provides functionalities to play with:
  * The GUI Gadgets can be started as one MDI window or spanned in several Widgets, using the built-in window manager:
   * Right mouse button to move the Widgets on screen.
   * Left, to scroll Widgets, or push the GUI buttons and run the associated command.
- * A commands set allows to drive the Processor features, such as enabling, disabling `SpeedStep`, `Turbo Boost`, `Thermal Control`; but also, miscellaneous XFreq functionalities, such as setting RGB colors, font and layout; save and load from the configuration file.
+ * A commands set allows to drive the Processor features, such as enabling, disabling `SpeedStep`, `Turbo Boost`, `Thermal Control`; but also, miscellaneous XFreq functionalities, such as setting the RGB colors, font and layout; save and load from the configuration file.
  * The Widgets disposal is specified with the program options. See the help below.
  * The tasks scheduled by the kernel among the CPU Cores are shown in real time.
 ![alt text](http://blog.cyring.free.fr/images/xfreq-task-scheduling.png "TASKS, lets you know what's going on in your system !")
 
- * XFreq provides a set of commands to read, write the MSR registers, to enable, disable Processor features.
+ * XFreq's editor.
 ![alt text](http://blog.cyring.free.fr/images/xfreq-main-R2143.png "Full editor with a command line history")
 
  * Enter an address and a CPU Core number, XFreq will monitor its register bits.
@@ -157,7 +157,8 @@ The algorithms employed are introduced in the [Algorithms Wiki]
  26  Haswell/Ultra Low TDP     06_45            2         100.00
  27  Haswell/Ultra Low eXtreme 06_46            2         100.00
 ```
-Tips: you can force an architecture with the `-c` option.
+_Tips_: you can force an architecture with the `-c` option.
+
 #### Notes
  * XFreq is programmed in C and inline ASM, using the  [Code::Blocks](http://www.codeblocks.org) IDE and the _complete_ X11 developer packages and this [Workstation]
  * The very last development snapshot can be cloned from the git [repository](https://github.com/cyring/xfreq.git)
@@ -166,15 +167,20 @@ Tips: you can force an architecture with the `-c` option.
 
 ### Development
 XFreq is a Clients-Server model based software.
+
 #### API
   A shared memory interface `[SHM]` to exchange data with the server.
+
 #### Server
   A daemon program which monitors the hardware and fills the `SHM` with the collected data.
+
   The server which requires the superuser privileges of root, receives and processes Client commands.
+
 #### Clients
   Gui and text programs which connect to the server through the `SHM` and display the hardware activity.
+
   Clients *do not* require the root permissions.
-  
+
 ### Screenshots
  * Intel Processors Server
 
@@ -240,13 +246,13 @@ $ xfreq-gui
 ## News
  * Added Performance Monitor Features.
  * New commands to enable, disable C3 and C1 auto demotion.
- * C7 state is implemented. (need alpha testers to confirm ?)
-![alt text](http://blog.cyring.free.fr/images/xfreq-cstates-R2148.png "CSTATES")
+ * C7 state is implemented. (_need alpha testers to confirm ?_)
+ * ![alt text](http://blog.cyring.free.fr/images/xfreq-cstates-R2148.png "CSTATES")
  * 3 performance ratios:
   * IPS (Instructions Per Second)
   * IPC (Instructions Per Cycle),
   * CPI (Cycles Per Instruction),
- * C1 state is now available 
+ * C1 state is now available .
  * 3 new commands to "safely" enable, disable:
   * EIST ( `SpeedStep` )
   * C1E ( `Extended Halt` )
@@ -255,10 +261,10 @@ $ xfreq-gui
   * to enable, disable, the Intel Turbo Boost.
   * to read, write, and dump msr registers from any Core.
  * Integrated SmBIOS.
-![alt text](http://blog.cyring.free.fr/images/XFreq-SmBIOS.png "System Management BIOS")
- * Ported to FreeBSD
- * Up to 64 simultaneous clients
-![alt text](http://blog.cyring.free.fr/images/XFreq-64cli.png "64 Clients in action !")
+ * ![alt text](http://blog.cyring.free.fr/images/XFreq-SmBIOS.png "System Management BIOS")
+ * Ported to FreeBSD.
+ * Up to 64 simultaneous clients.
+ * ![alt text](http://blog.cyring.free.fr/images/XFreq-64cli.png "64 Clients in action !")
 # Regards
 _`CyrIng`_
 
