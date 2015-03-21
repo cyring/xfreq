@@ -2038,7 +2038,7 @@ void	BuildLayout(uARG *A, int G)
 					if(!A->L.Play.showRatios)
 					{
 					XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
-							One_Char_Width(G) * 37,
+							One_Char_Width(G) * 33,
 							One_Char_Height(G),
 							"w/PID", 5);
 					}
