@@ -2271,16 +2271,20 @@ int main(int argc, char *argv[])
 						long int idleRemaining;
 						if((idleRemaining=Sync_Wait(0, &A.SHM->Sync, A.SHM->P.IdleTime)))
 						{
-							XCHG_MAP XChange={.Map64=atomic_load(&A.SHM->Sync.Play)};
-							Play(&A, &XChange);
-							atomic_store(&A.SHM->Sync.Play, XChange.Map64);
-
+							{
+								XCHG_MAP XChange={.Map64=atomic_load(&A.SHM->Sync.Play)};
+								Play(&A, &XChange);
+								atomic_store(&A.SHM->Sync.Play, XChange.Map64);
+							}
 							usleep(IDLE_BASE_USEC*idleRemaining);
 						}
 						else
-						{	XCHG_MAP XChange={.Map64=atomic_load(&A.SHM->Sync.Play)};
-							Play(&A, &XChange);
-							atomic_store(&A.SHM->Sync.Play, XChange.Map64);
+						{
+							{
+								XCHG_MAP XChange={.Map64=atomic_load(&A.SHM->Sync.Play)};
+								Play(&A, &XChange);
+								atomic_store(&A.SHM->Sync.Play, XChange.Map64);
+							}
 						}
 					}
 					// Release the ressources.

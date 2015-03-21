@@ -51,7 +51,7 @@ enum {
 #define	_BACKGROUND_GLOBAL	0x2a0308
 #define	_FOREGROUND_GLOBAL	0x8fcefa
 #define	_BACKGROUND_SPLASH	0x000000
-#define	_FOREGROUND_SPLASH	0x8fcefa
+#define	_FOREGROUND_SPLASH	0xa00b1f
 
 #define	_BACKGROUND_MAIN	0x2a0308
 #define	_FOREGROUND_MAIN	0x8fcefa
@@ -92,36 +92,35 @@ typedef	struct
 
 enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 
-#define	ID_MIN		'm'
-#define	ID_SAVE		'.'
-#define	ID_NORTH	'N'
-#define	ID_SOUTH	'S'
-#define	ID_EAST		'E'
-#define	ID_WEST		'W'
-#define	ID_PGUP		'U'
-#define	ID_PGDW		'D'
-#define	ID_PGHOME	'['
-#define	ID_PGEND	']'
-#define	ID_CTRLHOME	'{'
-#define	ID_CTRLEND	'}'
-#define	ID_PAUSE	'I'
-#define	ID_STOP		'&'
-#define	ID_RESUME	'!'
-#define	ID_CHART	'c'
-#define	ID_CYCLE	'Y'
-#define	ID_IPS		'j'
-#define	ID_IPC		'J'
-#define	ID_CPI		'i'
-#define	ID_FREQ		'z'
-#define	ID_RATIO	'R'
-#define	ID_SCHED	'T'
-#define	ID_CSTATE	'P'
-#define	ID_TEMP		't'
-#define	ID_WALLBOARD	'B'
+#define	ID_MIN		0x3f
+#define	ID_SAVE		0x3e
+#define	ID_NORTH	0x3d
+#define	ID_SOUTH	0x3c
+#define	ID_EAST		0x3b
+#define	ID_WEST		0x3a
+#define	ID_PGUP		0x39
+#define	ID_PGDW		0x38
+#define	ID_PGHOME	0x37
+#define	ID_PGEND	0x36
+#define	ID_CTRLHOME	0x35
+#define	ID_CTRLEND	0x34
+#define	ID_PAUSE	0x33
+#define	ID_STOP		0x32
+#define	ID_RESUME	0x31
+#define	ID_CHART	0x30
+#define	ID_CYCLE	0x2f
+#define	ID_IPS		0x2e
+#define	ID_IPC		0x2d
+#define	ID_CPI		0x2c
+#define	ID_FREQ		0x2b
+#define	ID_RATIO	0x2a
+#define	ID_CSTATE	0x29
+#define	ID_PSTATE	0x28
+#define	ID_TEMP		0x27
+#define	ID_WALLBOARD	0x26
 
-#define	RSC_PAUSE	"Pause"
 #define	RSC_RESET	"Reset"
-#define	RSC_FREQ	"Hz"
+#define	RSC_FREQ	"Freq"
 #define	RSC_CYCLE	"Cycle"
 #define	RSC_IPS		"IPS"
 #define	RSC_IPC		"IPC"
@@ -129,6 +128,7 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 #define	RSC_RATIO	"Ratio"
 #define	RSC_SCHED	"Task"
 #define	RSC_CSTATE	"C-States"
+#define	RSC_PSTATE	"P-States"
 #define	RSC_TSC		"TSC"
 #define	RSC_TSC_AUX	"AUX"
 #define	RSC_BIOS	"BIOS"
@@ -341,14 +341,14 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CORE_TASK	"%s"
 #define	CORE_RATIO	"%-3.1f"
 #define	CSTATES_PERCENT	"%6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%"
-#define	CSTATES_AVERAGE	"%6.2f      %6.2f      %6.2f      %6.2f      %6.2f      %6.2f"
-#define	CSTATES_FOOTER	"~      % Uh        % C0        % C1        % C3        % C6        % C7"
+#define	CSTATES_AVERAGE	"%6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%     %6.2f%%"
+#define	CSTATES_FOOTER	"Turbo[       ] C0[       ] C1[       ] C3[       ] C6[       ] C7[       ]"
 #define	OVERCLOCK	"%s [%4.0f MHz]"
 #define	TEMPERATURE	"%3d"
 
 #define	PROC_FORMAT	"Processor  [%s]\n"									\
 			"\n"											\
-			"Base Clock [%5.2f MHz]                                  Source [%s]\n"			\
+			"Base Clock [%5.2f] MHz                                  Source [%s]\n"			\
 			"\n"											\
 			" Family               Model             Stepping              Max# of\n"		\
 			"  Code                 No.                 ID                 Threads\n"		\
@@ -456,27 +456,31 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	CAS_FORMAT	"      #%1i   |%4d%6d%6d%6d%6d%6d%6d%6d%6d%6d%6d\n"
 
 #define	SMBIOS_SECTION	"\n"											\
-			"System Management BIOS\n"
+			"SmBIOS\n"
 #define	SMBIOS4_FORMAT	"|- Processor\n"									\
-			"|     |- product [%s]\n"								\
-			"|     |- manufactured by %s\n"								\
-			"|     |- socket %s\n"									\
-			"|     |- tension %.1f V\n"
+			"|     |- Product [%s]\n"								\
+			"|     |- Manufactured by %s\n"								\
+			"|     |- Socket %s\n"									\
+			"|     |- Tension %.1f V\n"
 #define	SMBIOS7_FORMAT	"|     |- %s [%4lld]%s\n"
 #define	SMBIOS2_FORMAT	"|-  Board\n"										\
-			"|     |- product [%s]\n"								\
-			"|     |- version %s\n"									\
-			"|     |- manufactured by %s\n"								\
-			"|     |- serial [%s]\n"
+			"|     |- Product [%s]\n"								\
+			"|     |- Version %s\n"									\
+			"|     |- Manufactured by %s\n"								\
+			"|     |- Serial [%s]\n"
 #define	SMBIOS0_FORMAT	"|-  BIOS\n"										\
-			"|     |- product [%s]\n"								\
-			"|     |- version %s\n"									\
-			"|     |- released date %s\n"								\
-			"|     |- revision %lld.%lld\n"								\
+			"|     |- Product [%s]\n"								\
+			"|     |- Version %s\n"									\
+			"|     |- Released date %s\n"								\
+			"|     |- Revision %lld.%lld\n"								\
 			"|     |- ROM Size %lld KB at 0x%04llX\n"
 #define	SMBIOS16_FORMAT	"|-  RAM\n"										\
-			"      |- Capacity [%lld/%lld MB]\n"
+			"      |- Capacity [%lld / %lld] MB\n"
 #define	SMBIOS17_FORMAT	"            |- %s:%s  %lld MB @ %lld MHz\n"
+
+#define	OSINFO_SECTION	"\n"											\
+			"Powered by %s\n"
+
 
 #define	SYSINFO_SECTION	"System Information"
 //                       .# 12345678 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234] #00

@@ -12,7 +12,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "50"
+#define _NIGHTLY "51"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #if defined(Linux)
@@ -854,7 +854,7 @@ typedef	union
 		unsigned int		Addr;
 		unsigned short int	Core;
 		unsigned char		Arg;
-		char			ID;
+		unsigned char		ID;
 	} Map;
 } XCHG_MAP;
 
@@ -872,23 +872,23 @@ typedef	struct
 	CPU_STRUCT	C[];
 } SHM_STRUCT;
 
-#define	ID_NULL		'\0'
-#define	ID_DONE		0x7f
-#define	ID_QUIT		'Q'
-#define	ID_SCHED	'T'
-#define	ID_RESET	'Z'
-#define	ID_TSC		't'
-#define	ID_BIOS		'b'
-#define	ID_SPEC		'a'
-#define	ID_ROM		'o'
-#define	ID_TSC_AUX	'u'
-#define	ID_REFRESH	'h'
-#define	ID_INCLOOP	'<'
-#define	ID_DECLOOP	'>'
-#define	ID_DUMPMSR	'd'
-#define	ID_READMSR	'r'
-#define	ID_WRITEMSR	'w'
-#define	ID_CTLFEATURE	'g'
+#define	ID_NULL		0x00
+#define	ID_DONE		0x80
+#define	ID_QUIT		0x7f
+#define	ID_SCHED	0x7e
+#define	ID_RESET	0x7d
+#define	ID_TSC		0x7c
+#define	ID_BIOS		0x7b
+#define	ID_SPEC		0x7a
+#define	ID_ROM		0x79
+#define	ID_TSC_AUX	0x78
+#define	ID_REFRESH	0x77
+#define	ID_INCLOOP	0x76
+#define	ID_DECLOOP	0x75
+#define	ID_DUMPMSR	0x74
+#define	ID_READMSR	0x73
+#define	ID_WRITEMSR	0x72
+#define	ID_CTLFEATURE	0x71
 
 #define	CTL_NOP		0b00000000
 #define	CTL_ENABLE	0b00000001

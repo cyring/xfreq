@@ -10,6 +10,7 @@
 #else
 #define _GNU_SOURCE
 #include <sched.h>
+#include <sys/sysinfo.h>
 #endif
 
 #include <X11/Xlib.h>
@@ -30,6 +31,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <stdatomic.h>
+#include <sys/utsname.h>
+
 
 #if defined(FreeBSD)
 #include <pthread_np.h>
@@ -148,7 +151,8 @@ void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 	switch(wButton->ID) {
 		case ID_SAVE:
 		{
-			XPoint xpoints[]={
+			XPoint xpoints[]=
+			{
 					{	.x=+wButton->x	, .y=+wButton->y	},
 					{	.x=+wButton->w	, .y=0			},
 					{	.x=0		, .y=+wButton->h	},
@@ -158,7 +162,8 @@ void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 			};
 			XDrawLines(	A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
 					xpoints, sizeof(xpoints) / sizeof(XPoint), CoordModePrevious);
-			XPoint xpoly[]={
+			XPoint xpoly[]=
+			{
 					{	.x=wButton->x+4			, .y=wButton->y+wButton->h-(wButton->h >> 1)	},
 					{	.x=wButton->x+wButton->w-2	, .y=wButton->y+wButton->h-(wButton->h >> 1)	},
 					{	.x=wButton->x+wButton->w-2	, .y=wButton->y+wButton->h-1	},
@@ -167,7 +172,8 @@ void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 			XFillPolygon(	A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
 					xpoly, sizeof(xpoly) / sizeof(XPoint), Nonconvex, CoordModeOrigin);
 
-			XSegment xsegments[]={
+			XSegment xsegments[]=
+			{
 				{	.x1=wButton->x+3,		.y1=wButton->y+3,	.x2=wButton->x+3,		.y2=wButton->y+4},
 				{	.x1=wButton->x+wButton->w-3,	.y1=wButton->y+3,	.x2=wButton->x+wButton->w-3,	.y2=wButton->y+4}
 			};
@@ -184,7 +190,7 @@ void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 					wButton->y,
 					wButton->w,
 					wButton->h,
-					34 << 8, 66 << 8);
+					145 << 6, 250 << 6);
 		}
 			break;
 		case ID_MIN:
@@ -194,6 +200,20 @@ void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 					wButton->x, wButton->y, wButton->w, wButton->h );
 			XFillRectangle(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
 					wButton->x + 2, wButton->y + 2, wButton->w - inner, wButton->h - inner);
+		}
+			break;
+		case ID_PAUSE:
+		{
+			XDrawRectangle(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
+					wButton->x, wButton->y, wButton->w, wButton->h );
+
+			int inner=wButton->w >> 1;
+			XRectangle xrectangles[]=
+			{
+				{	.x=wButton->x+inner-2,	.y=wButton->y+3,	.width=2,	.height=wButton->h-5},
+				{	.x=wButton->x+inner+2,	.y=wButton->y+3,	.width=2,	.height=wButton->h-5}
+			};
+			XFillRectangles(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc, xrectangles, 2);
 		}
 			break;
 		case ID_CHART:
@@ -211,6 +231,16 @@ void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 			XDrawRectangle(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
 					wButton->x, wButton->y, wButton->w, wButton->h );
 			XDrawSegments(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc, sChart, nChart);
+		}
+			break;
+		case ID_REFRESH:
+		{
+			XArc xarcs[]=
+			{
+				{.x=wButton->x,   .y=wButton->y,   .width=wButton->w,   .height=wButton->h,   .angle1=0 << 6, .angle2=360 << 6},
+				{.x=wButton->x+4, .y=wButton->y+4, .width=wButton->w-8, .height=wButton->h-8, .angle1=0 << 6, .angle2=360 << 6}
+			};
+			XDrawArcs(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc, xarcs, 2);
 		}
 			break;
 	}
@@ -1168,6 +1198,16 @@ int	OpenWidgets(uARG *A)
 
 						WBSTATE WBState={Button_State, &A->L.Play.fillGraphics};
 						CreateButton(	A, DECORATION, ID_CHART, G,
+								A->W[G].width - (One_Char_Width(G) * 8) - 2,
+								2,
+								square - 2,
+								square - 2,
+								CallBackButton,
+								NULL,
+								&WBState);
+
+						WBState.Key=&A->PAUSE[G];
+						CreateButton(	A, DECORATION, ID_PAUSE, G,
 								A->W[G].width - (One_Char_Width(G) * 5) - 2,
 								2,
 								square - 2,
@@ -1189,8 +1229,7 @@ int	OpenWidgets(uARG *A)
 							char		ID;
 							RESOURCE	RSC;
 							WBSTATE		WBState;
-						} Loader[]={	{.ID=ID_PAUSE, .RSC={.Text=RSC_PAUSE}, {Button_State, &A->PAUSE[G]}},
-								{.ID=ID_FREQ , .RSC={.Text=RSC_FREQ},  {Button_State, &A->L.Play.freqHertz}},
+						} Loader[]={	{.ID=ID_FREQ , .RSC={.Text=RSC_FREQ},  {Button_State, &A->L.Play.freqHertz}},
 								{.ID=ID_CYCLE, .RSC={.Text=RSC_CYCLE}, {Button_State, &A->L.Play.showCycles}},
 								{.ID=ID_IPS, .  RSC={.Text=RSC_IPS}, {Button_State, &A->L.Play.showIPS}},
 								{.ID=ID_IPC, .  RSC={.Text=RSC_IPC}, {Button_State, &A->L.Play.showIPC}},
@@ -1261,6 +1300,16 @@ int	OpenWidgets(uARG *A)
 
 						unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
 
+						WBSTATE WBState={Button_State, &A->PAUSE[G]};
+						CreateButton(	A, DECORATION, ID_PAUSE, G,
+								A->W[G].width - Twice_Char_Width(G) - 2,
+								A->W[G].height - (square + 2),
+								square - 2,
+								square - 2,
+								CallBackButton,
+								NULL,
+								&WBState);
+
 						CreateButton(	A, DECORATION, ID_MIN, G,
 								A->W[G].width - Twice_Char_Width(G) - 2,
 								2,
@@ -1274,8 +1323,8 @@ int	OpenWidgets(uARG *A)
 							char		ID;
 							RESOURCE	RSC;
 							WBSTATE		WBState;
-						} Loader[]={	{.ID=ID_PAUSE,  .RSC={.Text=RSC_PAUSE},  {Button_State, &A->PAUSE[G]}},
-								{.ID=ID_CSTATE, .RSC={.Text=RSC_CSTATE}, {Button_State, &A->L.Play.cStatePercent}},
+						} Loader[]={	{.ID=ID_CSTATE, .RSC={.Text=RSC_CSTATE}, {Button_State, &A->L.Play.cStatePercent}},
+								{.ID=ID_PSTATE, .RSC={.Text=RSC_PSTATE}, {NULL, NULL}},
 								{.ID=ID_NULL ,  .RSC={.Text=NULL},       {NULL, NULL}}
 							};
 						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
@@ -1371,6 +1420,16 @@ int	OpenWidgets(uARG *A)
 
 						A->W[G].height+=Footer_Height(G);
 
+						WBState.Key=&A->PAUSE[G];
+						CreateButton(	A, DECORATION, ID_PAUSE, G,
+								A->W[G].width - Twice_Char_Width(G) - 2,
+								A->W[G].height - (square + 2),
+								square - 2,
+								square - 2,
+								CallBackButton,
+								NULL,
+								&WBState);
+
 						CreateButton(	A, DECORATION, ID_MIN, G,
 								A->W[G].width - Twice_Char_Width(G) - 2,
 								2,
@@ -1384,8 +1443,7 @@ int	OpenWidgets(uARG *A)
 							char		ID;
 							RESOURCE	RSC;
 							WBSTATE		WBState;
-						} Loader[]={	{.ID=ID_PAUSE, .RSC={.Text=RSC_PAUSE}, {Button_State, &A->PAUSE[G]}},
-								{.ID=ID_RESET, .RSC={.Text=RSC_RESET}, {NULL, NULL}},
+						} Loader[]={	{.ID=ID_RESET, .RSC={.Text=RSC_RESET}, {NULL, NULL}},
 								{.ID=ID_NULL , .RSC={.Text=NULL},      {NULL, NULL}}
 							};
 						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
@@ -1436,6 +1494,25 @@ int	OpenWidgets(uARG *A)
 
 						unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
 
+						CreateButton(	A, DECORATION, ID_REFRESH, G,
+								A->W[G].width - (One_Char_Width(G) * 8) - 2,
+								2,
+								square - 2,
+								square - 2,
+								CallBackButton,
+								NULL,
+								NULL);
+
+						WBSTATE WBState={Button_State, &A->PAUSE[G]};
+						CreateButton(	A, DECORATION, ID_PAUSE, G,
+								A->W[G].width - (One_Char_Width(G) * 5) - 2,
+								2,
+								square - 2,
+								square - 2,
+								CallBackButton,
+								NULL,
+								&WBState);
+
 						CreateButton(	A, DECORATION, ID_MIN, G,
 								A->W[G].width - Twice_Char_Width(G) - 2,
 								2,
@@ -1488,8 +1565,7 @@ int	OpenWidgets(uARG *A)
 							char		ID;
 							RESOURCE	RSC;
 							WBSTATE		WBState;
-						} Loader[]={	{.ID=ID_PAUSE,     .RSC={.Text=RSC_PAUSE},     {Button_State, &A->PAUSE[G]}},
-								{.ID=ID_WALLBOARD, .RSC={.Text=RSC_WALLBOARD}, {Button_State, &A->L.Play.wallboard}},
+						} Loader[]={	{.ID=ID_WALLBOARD, .RSC={.Text=RSC_WALLBOARD}, {Button_State, &A->L.Play.wallboard}},
 								{.ID=ID_INCLOOP,   .RSC={.Text=RSC_INCLOOP},   {NULL, NULL}},
 								{.ID=ID_TSC,       .RSC={.Text=RSC_TSC},       {TSC_State,  NULL}},
 								{.ID=ID_TSC_AUX,   .RSC={.Text=RSC_TSC_AUX},   {TSC_AUX_State,  NULL}},
@@ -1512,7 +1588,7 @@ int	OpenWidgets(uARG *A)
 										&Loader[i].WBState);
 
 						// Prepare a Wallboard string with the Processor information.
-						int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
+						int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 10;
 						sprintf(str, OVERCLOCK, A->SHM->P.Features.BrandString, A->SHM->P.Boost[1] * A->SHM->P.ClockSpeed);
 						A->L.WB.Length=strlen(str) + (padding << 1);
 						A->L.WB.String=calloc(A->L.WB.Length, 1);
@@ -1557,6 +1633,16 @@ int	OpenWidgets(uARG *A)
 
 						unsigned int square=MAX(One_Char_Height(G), One_Char_Width(G));
 
+						WBSTATE WBState={Button_State, &A->PAUSE[G]};
+						CreateButton(	A, DECORATION, ID_PAUSE, G,
+								A->W[G].width - Twice_Char_Width(G) - 2,
+								A->W[G].height - (square + 2),
+								square - 2,
+								square - 2,
+								CallBackButton,
+								NULL,
+								&WBState);
+
 						CreateButton(	A, DECORATION, ID_MIN, G,
 								A->W[G].width - Twice_Char_Width(G) - 2,
 								2,
@@ -1568,49 +1654,48 @@ int	OpenWidgets(uARG *A)
 
 						if(A->L.Page[G].Pageable)
 						{
-						CreateButton(	A, SCROLLING, ID_NORTH, G,
-								A->W[G].width - square,
-								Header_Height(G) + 2,
-								square,
-								square,
-								CallBackButton,
-								NULL,
-								NULL);
+							CreateButton(	A, SCROLLING, ID_NORTH, G,
+									A->W[G].width - square,
+									Header_Height(G) + 2,
+									square,
+									square,
+									CallBackButton,
+									NULL,
+									NULL);
 
-						CreateButton(	A, SCROLLING, ID_SOUTH, G,
-								A->W[G].width - square,
-								A->W[G].height - (Footer_Height(G) + square + 2),
-								square,
-								square,
-								CallBackButton,
-								NULL,
-								NULL);
+							CreateButton(	A, SCROLLING, ID_SOUTH, G,
+									A->W[G].width - square,
+									A->W[G].height - (Footer_Height(G) + square + 2),
+									square,
+									square,
+									CallBackButton,
+									NULL,
+									NULL);
 
-						CreateButton(	A, SCROLLING, ID_EAST, G,
-								A->W[G].width
-								- (MAX(Twice_Char_Height(G),Twice_Char_Width(G)) + 2),
-								A->W[G].height - (square + 2),
-								square,
-								square,
-								CallBackButton,
-								NULL,
-								NULL);
+							CreateButton(	A, SCROLLING, ID_EAST, G,
+									A->W[G].width
+									- (MAX(Twice_Char_Height(G),Twice_Char_Width(G)) + 2),
+									A->W[G].height - (square + 2),
+									square,
+									square,
+									CallBackButton,
+									NULL,
+									NULL);
 
-						CreateButton(	A, SCROLLING, ID_WEST, G,
-								2,
-								A->W[G].height - (square + 2),
-								square,
-								square,
-								CallBackButton,
-								NULL,
-								NULL);
+							CreateButton(	A, SCROLLING, ID_WEST, G,
+									2,
+									A->W[G].height - (square + 2),
+									square,
+									square,
+									CallBackButton,
+									NULL,
+									NULL);
 						}
 						struct {
 							char		ID;
 							RESOURCE	RSC;
 							WBSTATE		WBState;
-						} Loader[]={	{.ID=ID_PAUSE, .RSC={.Text=RSC_PAUSE}, {Button_State, &A->PAUSE[G]}},
-								{.ID=ID_NULL , .RSC={.Text=NULL},      {NULL, NULL}}
+						} Loader[]={	{.ID=ID_NULL , .RSC={.Text=NULL},      {NULL, NULL}}
 							};
 						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
 						int i=0;
@@ -1933,7 +2018,7 @@ void	BuildLayout(uARG *A, int G)
 					One_Char_Width(G) * ((A->SHM->P.Boost[9] + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					&str[4], 2);
-			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
+			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			if(A->L.Play.showCycles)
 			{
 				if(!A->L.Play.showIPS
@@ -2036,8 +2121,9 @@ void	BuildLayout(uARG *A, int G)
 					One_Char_Height(G)
 					+ (90 * (One_Char_Height(G) * CSTATES_TEXT_HEIGHT)) / 100,
 					"10", 2 );
+			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 			XDrawString(A->display, A->W[G].pixmap.B, A->W[G].gc,
-					One_Char_Width(G),
+					0,
 					One_Char_Height(G) + (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT + 1)),
 					CSTATES_FOOTER, strlen(CSTATES_FOOTER) );
 
@@ -2045,7 +2131,6 @@ void	BuildLayout(uARG *A, int G)
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
 			{
-				XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 				sprintf(str, CORE_NUM, cpu);
 				XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 						Twice_Char_Width(G) + ((cpu * CSTATES_TEXT_SPACING) * One_Half_Char_Width(G)),
@@ -2060,6 +2145,7 @@ void	BuildLayout(uARG *A, int G)
 							One_Char_Height(G)
 							+ (One_Char_Height(G) * CSTATES_TEXT_HEIGHT),
 							"OFF", 3 );
+					XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
 				}
 			}
 		}
@@ -2090,7 +2176,7 @@ void	BuildLayout(uARG *A, int G)
 					A->L.Page[G].Title,
 					strlen(A->L.Page[G].Title) );
 
-			char *str=calloc(256, 1);
+			char *str=calloc(512, 1);
 
 			int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
 			sprintf(str, OVERCLOCK, A->SHM->P.Features.BrandString, A->SHM->P.Boost[1] * A->SHM->P.ClockSpeed);
@@ -2105,7 +2191,7 @@ void	BuildLayout(uARG *A, int G)
 
 			if(A->L.Page[G].Pageable)
 			{
-				char 		*items=calloc(8192, 1);
+				char 		*items=calloc(12288, 1);
 				#define		powered(bit) ((bit == 1) ? 'Y' : 'N')
 				#define		enabled(bit) ((bit == 1) ? "ON" : "OFF")
 				const char	*ClockSrcStr[SRC_COUNT]={"TSC", "BIOS", "SPEC", "ROM", "AUX"};
@@ -2339,6 +2425,54 @@ void	BuildLayout(uARG *A, int G)
 				else
 					strcat(items, "Unknown IMC\n");
 
+				struct utsname OSinfo={{0}};
+				uname(&OSinfo);
+				sprintf(str, OSINFO_SECTION, OSinfo.sysname);
+				strcat(items, str);
+#if defined(Linux)
+				struct sysinfo sysLinux;
+				if(!sysinfo(&sysLinux))
+				{
+					sprintf(str,
+							"|- Kernel\n"				\
+							"|     |- Release %s\n"			\
+							"|     |- Processes [%hu]\n"		\
+							"|- Memory\n"				\
+							"      |- Total  [%14lu] Bytes\n"	\
+							"      |- Free   [%14lu] Bytes\n"	\
+							"      |- Shared [%14lu] Bytes\n"	\
+							"      |- Buffer [%14lu] Bytes\n",
+							OSinfo.release,
+							sysLinux.procs,
+							sysLinux.totalram,
+							sysLinux.freeram,
+							sysLinux.sharedram,
+							sysLinux.bufferram);
+					strcat(items, str);
+
+					if(sysLinux.totalswap > 0)
+						sprintf(str,
+							"      |- Swap\n"			\
+							"      |     |- Total [%14lu] Bytes\n"	\
+							"      |     |- Free  [%14lu] Bytes\n",
+							sysLinux.totalswap,
+							sysLinux.freeswap);
+					else
+						strcpy(str,"      |- No Swap\n");
+					strcat(items, str);
+
+					if(sysLinux.totalhigh > 0)
+					{
+						sprintf(str,
+							"      |- High\n"			\
+							"            |- Total [%14lu] Bytes\n"	\
+							"            |- Free  [%14lu] Bytes\n",
+							sysLinux.totalhigh,
+							sysLinux.freehigh);
+						strcat(items, str);
+					}
+				}
+#endif
 				// Clear the scrolling area.
 				XSetForeground(A->display, A->W[G].gc, A->W[G].background);
 				XFillRectangle(A->display, A->L.Page[G].Pixmap, A->W[G].gc,
@@ -2660,8 +2794,7 @@ void	DrawLayout(uARG *A, int G)
 			break;
 		case CSTATES:
 		{
-			char *str=calloc(72, 1);
-			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+			char *str=calloc(80, 1);
 			int cpu=0;
 			for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
 				if(A->SHM->C[cpu].T.Offline != TRUE)
@@ -2702,6 +2835,7 @@ void	DrawLayout(uARG *A, int G)
 					A->L.Usage.C7[cpu].height=One_Char_Height(G)
 								+ (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT - 1)) * A->SHM->C[cpu].State.C7;
 				}			// Display the C-State averages.
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 			sprintf(str, CSTATES_AVERAGE,	100.f * A->SHM->P.Avg.Turbo,
 							100.f * A->SHM->P.Avg.C0,
 							100.f * A->SHM->P.Avg.C1,
@@ -2709,7 +2843,7 @@ void	DrawLayout(uARG *A, int G)
 							100.f * A->SHM->P.Avg.C6,
 							100.f * A->SHM->P.Avg.C7);
 			XDrawString(A->display, A->W[G].pixmap.F, A->W[G].gc,
-						Twice_Char_Width(G),
+						6*One_Char_Width(G),
 						One_Char_Height(G) + (One_Char_Height(G) * (CSTATES_TEXT_HEIGHT + 1)),
 						str, strlen(str) );
 
@@ -2734,7 +2868,7 @@ void	DrawLayout(uARG *A, int G)
 								One_Char_Height(G) * (cpu + 1 + 1),
 								str, strlen(str) );
 
-						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
+						XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
 						sprintf(str, CSTATES_PERCENT,	100.f * A->SHM->C[cpu].State.Turbo,
 										100.f * A->SHM->C[cpu].State.C0,
 										100.f * A->SHM->C[cpu].State.C1,
@@ -2743,7 +2877,7 @@ void	DrawLayout(uARG *A, int G)
 										100.f * A->SHM->C[cpu].State.C7);
 
 						XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
-								One_Char_Width(G) << 2,
+								5*One_Char_Width(G),
 								One_Char_Height(G) * (cpu + 1 + 1),
 								str, strlen(str) );
 					}
@@ -2839,7 +2973,7 @@ void	DrawLayout(uARG *A, int G)
 			XDrawImageString(A->display,
 					A->W[G].pixmap.F,
 					A->W[G].gc,
-					((TEMPS_TEXT_WIDTH + 2) * One_Char_Width(G)) + One_Char_Width(G),
+					((TEMPS_TEXT_WIDTH + 2) * One_Char_Width(G)) + Half_Char_Width(G),
 					(A->W[G].height * A->SHM->C[A->SHM->P.Hot].ThermStat.DTS) / A->SHM->C[A->SHM->P.Hot].TjMax.Target,
 					str, 3);
 
@@ -2872,7 +3006,7 @@ void	DrawLayout(uARG *A, int G)
 					A->L.WB.Scroll++;
 				else
 					A->L.WB.Scroll=0;
-				int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
+				int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 10;
 
 				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 				XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
