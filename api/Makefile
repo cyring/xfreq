@@ -1,4 +1,4 @@
-CC = cc
+export CC
 CFLAGS = -Wall -x c
 KERNEL = `uname -s`
 SRC_PATH=.

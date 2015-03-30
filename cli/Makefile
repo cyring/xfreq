@@ -1,4 +1,4 @@
-CC = cc
+export CC
 CFLAGS = -Wall -pthread -x c
 KERNEL = `uname -s`
 APP_NAME=xfreq-cli
