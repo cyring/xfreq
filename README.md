@@ -3,11 +3,11 @@
 XFreq provides a GUI to monitor the Processor frequencies (including Turbo Boost), the temperatures, C-States; and alter the operational features of the Intel Core i7 processor.
 XFreq is also programmed for Core 2 and other Intel 64-bits architectures.
 
-![alt text](http://blog.cyring.free.fr/images/xfreq-core-R2146.png "CORE")
+![alt text](http://blog.cyring.free.fr/images/XFreq-core-R2151.png "CORE")
 
-![alt text](http://blog.cyring.free.fr/images/xfreq-temps-R2146.png "TEMPS")
+![alt text](http://blog.cyring.free.fr/images/XFreq-temps-R2151.png "TEMPS")
 
-![alt text](http://blog.cyring.free.fr/images/xfreq-cstates-R2146.png "CSTATES")
+![alt text](http://blog.cyring.free.fr/images/XFreq-cstates-R2151.png "CSTATES")
 
 
 ### Features
