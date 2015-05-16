@@ -1,10 +1,10 @@
 /*
  * xfreq-gui.h by CyrIng
  *
+ * XFreq
  * Copyright (C) 2013-2015 CYRIL INGENIERIE
  * Licenses: GPL2
  */
-
 
 #if defined(FreeBSD)
 // Posix fix.
@@ -107,17 +107,26 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 #define	ID_PAUSE	0x33
 #define	ID_STOP		0x32
 #define	ID_RESUME	0x31
-#define	ID_CHART	0x30
-#define	ID_CYCLE	0x2f
-#define	ID_IPS		0x2e
-#define	ID_IPC		0x2d
-#define	ID_CPI		0x2c
-#define	ID_FREQ		0x2b
-#define	ID_RATIO	0x2a
-#define	ID_CSTATE	0x29
-#define	ID_PSTATE	0x28
-#define	ID_TEMP		0x27
-#define	ID_WALLBOARD	0x26
+#define	ID_WALLBOARD	0x30
+#define	ID_CHART	0x2f
+#define	ID_CYCLE	0x2e
+#define	ID_IPS		0x2d
+#define	ID_IPC		0x2c
+#define	ID_CPI		0x2b
+#define	ID_FREQ		0x2a
+#define	ID_RATIO	0x29
+#define	ID_CSTATE	0x28
+#define	ID_PSTATE	0x27
+#define	ID_TEMP		0x26
+#define	ID_DUMP		0x25
+#define	ID_TOGGLEBIT	0x24
+#define	ID_WRITEBITS	0x23
+//	ID_NULL + 5	DUMP
+//	ID_NULL + 4	SYSINFO
+//	ID_NULL + 3	TEMPS
+//	ID_NULL + 2	CSTATES
+//	ID_NULL + 1	CORES
+//	ID_NULL + 0	MAIN
 
 #define	RSC_RESET	"Reset"
 #define	RSC_FREQ	"Freq"
@@ -137,6 +146,7 @@ enum	{MC_DEFAULT, MC_MOVE, MC_WAIT, MC_COUNT};
 #define	RSC_INCLOOP	"<<"
 #define	RSC_DECLOOP	">>"
 #define	RSC_WALLBOARD	"Brand"
+#define	RSC_WRITEBITS	"Write"
 
 #define	ICON_LABELS	{{.Label='M'}, {.Label='C'}, {.Label='S'}, {.Label='T'}, {.Label='I'}, {.Label='D'}}
 
@@ -290,10 +300,10 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	DUMP_HEX16_STR		16
 // BIN64: 16 x 4 digits + '\0'
 #define DUMP_BIN64_STR		(16 * 4) + 1
-// PRE_TEXT: ##' 'Addr[8+1]' 'Name&Padding[24]'['
-#define DUMP_PRE_TEXT		(2 + 1 + (8+0) + 1 + DUMP_REG_ALIGN + 1)
-// Columns: PRE_TEXT + BIN64 w/ 15 interspaces + '] ' + CoreNum + ScrollButtons
-#define	GEOMETRY_DUMP_COLS	(DUMP_PRE_TEXT + DUMP_BIN64_STR + 15 + 2 + 3 + 3)
+// PRE_TEXT: ##' 'Addr[8+1]' 'Name&Padding[24]
+#define DUMP_PRE_TEXT		(2 + 1 + 8 + 1 + DUMP_REG_ALIGN)
+// Columns: PRE_TEXT + BIN64 w/ 15 interspaces + '  ' + CoreNum + ScrollButtons
+#define	GEOMETRY_DUMP_COLS	sizeof(DUMP_SECTION)	/*(DUMP_PRE_TEXT + DUMP_BIN64_STR + 15 + 2 + 3 + 3)*/
 #define	GEOMETRY_DUMP_ROWS	(DUMP_ARRAY_DIMENSION + 2)
 #define	DUMP_TEXT_WIDTH		MAX(GEOMETRY_DUMP_COLS, A->L.Page[DUMP].Geometry.cols)
 #define	DUMP_TEXT_HEIGHT	MAX(GEOMETRY_DUMP_ROWS, A->L.Page[DUMP].Geometry.rows)
@@ -398,8 +408,8 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"|- Fast-Strings                                   REP MOVSB/STOSB [%c]   [%3s]\n"	\
 			"|- Digital Thermal Sensor                                     DTS [%c]\n"		\
 			"|- Automatic Thermal Control Circuit Enable                   TCC       [%3s]\n"	\
-			"|- Performance Monitoring Available                            PM       [%3s]\n"	\
-			"|- Branch Trace Storage Unavailable                           BTS       [%3s]\n"	\
+			"|- Performance Monitoring                                      PM       [%3s]\n"	\
+			"|- Branch Trace Storage                                       BTS       [%3s]\n"	\
 			"|- Limit CPUID Maxval                                 Limit-CPUID       [%3s]\n"	\
 			"|- Turbo Boost Technology/Dynamic Acceleration          TURBO/IDA [%c]   [%3s]\n"	\
 			"\n"											\
@@ -483,11 +493,11 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 
 
 #define	SYSINFO_SECTION	"System Information"
-//                       .# 12345678 123456789012345678901234[1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234] #00
-#define	DUMP_SECTION	" #  Address          Register          60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0 Core"
+//                       12345678 1234567890123456789012341234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 1234 #00. 12345
+#define	DUMP_SECTION	" Address         Register          60   56   52   48   44   40   36   32   28   24   20   16   12    8    4    0 Core      "
 #define	REG_HEXVAL	"%016llX"
-#define	REG_FORMAT_BOL	"%02d %08X %s%%%zdc["
-#define	REG_FORMAT_EOL	"] "CORE_NUM"\n"
+#define	REG_FORMAT_BOL	"%08X %s%%%zdc"
+#define	REG_FORMAT_EOL	"  "CORE_NUM"\n"
 
 #define	TASK_SECTION	"Task Scheduling"
 
@@ -574,6 +584,11 @@ typedef struct
 				skipTaskbar,
 				cursorShape;
 	} Play;
+	struct {
+		Bool32		*RowSw,
+				*BitSw;
+		int		RowIx;
+	} Toggle;
 	struct {;
 		int		Scroll,
 				Length;
@@ -743,6 +758,8 @@ void	CallBackSave(uARG *A, WBUTTON *wButton) ;
 void	CallBackQuit(uARG *A, WBUTTON *wButton) ;
 void	CallBackButton(uARG *A, WBUTTON *wButton) ;
 void	CallBackTemps(uARG *A, WBUTTON *wButton) ;
+void	CallBackToggleDump(uARG *A, WBUTTON *wButton) ;
+void	CallBackToggleBit(uARG *A, WBUTTON *wButton) ;
 void	CallBackMinimizeWidget(uARG *A, WBUTTON *wButton) ;
 void	CallBackRestoreWidget(uARG *A, WBUTTON *wButton) ;
 

@@ -1,6 +1,7 @@
 /*
  * xfreq-types.h by CyrIng
  *
+ * XFreq
  * Copyright (C) 2013-2015 CYRIL INGENIERIE
  * Licenses: GPL2
  */
@@ -25,3 +26,5 @@ typedef unsigned int		Bool32;
 #define MAX(M, m)	((M) > (m) ? (M) : (m))
 #define MIN(m, M)	((m) < (M) ? (m) : (M))
 #endif
+
+#define	BT64(r64, i32) ((r64 & (unsigned long long int) 1 << i32) >> i32)

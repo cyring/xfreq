@@ -1,0 +1,45 @@
+/*
+ * xfreq:redblack.css by CyrIng
+ *
+ * XFreq
+ * Copyright (C) 2015 CYRIL INGENIERIE
+ * Licenses: GPL2
+ */
+
+body {
+        background-color: #2a0308;
+        color: white;
+}
+#SocketState {
+	color: #c0c0c0;
+	margin: 2px 0;
+}
+#LogHistory {
+	background-color: black;
+	color: white;
+	font-size: smaller;
+	height: 600px;
+	overflow: auto;
+	width: auto;
+}
+#ControlBar {
+	background-color: black;
+	border: #c0c0c0 2px solid;
+	font-size: small;
+	margin-top: 2px;
+	padding: 6px 6px;
+}
+#ControlBar div {
+	float: right;
+}
+#ControlBar div, #SuspendBtn, #ResumeBtn {
+	font-size: small;
+}
+#ControlBar div #HistoryDepth {
+	font-size: small;
+	width: 4em;
+}
+#ControlBar div #SubmitDepth {
+	padding-left: 2px;
+	padding-right: 2px;
+}

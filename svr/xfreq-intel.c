@@ -1,6 +1,7 @@
 /*
  * xfreq-intel.c by CyrIng
  *
+ * XFreq
  * Copyright (C) 2013-2015 CYRIL INGENIERIE
  * Licenses: GPL2
  */
@@ -2167,7 +2168,7 @@ int main(int argc, char *argv[])
 						Play(&A, &XChange);
 					}
 
-					printf(	"Processor [%s]\t%d/%d CPU Online\n" \
+					printf(	"Processor [%s] %d/%d CPU Online\n" \
 						"Signature [%1X%1X_%1X%1X] Architecture [%s]\n" \
 						"\n%s",
 						A.SHM->P.Features.BrandString, A.SHM->P.OnLine, A.SHM->P.CPU,

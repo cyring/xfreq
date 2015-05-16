@@ -1,6 +1,7 @@
 /*
  * xfreq-api.h by CyrIng
  *
+ * XFreq
  * Copyright (C) 2013-2015 CYRIL INGENIERIE
  * Licenses: GPL2
  */
@@ -12,7 +13,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "51a"
+#define _NIGHTLY "52"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #if defined(Linux)
@@ -903,8 +904,9 @@ typedef	struct
 #define	SIG_EMERGENCY_FMT	"\nShutdown(%02d)"
 #define	TASK_PID_FMT		"%5ld"
 
-extern unsigned int fROL32(unsigned int r32, unsigned short int m16);
-extern unsigned int fROR32(unsigned int r32, unsigned short int m16);
+extern unsigned int ROL32(unsigned int r32, unsigned short int m16);
+extern unsigned int ROR32(unsigned int r32, unsigned short int m16);
+/*	extern unsigned long long int BT64(unsigned long long int r64, unsigned long long int i64);	*/
 extern void abstimespec(useconds_t usec, struct timespec *tsec);
 extern int addtimespec(struct timespec *asec, const struct timespec *tsec);
 extern void Sync_Init(SYNCHRONIZATION *sync);

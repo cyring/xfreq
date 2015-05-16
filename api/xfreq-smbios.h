@@ -1,6 +1,7 @@
 /*
  * xfreq-smbios.h by CyrIng
  *
+ * XFreq
  * Copyright (C) 2012-2015 CYRIL INGENIERIE
  * Licenses: GPL2
  */

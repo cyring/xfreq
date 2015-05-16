@@ -1,19 +1,12 @@
 /*
- * xfreq-cli.h by CyrIng
+ * xfreq-web.h by CyrIng
  *
  * XFreq
  * Copyright (C) 2013-2015 CYRIL INGENIERIE
  * Licenses: GPL2
  */
 
-
-#if defined(FreeBSD)
-// Posix fix.
-#define	pthread_setname_np pthread_set_name_np
-#define	pthread_tryjoin_np(t, r) pthread_timedjoin_np(t, r, 0)
-#endif
-
-#define	OPTIONS_COUNT	3
+#define	OPTIONS_COUNT	2
 typedef struct
 {
 	char		*argument;
@@ -33,15 +26,9 @@ typedef struct
 	SHM_STRUCT	*SHM;
 	SMBIOS_TREE	*SmBIOS;
 
-	sigset_t	Signal;
-	pthread_t	TID_SigHandler,
-			TID_Read;
-
 	unsigned int	Room;
 
-	unsigned int	iFunc;
-	void		*(*uFunc)(void *uArg);
-
-	Bool32		LOOP;
+	Bool32		LOOP,
+			fSuspended;
 	OPTIONS		Options[OPTIONS_COUNT];
 } uARG;

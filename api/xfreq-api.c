@@ -11,34 +11,55 @@
 #include "xfreq-smbios.h"
 #include "xfreq-api.h"
 
-unsigned int fROL32(unsigned int r32, unsigned short int m16)
+unsigned int ROL32(unsigned int r32, unsigned short int m16)
 {
 	__asm__	volatile
 	(
 		"mov	%0, %%eax	\n\t"
 		"movw	%1, %%cx	\n\t"
 		"rol	%%cl,%%eax	\n\t"
-		"mov	%%eax, %0"
+		"mov	%%eax, %0	"
 		: "=m" (r32), "=m" (m16)
                 : "m" (r32)
 	);
 	return(r32);
 }
 
-unsigned int fROR32(unsigned int r32, unsigned short int m16)
+unsigned int ROR32(unsigned int r32, unsigned short int m16)
 {
 	__asm__	volatile
 	(
 		"mov	%0, %%eax	\n\t"
 		"movw	%1, %%cx	\n\t"
 		"ror	%%cl, %%eax	\n\t"
-		"mov	%%eax, %0"
+		"mov	%%eax, %0	"
 		: "=m" (r32), "=m" (m16)
                 : "m" (r32)
 	);
 	return(r32);
 }
-
+/*
+unsigned long long int BT64(unsigned long long int r64, unsigned long long int i64)
+{
+	unsigned long long int f64;
+	__asm__	volatile
+	(
+		"mov	%1, %%rax	\n\t"
+		"mov	%2, %%rdx	\n\t"
+		"bt	%%rdx, %%rax	\n\t"
+		"jc	One		\n\t"
+		"mov	%%rax, 0x0 	\n\t"
+		"jmp	Over		\n\t"
+		"One:			\n\t"
+		"mov	%%rax, 0x1	\n\t"
+		"Over:			\n\t"
+		"mov	%%rax, %0"
+		: "=m" (f64)
+                : "m" (r64), "m" (i64)
+	);
+	return(f64);
+}
+*/
 void	abstimespec(useconds_t usec, struct timespec *tsec)
 {
 	tsec->tv_sec=usec / 1000000L;

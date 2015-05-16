@@ -244,6 +244,9 @@ $ xfreq-gui
 ... and in the reverse order to shutdown.
 
 ## News
+ * Web UI alpha release preview.
+ * ![alt text](http://blog.cyring.free.fr/images/XFreq-WebUI.png "XFreq Web UI")
+ * Bit set calculator.
  * Added Performance Monitor Features.
  * New commands to enable, disable C3 and C1 auto demotion.
  * C7 state is implemented. (_need alpha testers to confirm ?_)

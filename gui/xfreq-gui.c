@@ -1,6 +1,7 @@
 /*
  * xfreq-gui.c by CyrIng
  *
+ * XFreq
  * Copyright (C) 2013-2015 CYRIL INGENIERIE
  * Licenses: GPL2
  */
@@ -13,12 +14,6 @@
 #include <sys/sysinfo.h>
 #endif
 
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xos.h>
-#include <X11/Xatom.h>
-#include <X11/cursorfont.h>
-#include <X11/Xresource.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -37,6 +32,14 @@
 #if defined(FreeBSD)
 #include <pthread_np.h>
 #endif
+
+//#include <X11/Xlib-xcb.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/Xos.h>
+#include <X11/Xatom.h>
+#include <X11/cursorfont.h>
+#include <X11/Xresource.h>
 
 #define	_APPNAME "XFreq-Gui"
 #include "xfreq-smbios.h"
@@ -160,8 +163,7 @@ void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 					{	.x=-3		, .y=-3			},
 					{	.x=0		, .y=-wButton->h+3	}
 			};
-			XDrawLines(	A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
-					xpoints, sizeof(xpoints) / sizeof(XPoint), CoordModePrevious);
+			XDrawLines(	A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc, xpoints, sizeof(xpoints) / sizeof(XPoint), CoordModePrevious);
 			XPoint xpoly[]=
 			{
 					{	.x=wButton->x+4			, .y=wButton->y+wButton->h-(wButton->h >> 1)	},
@@ -177,8 +179,7 @@ void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 				{	.x1=wButton->x+3,		.y1=wButton->y+3,	.x2=wButton->x+3,		.y2=wButton->y+4},
 				{	.x1=wButton->x+wButton->w-3,	.y1=wButton->y+3,	.x2=wButton->x+wButton->w-3,	.y2=wButton->y+4}
 			};
-			XDrawSegments(	A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
-					xsegments, sizeof(xsegments)/sizeof(XSegment));
+			XDrawSegments(	A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc, xsegments, sizeof(xsegments)/sizeof(XSegment));
 		}
 			break;
 		case ID_QUIT:
@@ -241,6 +242,15 @@ void	DrawDecorationButton(uARG *A, WBUTTON *wButton)
 				{.x=wButton->x+4, .y=wButton->y+4, .width=wButton->w-8, .height=wButton->h-8, .angle1=0 << 6, .angle2=360 << 6}
 			};
 			XDrawArcs(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc, xarcs, 2);
+		}
+			break;
+		case ID_TOGGLEBIT:
+		{
+			unsigned int inner=wButton->w >> 2;
+			char str[2]={*(wButton->WBState.Key)+'0', '\0'};
+
+			XDrawImageString(A->display, A->W[wButton->Target].pixmap.B, A->W[wButton->Target].gc,
+					wButton->x+inner, wButton->y+(A->W[wButton->Target].extents.ascent), str, 1);
 		}
 			break;
 	}
@@ -342,7 +352,11 @@ void	CreateButton(uARG *A, WBTYPE Type, char ID, int Target, int x, int y, unsig
 	switch(NewButton->Type)
 	{
 		case DECORATION:
+		{
+			if(Resource != NULL)
+				NewButton->Resource.Label=Resource->Label;
 			NewButton->DrawFunc=DrawDecorationButton;
+		}
 			break;
 		case SCROLLING:
 			NewButton->DrawFunc=DrawScrollingButton;
@@ -408,7 +422,25 @@ void	DestroyButton(uARG *A, int G, char ID)
 			cButton=cButton->Chain;
 		}
 }
-
+/*
+void	DestroyDecorationByLabel(uARG *A, int G, char ID, char label)
+{
+	WBUTTON *wButton=A->W[G].wButton[HEAD], *cButton=A->W[G].wButton[HEAD];
+	while(cButton != NULL)
+		if((cButton->ID == ID) && (cButton->Type == DECORATION) && (cButton->Resource.Label == label))
+		{
+			if(cButton == A->W[G].wButton[TAIL])
+				A->W[G].wButton[TAIL]=wButton;
+			wButton->Chain=cButton->Chain;
+			free(cButton);
+			break;
+		}
+		else {
+			wButton=cButton;
+			cButton=cButton->Chain;
+		}
+}
+*/
 void	DestroyAllButtons(uARG *A, int G)
 {
 	WBUTTON *wButton=A->W[G].wButton[HEAD], *cButton=NULL;
@@ -910,6 +942,14 @@ int	OpenDisplay(uARG *A)
 }
 
 // Release the Widget resources.
+/*
+void	CancelToggle(uARG *A, WBUTTON *wButton)
+{
+	int bit=0;
+	for(bit=0; bit < 64; bit++)
+		DestroyDecorationByLabel(A, wButton->Target, ID_TOGGLEBIT, bit);
+}
+*/
 void	CloseWidgets(uARG *A)
 {
 	if(A->L.Output)
@@ -937,6 +977,8 @@ void	CloseWidgets(uARG *A)
 	free(A->L.Usage.C6);
 	free(A->L.Usage.C7);
 	free(A->L.Play.showTemps);
+	free(A->L.Toggle.RowSw);
+	free(A->L.Toggle.BitSw);
 
 	int cpu=0;
 	for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
@@ -1229,7 +1271,8 @@ int	OpenWidgets(uARG *A)
 							char		ID;
 							RESOURCE	RSC;
 							WBSTATE		WBState;
-						} Loader[]={	{.ID=ID_FREQ , .RSC={.Text=RSC_FREQ},  {Button_State, &A->L.Play.freqHertz}},
+						} Loader[]={
+								{.ID=ID_FREQ , .RSC={.Text=RSC_FREQ},  {Button_State, &A->L.Play.freqHertz}},
 								{.ID=ID_CYCLE, .RSC={.Text=RSC_CYCLE}, {Button_State, &A->L.Play.showCycles}},
 								{.ID=ID_IPS, .  RSC={.Text=RSC_IPS}, {Button_State, &A->L.Play.showIPS}},
 								{.ID=ID_IPC, .  RSC={.Text=RSC_IPC}, {Button_State, &A->L.Play.showIPC}},
@@ -1302,8 +1345,8 @@ int	OpenWidgets(uARG *A)
 
 						WBSTATE WBState={Button_State, &A->PAUSE[G]};
 						CreateButton(	A, DECORATION, ID_PAUSE, G,
-								A->W[G].width - Twice_Char_Width(G) - 2,
-								A->W[G].height - (square + 2),
+								A->W[G].width - (One_Char_Width(G) * 5) - 2,
+								2,
 								square - 2,
 								square - 2,
 								CallBackButton,
@@ -1323,7 +1366,8 @@ int	OpenWidgets(uARG *A)
 							char		ID;
 							RESOURCE	RSC;
 							WBSTATE		WBState;
-						} Loader[]={	{.ID=ID_CSTATE, .RSC={.Text=RSC_CSTATE}, {Button_State, &A->L.Play.cStatePercent}},
+						} Loader[]={
+								{.ID=ID_CSTATE, .RSC={.Text=RSC_CSTATE}, {Button_State, &A->L.Play.cStatePercent}},
 								{.ID=ID_PSTATE, .RSC={.Text=RSC_PSTATE}, {NULL, NULL}},
 								{.ID=ID_NULL ,  .RSC={.Text=NULL},       {NULL, NULL}}
 							};
@@ -1422,8 +1466,8 @@ int	OpenWidgets(uARG *A)
 
 						WBState.Key=&A->PAUSE[G];
 						CreateButton(	A, DECORATION, ID_PAUSE, G,
-								A->W[G].width - Twice_Char_Width(G) - 2,
-								A->W[G].height - (square + 2),
+								A->W[G].width - (One_Char_Width(G) * 5) - 2,
+								2,
 								square - 2,
 								square - 2,
 								CallBackButton,
@@ -1443,7 +1487,8 @@ int	OpenWidgets(uARG *A)
 							char		ID;
 							RESOURCE	RSC;
 							WBSTATE		WBState;
-						} Loader[]={	{.ID=ID_RESET, .RSC={.Text=RSC_RESET}, {NULL, NULL}},
+						} Loader[]={
+								{.ID=ID_RESET, .RSC={.Text=RSC_RESET}, {NULL, NULL}},
 								{.ID=ID_NULL , .RSC={.Text=NULL},      {NULL, NULL}}
 							};
 						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
@@ -1524,48 +1569,49 @@ int	OpenWidgets(uARG *A)
 
 						if(A->L.Page[G].Pageable)
 						{
-						CreateButton(	A, SCROLLING, ID_NORTH, G,
-								A->W[G].width - square,
-								Header_Height(G) + 2,
-								square,
-								square,
-								CallBackButton,
-								NULL,
-								NULL);
+							CreateButton(	A, SCROLLING, ID_NORTH, G,
+									A->W[G].width - square,
+									Header_Height(G) + 2,
+									square,
+									square,
+									CallBackButton,
+									NULL,
+									NULL);
 
-						CreateButton(	A, SCROLLING, ID_SOUTH, G,
-								A->W[G].width - square,
-								A->W[G].height - (Footer_Height(G) + square + 2),
-								square,
-								square,
-								CallBackButton,
-								NULL,
-								NULL);
+							CreateButton(	A, SCROLLING, ID_SOUTH, G,
+									A->W[G].width - square,
+									A->W[G].height - (Footer_Height(G) + square + 2),
+									square,
+									square,
+									CallBackButton,
+									NULL,
+									NULL);
 
-						CreateButton(	A, SCROLLING, ID_EAST, G,
-								A->W[G].width
-								- (MAX(Twice_Char_Height(G),Twice_Char_Width(G)) + 2),
-								A->W[G].height - (square + 2),
-								square,
-								square,
-								CallBackButton,
-								NULL,
-								NULL);
+							CreateButton(	A, SCROLLING, ID_EAST, G,
+									A->W[G].width
+									- (MAX(Twice_Char_Height(G),Twice_Char_Width(G)) + 2),
+									A->W[G].height - (square + 2),
+									square,
+									square,
+									CallBackButton,
+									NULL,
+									NULL);
 
-						CreateButton(	A, SCROLLING, ID_WEST, G,
-								2,
-								A->W[G].height - (square + 2),
-								square,
-								square,
-								CallBackButton,
-								NULL,
-								NULL);
+							CreateButton(	A, SCROLLING, ID_WEST, G,
+									2,
+									A->W[G].height - (square + 2),
+									square,
+									square,
+									CallBackButton,
+									NULL,
+									NULL);
 						}
 						struct {
 							char		ID;
 							RESOURCE	RSC;
 							WBSTATE		WBState;
-						} Loader[]={	{.ID=ID_WALLBOARD, .RSC={.Text=RSC_WALLBOARD}, {Button_State, &A->L.Play.wallboard}},
+						} Loader[]={
+								{.ID=ID_WALLBOARD, .RSC={.Text=RSC_WALLBOARD}, {Button_State, &A->L.Play.wallboard}},
 								{.ID=ID_INCLOOP,   .RSC={.Text=RSC_INCLOOP},   {NULL, NULL}},
 								{.ID=ID_TSC,       .RSC={.Text=RSC_TSC},       {TSC_State,  NULL}},
 								{.ID=ID_TSC_AUX,   .RSC={.Text=RSC_TSC_AUX},   {TSC_AUX_State,  NULL}},
@@ -1614,7 +1660,7 @@ int	OpenWidgets(uARG *A)
 									+ A->W[G].extents.descent;
 
 						A->W[G].width	= A->W[G].extents.overall.width;
-						A->W[G].height	= One_Char_Height(G) * DUMP_TEXT_HEIGHT;
+						A->W[G].height	= (One_Char_Height(G) + Quarter_Char_Height(G)) * DUMP_TEXT_HEIGHT;
 
 						// Prepare the chart axes.
 						A->L.Axes[G].N=2;
@@ -1635,8 +1681,8 @@ int	OpenWidgets(uARG *A)
 
 						WBSTATE WBState={Button_State, &A->PAUSE[G]};
 						CreateButton(	A, DECORATION, ID_PAUSE, G,
-								A->W[G].width - Twice_Char_Width(G) - 2,
-								A->W[G].height - (square + 2),
+								A->W[G].width - (One_Char_Width(G) * 5) - 2,
+								2,
 								square - 2,
 								square - 2,
 								CallBackButton,
@@ -1652,7 +1698,7 @@ int	OpenWidgets(uARG *A)
 								NULL,
 								NULL);
 
-						if(A->L.Page[G].Pageable)
+/*						if(A->L.Page[G].Pageable)
 						{
 							CreateButton(	A, SCROLLING, ID_NORTH, G,
 									A->W[G].width - square,
@@ -1691,11 +1737,13 @@ int	OpenWidgets(uARG *A)
 									NULL,
 									NULL);
 						}
-						struct {
+						struct
+						{
 							char		ID;
 							RESOURCE	RSC;
 							WBSTATE		WBState;
-						} Loader[]={	{.ID=ID_NULL , .RSC={.Text=NULL},      {NULL, NULL}}
+						} Loader[]={
+								{.ID=ID_NULL , .RSC={.Text=NULL},      {NULL, NULL}}
 							};
 						int spacing=MAX(One_Char_Height(G), One_Char_Width(G)) + 2 + 2;
 						int i=0;
@@ -1708,6 +1756,51 @@ int	OpenWidgets(uARG *A)
 									CallBackButton,
 									&Loader[i].RSC,
 									&Loader[i].WBState);
+*/
+						A->L.Toggle.RowSw=calloc(DUMP_ARRAY_DIMENSION, sizeof(Bool32));
+						A->L.Toggle.BitSw=calloc(64, sizeof(Bool32));
+
+						RESOURCE RSC1={.Text=calloc(3, sizeof(char))}, RSC2={.Label=0};
+
+						int i=0, x=11;
+						for(i=0; i < 16; i++)
+						{
+							int j=0;
+							for(j=0; j < 4; j++)
+							{
+								const int b=(4 * i) + j;
+								WBState.Key=&A->L.Toggle.BitSw[b];
+								RSC2.Label=b;
+
+								x++;
+								CreateButton(	A, DECORATION, ID_TOGGLEBIT, G,
+										A->W[G].width - (x * One_Char_Width(G))
+										 - Half_Char_Width(G) - Quarter_Char_Width(G),
+										A->W[G].height - Footer_Height(G) + 2,
+										One_Char_Width(G),
+										One_Char_Height(G),
+										CallBackToggleBit,
+										&RSC2,
+										&WBState);
+							}
+							x++;
+						}
+						for(i=0; i < DUMP_ARRAY_DIMENSION; i++)
+						{
+							sprintf(RSC1.Text, "%02d", i);
+							WBState.Key=&A->L.Toggle.RowSw[i];
+
+							CreateButton(	A, TEXT, ID_DUMP, G,
+									A->W[G].width - (4 * One_Char_Width(G)),
+									1 + 2 + Header_Height(G) + Half_Char_Height(G)
+									 + (i * (One_Char_Height(G) + Quarter_Char_Height(G))),
+									Twice_Half_Char_Width(G) + Quarter_Char_Width(G),
+									One_Char_Height(G) - 1,
+									CallBackToggleDump,
+									&RSC1,
+									&WBState);
+						}
+						free(RSC1.Text);
 					}
 						break;
 				}
@@ -1979,46 +2072,34 @@ void	BuildLayout(uARG *A, int G)
 			sprintf(str, "%02d%02d%02d", A->SHM->P.Boost[0], A->SHM->P.Boost[1], A->SHM->P.Boost[9]);
 
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
-			XDrawString(	A->display,
-					A->W[G].pixmap.B,
-					A->W[G].gc,
+			XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 					Quarter_Char_Width(G),
 					One_Char_Height(G),
 					"Core", 4);
-			XDrawString(	A->display,
-					A->W[G].pixmap.B,
-					A->W[G].gc,
+			XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 					Quarter_Char_Width(G),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					"Ratio", 5);
-			XDrawString(	A->display,
-					A->W[G].pixmap.B,
-					A->W[G].gc,
+			XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 					One_Char_Width(G) * ((5 + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					"5", 1);
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LOW_VALUE].RGB);
-			XDrawString(	A->display,
-					A->W[G].pixmap.B,
-					A->W[G].gc,
+			XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 					One_Char_Width(G) * ((A->SHM->P.Boost[0] + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					&str[0], 2);
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_MED_VALUE].RGB);
-			XDrawString(	A->display,
-					A->W[G].pixmap.B,
-					A->W[G].gc,
+			XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 					One_Char_Width(G) * ((A->SHM->P.Boost[1] + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					&str[2], 2);
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_HIGH_VALUE].RGB);
-			XDrawString(	A->display,
-					A->W[G].pixmap.B,
-					A->W[G].gc,
+			XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 					One_Char_Width(G) * ((A->SHM->P.Boost[9] + 1) * 2),
 					One_Char_Height(G) * (CORES_TEXT_HEIGHT + 1 + 1),
 					&str[4], 2);
-			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			if(A->L.Play.showCycles)
 			{
 				if(!A->L.Play.showIPS
@@ -2153,15 +2234,11 @@ void	BuildLayout(uARG *A, int G)
 		case TEMPS:
 		{
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
-			XDrawImageString(A->display,
-					A->W[G].pixmap.B,
-					A->W[G].gc,
+			XDrawImageString(A->display, A->W[G].pixmap.B, A->W[G].gc,
 					Quarter_Char_Width(G),
 					One_Char_Height(G),
 					"Core", 4);
-			XDrawString(	A->display,
-					A->W[G].pixmap.B,
-					A->W[G].gc,
+			XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 					Quarter_Char_Width(G),
 					One_Char_Height(G) * (TEMPS_TEXT_HEIGHT + 1 + 1),
 					"Temps", 5);
@@ -2169,7 +2246,7 @@ void	BuildLayout(uARG *A, int G)
 			break;
 		case SYSINFO:
 		{
-			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
 					One_Char_Width(G),
 					One_Char_Height(G),
@@ -2183,7 +2260,6 @@ void	BuildLayout(uARG *A, int G)
 			memcpy(&A->L.WB.String[padding], str, strlen(str));
 
 			sprintf(str, "Loop(%d usecs)", (IDLE_BASE_USEC * A->SHM->P.IdleTime) );
-			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawImageString(A->display, A->W[G].pixmap.B, A->W[G].gc,
 					A->W[G].width - (24 * One_Char_Width(G)),
 					A->W[G].height - Half_Char_Height(G),
@@ -2504,9 +2580,19 @@ void	BuildLayout(uARG *A, int G)
 			break;
 		case DUMP:
 		{
-			XSetForeground(A->display, A->W[G].gc, A->W[G].foreground);
+			if(A->L.Toggle.RowIx != -1)
+			{
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_GRAPH3].RGB);
+				XFillRectangle(	A->display, A->W[G].pixmap.B, A->W[G].gc,
+						Quarter_Char_Width(G),
+						2 + Header_Height(G) + Half_Char_Height(G)
+						 + (A->L.Toggle.RowIx * (One_Char_Height(G) + Quarter_Char_Height(G))),
+						A->W[G].width - (7 * One_Char_Width(G)) - Half_Char_Width(G),
+						One_Char_Height(G));
+			}
+			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
 			XDrawString(	A->display, A->W[G].pixmap.B, A->W[G].gc,
-					One_Char_Width(G),
+					Half_Char_Width(G),
 					One_Char_Height(G),
 					A->L.Page[G].Title,
 					strlen(A->L.Page[G].Title) );
@@ -2909,10 +2995,10 @@ void	DrawLayout(uARG *A, int G)
 					U->y2=(A->W[G].height * A->SHM->C[cpu].ThermStat.DTS) / A->SHM->C[cpu].TjMax.Target;
 
 					XSetForeground(A->display, A->W[G].gc,	A->L.Colors[COLOR_GRAPH1].RGB
-										| fROL32(0x28104080, cpu)
-										| fROR32(0x01010011, A->SHM->C[cpu].T.APIC_ID)
-										| fROL32(0x80808080, A->SHM->C[cpu].T.Core_ID)
-										| fROR32(0x01010100, A->SHM->C[cpu].T.Thread_ID));
+										| ROL32(0x28104080, cpu)
+										| ROR32(0x01010011, A->SHM->C[cpu].T.APIC_ID)
+										| ROL32(0x80808080, A->SHM->C[cpu].T.Core_ID)
+										| ROR32(0x01010100, A->SHM->C[cpu].T.Thread_ID));
 					if(A->L.Play.showTemps[cpu] == TRUE)
 						XDrawSegments(A->display, A->W[G].pixmap.F, A->W[G].gc, A->L.Temps[cpu].Segment, A->L.Temps[cpu].N);
 
@@ -2945,15 +3031,11 @@ void	DrawLayout(uARG *A, int G)
 					U->x2,
 					Threshold[1]);
 			XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_DYNAMIC].RGB);
-			XDrawString(A->display,
-					A->W[G].pixmap.F,
-					A->W[G].gc,
+			XDrawString(A->display, A->W[G].pixmap.F, A->W[G].gc,
 					One_Half_Char_Width(G) << 2,
 					Threshold[0],
 					"T#1", 3);
-			XDrawString(A->display,
-					A->W[G].pixmap.F,
-					A->W[G].gc,
+			XDrawString(A->display, A->W[G].pixmap.F, A->W[G].gc,
 					TEMPS_TEXT_WIDTH * One_Char_Width(G),
 					Threshold[1],
 					"T#2", 3);
@@ -2970,9 +3052,7 @@ void	DrawLayout(uARG *A, int G)
 			if(HotValue >= HIGH_TEMP_VALUE)
 				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_HIGH_VALUE].RGB);
 			sprintf(str, TEMPERATURE, HotValue);
-			XDrawImageString(A->display,
-					A->W[G].pixmap.F,
-					A->W[G].gc,
+			XDrawImageString(A->display, A->W[G].pixmap.F, A->W[G].gc,
 					((TEMPS_TEXT_WIDTH + 2) * One_Char_Width(G)) + Half_Char_Width(G),
 					(A->W[G].height * A->SHM->C[A->SHM->P.Hot].ThermStat.DTS) / A->SHM->C[A->SHM->P.Hot].TjMax.Target,
 					str, 3);
@@ -2989,9 +3069,7 @@ void	DrawLayout(uARG *A, int G)
 			if(ColdValue >= HIGH_TEMP_VALUE)
 				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_HIGH_VALUE].RGB);
 			sprintf(str, TEMPERATURE, ColdValue);
-			XDrawImageString(A->display,
-					A->W[G].pixmap.F,
-					A->W[G].gc,
+			XDrawImageString(A->display, A->W[G].pixmap.F, A->W[G].gc,
 					0,
 					yCold,
 					str, 3);
@@ -3028,7 +3106,7 @@ void	DrawLayout(uARG *A, int G)
 			{
 				DumpRegister(A->SHM->D.Array[row].Value, NULL, binStr);
 
-				sprintf(mask, REG_FORMAT_BOL, row,
+				sprintf(mask, REG_FORMAT_BOL,
 					A->SHM->D.Array[row].Addr,
 					A->SHM->D.Array[row].Name,
 					DUMP_REG_ALIGN - strlen(A->SHM->D.Array[row].Name));
@@ -3048,30 +3126,30 @@ void	DrawLayout(uARG *A, int G)
 			free(binStr);
 			free(str);
 			free(mask);
-			if(A->L.Page[G].Pageable)
+/*			if(A->L.Page[G].Pageable)
 			{	// Clear the scrolling area.
 				XSetForeground(A->display, A->W[G].gc, A->W[G].background);
 				XFillRectangle(A->display, A->L.Page[G].Pixmap, A->W[G].gc,
 						0,
 						0,
 						GetHFrame(G) * One_Char_Width(G),
-						GetVFrame(G) * One_Char_Height(G));
+						GetVFrame(G) * (One_Char_Height(G) + Quarter_Char_Height(G)));
 				// Draw the Registers in a scrolling area.
 				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 				A->L.Page[G].Listing=XPrint(A->display, A->L.Page[G].Pixmap, A->W[G].gc,
-							One_Char_Width(G),
-							One_Char_Height(G),
+							4 * One_Char_Width(G),
+							One_Char_Height(G) + Quarter_Char_Height(G),
 							items,
-							One_Char_Height(G));
+							One_Char_Height(G) + Quarter_Char_Height(G));
 			}
-			else
+			else	*/
 			{	// Draw the Registers in a fixed height area.
 				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 				A->L.Page[G].Listing=XPrint(A->display, A->W[G].pixmap.F, A->W[G].gc,
-							One_Char_Width(G),
-							Header_Height(G) + One_Char_Height(G),
+							Half_Char_Width(G),
+							Header_Height(G) + One_Half_Char_Height(G),
 							items,
-							One_Char_Height(G));
+							One_Char_Height(G) + Quarter_Char_Height(G));
 			}
 			free(items);
 		}
@@ -3795,6 +3873,75 @@ void	CallBackTemps(uARG *A, WBUTTON *wButton)
 	int cpu=atoi(wButton->Resource.Text);
 
 	A->L.Play.showTemps[cpu]=!A->L.Play.showTemps[cpu];
+}
+
+void	ToogleBits(uARG *A, unsigned long long int value)
+{
+	unsigned int i=0;
+	for(i=0; i < 64; i++)
+		A->L.Toggle.BitSw[i]=BT64(value, i);
+}
+
+void	CallBackWriteBits(uARG *A, unsigned long long int value)
+{
+	if((A->L.Toggle.RowIx >= 0) && (A->L.Toggle.RowIx <DUMP_ARRAY_DIMENSION))
+	{
+		XCHG_MAP XChange={.Map={.Addr=A->SHM->D.Array[A->L.Toggle.RowIx].Addr, .Core=A->SHM->D.Array[A->L.Toggle.RowIx].Core, .Arg=0, .ID=ID_NULL}};
+
+		unsigned long long int data=0;
+		unsigned int i=0;
+		for(i=0; i < 64; i++)
+			if(A->L.Toggle.BitSw[i])
+				data=data | (unsigned long long int) 1 << i;
+
+		atomic_store(&A->SHM->Sync.Data, data);
+		Play(A, MAIN, ID_WRITEMSR, &XChange);
+	}
+}
+
+void	CallBackToggleDump(uARG *A, WBUTTON *wButton)
+{
+	int row=atoi(wButton->Resource.Text);
+
+	if(A->L.Toggle.RowSw[row] == FALSE)
+	{
+		if((A->L.Toggle.RowIx >= 0) && (A->L.Toggle.RowIx <DUMP_ARRAY_DIMENSION))
+			A->L.Toggle.RowSw[A->L.Toggle.RowIx]=FALSE;
+		else
+		{
+			RESOURCE RSC={.Text=RSC_WRITEBITS};
+			CreateButton(	A, TEXT, ID_WRITEBITS, wButton->Target,
+					A->W[wButton->Target].width - ((1 + strlen(RSC.Text)) * One_Char_Width(wButton->Target))
+					 - Half_Char_Width(wButton->Target),
+					A->W[wButton->Target].height - Footer_Height(wButton->Target) + 2,
+					One_Char_Width(wButton->Target) * (1 + strlen(RSC.Text)),
+					One_Char_Height(wButton->Target) - 1,
+					CallBackWriteBits,
+					&RSC,
+					NULL);
+		}
+		A->L.Toggle.RowIx=row;
+		A->L.Toggle.RowSw[A->L.Toggle.RowIx]=TRUE;
+
+		ToogleBits(A, A->SHM->D.Array[A->L.Toggle.RowIx].Value);
+		fDraw(wButton->Target, TRUE, FALSE);
+	}
+	else
+	{
+		A->L.Toggle.RowSw[row]=FALSE;
+		A->L.Toggle.RowIx=-1;
+
+		ToogleBits(A, 0);
+		DestroyButton(A, wButton->Target, ID_WRITEBITS);
+		fDraw(wButton->Target, TRUE, FALSE);
+	}
+}
+
+void	CallBackToggleBit(uARG *A, WBUTTON *wButton)
+{
+	int bit=wButton->Resource.Label;
+	if((bit >=0) && (bit < 64))
+		A->L.Toggle.BitSw[bit]=!A->L.Toggle.BitSw[bit];
 }
 
 void	CallBackSave(uARG *A, WBUTTON *wButton)
@@ -4864,12 +5011,18 @@ int main(int argc, char *argv[])
 					.showRatios=TRUE,
 					.showSchedule=FALSE,
 					.cStatePercent=FALSE,
+					.showTemps=NULL,
 					.wallboard=FALSE,
 					.flashCursor=TRUE,
 					.alwaysOnTop=FALSE,
 					.noDecorations=FALSE,
 					.skipTaskbar=FALSE,
-					.cursorShape=FALSE
+					.cursorShape=FALSE,
+				},
+				.Toggle={
+					.RowSw=NULL,
+					.BitSw=NULL,
+					.RowIx=-1
 				},
 				.WB={
 					.Scroll=0,

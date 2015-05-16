@@ -1,0 +1,29 @@
+<!--
+ * xfreq:index.html by CyrIng
+ *
+ * XFreq
+ * Copyright (C) 2015 CYRIL INGENIERIE
+ * Licenses: GPL2
+-->
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<link rel="stylesheet" href="themes/red-black.css">
+		<script src="scripts/xfreq-websocket.js"></script>
+		<script src="scripts/xfreq-webui.js"></script>
+	</head>
+	<body onload="XFreqWebSocket(); XFreqWebUI();">
+		<h1 id="SocketState"></h1>
+		<div id="LogHistory"></div>
+		<div id="ControlBar">
+			<button id="SuspendBtn" type="button" disabled onclick='BtnHandler("SuspendBtn")'>Suspend</button>
+			<button id="ResumeBtn" type="button" disabled onclick='BtnHandler("ResumeBtn")'>Resume</button>
+			<div>
+				<input id="HistoryDepth" type="number" min="1" max="99" maxlength="2">
+				<input id="SubmitDepth" type="button" value="&crarr;" onclick='BtnHandler("HistoryDepth")'>
+			</div>
+		</div>
+	</body>
+</html>
