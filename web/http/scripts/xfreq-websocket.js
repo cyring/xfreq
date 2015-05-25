@@ -30,8 +30,20 @@ function XFreqWebSocket()
 	}
 	XFreqWS.onmessage=function(evt)
 	{
-		var SHM=JSON.parse(evt.data);
-		var str=JSON.stringify(SHM, null, 2);
+		var SHM;
+		try {
+			SHM=JSON.parse(evt.data);
+		}
+		catch(err) {
+			History.LogWindow(err + evt);
+		}
+		var str;
+		try {
+			str=JSON.stringify(SHM, null, 2);
+		}
+		catch(err) {
+			str=err.message;
+		}
 		History.LogWindow(str);
 
 		if(!SHM.Transmission.Suspended) {

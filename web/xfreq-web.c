@@ -139,11 +139,193 @@ int	ScanOptions(uARG *A, int argc, char *argv[])
 	return(noerr);
 }
 
+size_t jsonStringify(unsigned int what, char *jsonStr)
+{
+	if(A.fSuspended)
+	{
+		strcpy(jsonStr,
+						"{"					\
+						"\"Transmission\":"			\
+							"{"				\
+							"\"Suspended\":true"		\
+							"}"				\
+						"}");
+	}
+	else
+	{
+		sprintf(jsonStr,
+						"{"					\
+						"\"Transmission\":"			\
+							"{"				\
+							"\"What\":%u,"			\
+							"\"Suspended\":false"		\
+							"},"				\
+						"\"P\":"				\
+							"{", what);
+		if(what & 0x00000001)
+		{
+			char localStr[64], Array[32]={0}, Boost[4];
+			unsigned int i=0;
+			for(i=0; i < 10; i++)  {
+				sprintf(Boost, "%2u%c", A.SHM->P.Boost[i], (i < 9) ? ',':'\0');
+				strcat(Array, Boost);
+			}
+			sprintf(localStr,		"\"ClockSpeed\":%f,"		\
+							"\"CPU\":%u,"			\
+							"\"OnLine\":%u,"		\
+							"\"Boost\":[%s]",
+							A.SHM->P.ClockSpeed,
+							A.SHM->P.CPU,
+							A.SHM->P.OnLine,
+							Array);
+			strcat(jsonStr, localStr);
+		}
+		if(what & 0x80000000)
+		{
+			char localStr[256];
+			sprintf(localStr,		"\"Avg\":"			\
+								"{"			\
+								"\"Turbo\":%f,"		\
+								"\"C0\":%f,"		\
+								"\"C1\":%f,"		\
+								"\"C3\":%f,"		\
+								"\"C6\":%f,"		\
+								"\"C7\":%f"		\
+								"},"			\
+							"\"Top\":%u,"			\
+							"\"Hot\":%u,"			\
+							"\"Cold\":%u,"			\
+							"\"PerCore\":%u,"		\
+							"\"ClockSrc\":%u,"		\
+							"\"IdleTime\":%u",
+								100.f * A.SHM->P.Avg.Turbo,
+								100.f * A.SHM->P.Avg.C0,
+								100.f * A.SHM->P.Avg.C1,
+								100.f * A.SHM->P.Avg.C3,
+								100.f * A.SHM->P.Avg.C6,
+								100.f * A.SHM->P.Avg.C7,
+							A.SHM->P.Top,
+							A.SHM->P.Hot,
+							A.SHM->P.Cold,
+							A.SHM->P.PerCore,
+							A.SHM->P.ClockSrc,
+							A.SHM->P.IdleTime);
+			strcat(jsonStr, localStr);
+		}
+		strcat(jsonStr,				"}");
+		if(what & 0x80000000)
+		{
+			char *Core=malloc(1024), *Array=calloc(A.SHM->P.CPU, 1024);
+			unsigned int i=0;
+			for(i=0; i < A.SHM->P.CPU; i++)
+			{
+				sprintf(Core,	"{"					\
+						"\"Cycles\":"				\
+							"{"				\
+							"\"INST\":[%llu,%llu],"		\
+							"\"C0\":["			\
+								"{"			\
+								"\"UCC\":%llu,"		\
+								"\"URC\":%llu"		\
+								"},"			\
+								"{"			\
+								"\"UCC\":%llu,"		\
+								"\"URC\":%llu"		\
+								"}],"			\
+							"\"C1\":[%llu,%llu],"		\
+							"\"C3\":[%llu,%llu],"		\
+							"\"C6\":[%llu,%llu],"		\
+							"\"C7\":[%llu,%llu],"		\
+							"\"TSC\":[%llu,%llu]"		\
+							"},"				\
+						"\"Delta\":"				\
+							"{"				\
+							"\"INST\":%llu,"		\
+							"\"C0\":"			\
+								"{"			\
+								"\"UCC\":%llu,"		\
+								"\"URC\":%llu"		\
+								"},"			\
+							"\"C1\":%llu,"			\
+							"\"C3\":%llu,"			\
+							"\"C6\":%llu,"			\
+							"\"C7\":%llu,"			\
+							"\"TSC\":%llu"			\
+							"},"				\
+						"\"IPS\":%f,"				\
+						"\"IPC\":%f,"				\
+						"\"CPI\":%f,"				\
+						"\"State\":"				\
+							"{"				\
+							"\"Turbo\":%f,"			\
+							"\"C0\":%f,"			\
+							"\"C1\":%f,"			\
+							"\"C3\":%f,"			\
+							"\"C6\":%f,"			\
+							"\"C7\":%f"			\
+							"},"				\
+						"\"RelativeRatio\":%f,"			\
+						"\"RelativeFreq\":%f,"			\
+						"\"TjMax\":"				\
+							"{"				\
+							"\"Target\":%u"			\
+							"},"				\
+						"\"ThermStat\":"			\
+							"{"				\
+							"\"DTS\":%u"			\
+							"}"				\
+						"%s",
+						A.SHM->C[i].Cycles.INST[0], A.SHM->C[i].Cycles.INST[1],
+						A.SHM->C[i].Cycles.C0[0].UCC, A.SHM->C[i].Cycles.C0[0].URC,
+						A.SHM->C[i].Cycles.C0[1].UCC, A.SHM->C[i].Cycles.C0[1].URC,
+						A.SHM->C[i].Cycles.C1[0], A.SHM->C[i].Cycles.C1[1],
+						A.SHM->C[i].Cycles.C3[0], A.SHM->C[i].Cycles.C3[1],
+						A.SHM->C[i].Cycles.C6[0], A.SHM->C[i].Cycles.C6[1],
+						A.SHM->C[i].Cycles.C7[0], A.SHM->C[i].Cycles.C7[1],
+						A.SHM->C[i].Cycles.TSC[0], A.SHM->C[i].Cycles.TSC[1],
+						A.SHM->C[i].Delta.INST,
+						A.SHM->C[i].Delta.C0.UCC, A.SHM->C[i].Delta.C0.URC,
+						A.SHM->C[i].Delta.C1,
+						A.SHM->C[i].Delta.C3,
+						A.SHM->C[i].Delta.C6,
+						A.SHM->C[i].Delta.C7,
+						A.SHM->C[i].Delta.TSC,
+						A.SHM->C[i].IPS,
+						A.SHM->C[i].IPC,
+						A.SHM->C[i].CPI,
+						A.SHM->C[i].State.Turbo,
+						A.SHM->C[i].State.C0,
+						A.SHM->C[i].State.C1,
+						A.SHM->C[i].State.C3,
+						A.SHM->C[i].State.C6,
+						A.SHM->C[i].State.C7,
+						A.SHM->C[i].RelativeRatio,
+						A.SHM->C[i].RelativeFreq,
+						A.SHM->C[i].TjMax.Target,
+						A.SHM->C[i].ThermStat.DTS,
+						(i < (A.SHM->P.CPU - 1)) ? "},":"}");
+				strcat(Array, Core);
+			}
+			strcat(jsonStr,		","					\
+						"\"C\":"				\
+							"[");
+			strcat(jsonStr, Array);
+			strcat(jsonStr,			"]");
+			free(Array);
+			free(Core);
+		}
+		strcat(jsonStr,			"}");
+	}
+	size_t fullLen=strlen(jsonStr);
+	return(fullLen);
+}
+
 
 #include <libwebsockets.h>
 
 #define	QUOTES '"'
 #define	ROOTDIR "http"
+
 typedef struct
 {
 	char *filePath;
@@ -178,9 +360,6 @@ static int callback_http(struct libwebsocket_context *ctx,
 {
 	SESSION_HTTP *session=(SESSION_HTTP *) user;
 	char *pIn=(char *)in;
-
-	if(len > 0)
-		lwsl_notice("HTTP: reason[%d] , len[%zd] , in[%s] , user[%p]\n", reason, len, pIn, user);
 
 	int rc=0;
 	switch(reason)
@@ -223,20 +402,13 @@ static int callback_http(struct libwebsocket_context *ctx,
 			}
 		break;
 		case LWS_CALLBACK_HTTP_BODY:
-		{
-			lwsl_notice("HTTP: post data\n");
-		}
 		break;
 		case LWS_CALLBACK_HTTP_BODY_COMPLETION:
-		{
-			lwsl_notice("HTTP: complete post data\n");
 			libwebsockets_return_http_status(ctx, wsi, HTTP_STATUS_OK, NULL);
-		}
 		break;
 		case LWS_CALLBACK_HTTP_WRITEABLE:
 		break;
 		case LWS_CALLBACK_CLOSED_HTTP:
-			lwsl_notice("HTTP closed connection\n");
 		break;
 		default:
 		break;
@@ -244,18 +416,36 @@ static int callback_http(struct libwebsocket_context *ctx,
 	return(rc);
 }
 
-static int callback_simple_json(struct libwebsocket_context *ctx,
+typedef struct
+{
+	int prefixSum;
+	int remainder;
+	unsigned char *buffer;
+} SESSION_JSON;
+
+static int callback_json(struct libwebsocket_context *ctx,
 				struct libwebsocket *wsi,
 				enum libwebsocket_callback_reasons reason,
 				void *user, void *in, size_t len)
 {
-	if(len > 0)
-		lwsl_notice("JSON: reason[%d] , len[%zd] , in[%s] , user[%p]\n", reason, len, (char *)in, user);
+	SESSION_JSON *session=(SESSION_JSON *) user;
 
+	int rc=0;
 	switch(reason)
 	{
 		case LWS_CALLBACK_ESTABLISHED:
-			lwsl_notice("JSON established connection\n");
+		{
+			char *jsonString=malloc(16384);
+			session->remainder=jsonStringify(0x00000001, jsonString);
+			session->prefixSum=0;
+			session->buffer=malloc(	LWS_SEND_BUFFER_PRE_PADDING
+						+ session->remainder
+						+ LWS_SEND_BUFFER_POST_PADDING);
+			strncpy((char *) &session->buffer[LWS_SEND_BUFFER_PRE_PADDING],
+					jsonString,
+					session->remainder);
+			free(jsonString);
+		}
 		break;
 		case LWS_CALLBACK_RECEIVE:
 			if(len > 0)
@@ -277,196 +467,57 @@ static int callback_simple_json(struct libwebsocket_context *ctx,
 				free(jsonStr);
 			}
 		break;
-		case LWS_CALLBACK_USER:
-			if(!len)
-			{
-				char *jsonStr=malloc(16384);
-
-				if(A.fSuspended)
-				{
-					sprintf(jsonStr,"{"					\
-							"\"Transmission\":"			\
-								"{"				\
-								"\"Suspended\":%u"		\
-								"}"				\
-							"}",
-								A.fSuspended);
-				}
-				else
-				{
-					char Boost[32]={0};
-					unsigned int i=0;
-					for(i=0; i < 10; i++)
-						sprintf(Boost, "%s%2u%c", Boost,
-									A.SHM->P.Boost[i],
-									(i < 9) ? ',':'\0');
-
-					char Core[8192]={0};
-					for(i=0; i < A.SHM->P.CPU; i++) {
-						sprintf(Core, "%s"				\
-								"{"				\
-								"\"Cycles\":"			\
-									"{"			\
-									"\"INST\":[%llu,%llu],"	\
-									"\"C0\":["		\
-										"{"		\
-										"\"UCC\":%llu,"	\
-										"\"URC\":%llu"	\
-										"},"		\
-										"{"		\
-										"\"UCC\":%llu,"	\
-										"\"URC\":%llu"	\
-										"}],"		\
-									"\"C1\":[%llu,%llu],"	\
-									"\"C3\":[%llu,%llu],"	\
-									"\"C6\":[%llu,%llu],"	\
-									"\"C7\":[%llu,%llu],"	\
-									"\"TSC\":[%llu,%llu]"	\
-									"},"			\
-								"\"Delta\":"			\
-									"{"			\
-									"\"INST\":%llu,"	\
-									"\"C0\":"		\
-										"{"		\
-										"\"UCC\":%llu,"	\
-										"\"URC\":%llu"	\
-										"},"		\
-									"\"C1\":%llu,"		\
-									"\"C3\":%llu,"		\
-									"\"C6\":%llu,"		\
-									"\"C7\":%llu,"		\
-									"\"TSC\":%llu"		\
-									"},"			\
-								"\"IPS\":%f,"			\
-								"\"IPC\":%f,"			\
-								"\"CPI\":%f,"			\
-								"\"State\":"			\
-									"{"			\
-									"\"Turbo\":%f,"		\
-									"\"C0\":%f,"		\
-									"\"C1\":%f,"		\
-									"\"C3\":%f,"		\
-									"\"C6\":%f,"		\
-									"\"C7\":%f"		\
-									"},"			\
-								"\"RelativeRatio\":%f,"		\
-								"\"RelativeFreq\":%f,"		\
-								"\"TjMax\":"			\
-									"{"			\
-									"\"Target\":%u"		\
-									"},"			\
-								"\"ThermStat\":"		\
-									"{"			\
-									"\"DTS\":%u"		\
-									"}"			\
-								"%s", Core,
-								A.SHM->C[i].Cycles.INST[0], A.SHM->C[i].Cycles.INST[1],
-								A.SHM->C[i].Cycles.C0[0].UCC, A.SHM->C[i].Cycles.C0[0].URC,
-								A.SHM->C[i].Cycles.C0[1].UCC, A.SHM->C[i].Cycles.C0[1].URC,
-								A.SHM->C[i].Cycles.C1[0], A.SHM->C[i].Cycles.C1[1],
-								A.SHM->C[i].Cycles.C3[0], A.SHM->C[i].Cycles.C3[1],
-								A.SHM->C[i].Cycles.C6[0], A.SHM->C[i].Cycles.C6[1],
-								A.SHM->C[i].Cycles.C7[0], A.SHM->C[i].Cycles.C7[1],
-								A.SHM->C[i].Cycles.TSC[0], A.SHM->C[i].Cycles.TSC[1],
-								A.SHM->C[i].Delta.INST,
-								A.SHM->C[i].Delta.C0.UCC, A.SHM->C[i].Delta.C0.URC,
-								A.SHM->C[i].Delta.C1,
-								A.SHM->C[i].Delta.C3,
-								A.SHM->C[i].Delta.C6,
-								A.SHM->C[i].Delta.C7,
-								A.SHM->C[i].Delta.TSC,
-								A.SHM->C[i].IPS,
-								A.SHM->C[i].IPC,
-								A.SHM->C[i].CPI,
-								A.SHM->C[i].State.Turbo,
-								A.SHM->C[i].State.C0,
-								A.SHM->C[i].State.C1,
-								A.SHM->C[i].State.C3,
-								A.SHM->C[i].State.C6,
-								A.SHM->C[i].State.C7,
-								A.SHM->C[i].RelativeRatio,
-								A.SHM->C[i].RelativeFreq,
-								A.SHM->C[i].TjMax.Target,
-								A.SHM->C[i].ThermStat.DTS,
-								(i < (A.SHM->P.CPU - 1)) ? "},":"}");
-					}
-
-					sprintf(jsonStr,"{"					\
-							"\"Transmission\":"			\
-								"{"				\
-								"\"Suspended\":%u"		\
-								"},"				\
-							"\"P\":"				\
-								"{"				\
-								"\"ClockSpeed\":%f,"		\
-								"\"CPU\":%u,"			\
-								"\"OnLine\":%u,"		\
-								"\"Boost\":[%s],"		\
-								"\"Avg\":"			\
-									"{"			\
-									"\"Turbo\":%f,"		\
-									"\"C0\":%f,"		\
-									"\"C1\":%f,"		\
-									"\"C3\":%f,"		\
-									"\"C6\":%f,"		\
-									"\"C7\":%f"		\
-									"},"			\
-								"\"Top\":%u,"			\
-								"\"Hot\":%u,"			\
-								"\"Cold\":%u,"			\
-								"\"PerCore\":%u,"		\
-								"\"ClockSrc\":%u,"		\
-								"\"IdleTime\":%u"		\
-								"},"				\
-							"\"C\":[%s]"				\
-							"}",
-								A.fSuspended,
-								A.SHM->P.ClockSpeed,
-								A.SHM->P.CPU,
-								A.SHM->P.OnLine,
-								Boost,
-									100.f * A.SHM->P.Avg.Turbo,
-									100.f * A.SHM->P.Avg.C0,
-									100.f * A.SHM->P.Avg.C1,
-									100.f * A.SHM->P.Avg.C3,
-									100.f * A.SHM->P.Avg.C6,
-									100.f * A.SHM->P.Avg.C7,
-								A.SHM->P.Top,
-								A.SHM->P.Hot,
-								A.SHM->P.Cold,
-								A.SHM->P.PerCore,
-								A.SHM->P.ClockSrc,
-								A.SHM->P.IdleTime,
-								Core
-						);
-				}
-				size_t jsonLen=strlen(jsonStr);
-
-				unsigned char *buffer=(unsigned char*) malloc(	LWS_SEND_BUFFER_PRE_PADDING
-										+ jsonLen
-										+ LWS_SEND_BUFFER_POST_PADDING);
-				strncpy((char *) &buffer[LWS_SEND_BUFFER_PRE_PADDING], jsonStr, jsonLen);
-				libwebsocket_write(wsi, &buffer[LWS_SEND_BUFFER_PRE_PADDING], jsonLen, LWS_WRITE_TEXT);
-				free(buffer);
-
-				free(jsonStr);
-			}
-		break;
 		case LWS_CALLBACK_SERVER_WRITEABLE:
+		{
+			int written;
+			if(session->remainder > 0)
+			{
+				written=libwebsocket_write(wsi,
+						&session->buffer[session->prefixSum + LWS_SEND_BUFFER_PRE_PADDING],
+							session->remainder, LWS_WRITE_TEXT);
+				if(written < 0) {
+					rc=1;
+					break;
+				}
+				else {
+					session->prefixSum+=written;
+					session->remainder-=written;
+					if(session->remainder)
+						libwebsocket_callback_on_writable(ctx, wsi);
+				}
+			}
+			else
+			{
+				char *jsonString=malloc(16384);
+				session->remainder=jsonStringify(0x80000000, jsonString);
+				session->prefixSum=0;
+				session->buffer=(unsigned char*) realloc(session->buffer,
+									LWS_SEND_BUFFER_PRE_PADDING
+									+ session->remainder
+									+ LWS_SEND_BUFFER_POST_PADDING);
+				strncpy((char *) &session->buffer[LWS_SEND_BUFFER_PRE_PADDING],
+						jsonString,
+						session->remainder);
+				free(jsonString);
+			}
+		}
 		break;
 		case LWS_CALLBACK_CLOSED:
-			lwsl_notice("JSON closed connection\n");
+		{
+			free(session->buffer);
+			lwsl_notice("JSON DISC\n");
+		}
 		break;
 		default:
 		break;
 	}
-	return(0);
+	return(rc);
 }
 
 static struct libwebsocket_protocols protocols[]=
 {
 	{"http-only", callback_http, sizeof(SESSION_HTTP)},
-	{"json-lite", callback_simple_json, 0},
+	{"json-lite", callback_json, sizeof(SESSION_JSON)},
 	{NULL, NULL, 0}
 };
 
@@ -507,7 +558,7 @@ int main(int argc, char *argv[])
 					const unsigned long int roomBit=(unsigned long long int) 1<<A.Room, roomCmp=~roomBit;
 					if(atomic_load(&A.SHM->Sync.IF) & roomBit)
 					{
-						libwebsocket_callback_all_protocol(&protocols[1], LWS_CALLBACK_USER);
+						libwebsocket_callback_on_writable_all_protocol(&protocols[1]);
 						atomic_fetch_and(&A.SHM->Sync.IF, roomCmp);
 					}
 					libwebsocket_service(context, 50);
