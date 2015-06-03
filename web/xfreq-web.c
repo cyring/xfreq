@@ -45,18 +45,6 @@ uARG	A={
 		}
 	};
 
-void	Play(uARG *A, char ID)
-{
-	switch(ID)
-	{
-		case ID_QUIT:
-			{
-			A->LOOP=FALSE;
-			}
-			break;
-	}
-}
-
 // Load settings
 char	*FQN_Settings(const char *fName)
 {
@@ -139,87 +127,91 @@ int	ScanOptions(uARG *A, int argc, char *argv[])
 	return(noerr);
 }
 
-size_t jsonStringify(unsigned int what, char *jsonStr)
+char *jsonStage0()
 {
-	if(A.fSuspended)
-	{
-		strcpy(jsonStr,
-						"{"					\
-						"\"Transmission\":"			\
-							"{"				\
-							"\"Suspended\":true"		\
-							"}"				\
-						"}");
+	char *fullStr=malloc(384), localStr[32]={0}, Boost[4];
+
+	unsigned int i=0;
+	for(i=0; i < 10; i++)  {
+		sprintf(Boost, "%2u%c", A.SHM->P.Boost[i], (i < 9) ? ',':'\0');
+		strcat(localStr, Boost);
 	}
-	else
+	sprintf(fullStr,
+				"\"H\":"				\
+					"{"				\
+					"\"ExtFamily\":%hd,"		\
+					"\"Family\":%hd,"		\
+					"\"ExtModel\":%hd,"		\
+					"\"Model\":%hd,"		\
+					"\"MaxOfCores\":%u,"		\
+					"\"FactoryClock\":%f,"		\
+					"\"Architecture\":\"%s\""	\
+					"},"				\
+				"\"P\":"				\
+					"{"				\
+					"\"Brand\":\"%s\","		\
+					"\"ClockSpeed\":%f,"		\
+					"\"CPU\":%u,"			\
+					"\"OnLine\":%u,"		\
+					"\"Boost\":[%s]"		\
+					"}",
+					A.SHM->H.Signature.ExtFamily,
+					A.SHM->H.Signature.Family,
+					A.SHM->H.Signature.ExtModel,
+					A.SHM->H.Signature.Model,
+					A.SHM->H.MaxOfCores,
+					A.SHM->H.ClockSpeed,
+					A.SHM->H.Architecture,
+					A.SHM->P.Features.BrandString,
+					A.SHM->P.ClockSpeed,
+					A.SHM->P.CPU,
+					A.SHM->P.OnLine,
+					localStr);
+	return(fullStr);
+}
+
+char *jsonStage1()
+{
+	char *localStr=malloc(1024), *fullStr=calloc(A.SHM->P.CPU, 1024);
+	sprintf(localStr,
+				"\"P\":"				\
+					"{"				\
+					"\"Avg\":"			\
+						"{"			\
+						"\"Turbo\":%f,"		\
+						"\"C0\":%f,"		\
+						"\"C1\":%f,"		\
+						"\"C3\":%f,"		\
+						"\"C6\":%f,"		\
+						"\"C7\":%f"		\
+						"},"			\
+					"\"Top\":%u,"			\
+					"\"Hot\":%u,"			\
+					"\"Cold\":%u,"			\
+					"\"PerCore\":%u,"		\
+					"\"ClockSrc\":%u,"		\
+					"\"IdleTime\":%u"		\
+					"},"				\
+				"\"C\":"				\
+					"[",
+						100.f * A.SHM->P.Avg.Turbo,
+						100.f * A.SHM->P.Avg.C0,
+						100.f * A.SHM->P.Avg.C1,
+						100.f * A.SHM->P.Avg.C3,
+						100.f * A.SHM->P.Avg.C6,
+						100.f * A.SHM->P.Avg.C7,
+					A.SHM->P.Top,
+					A.SHM->P.Hot,
+					A.SHM->P.Cold,
+					A.SHM->P.PerCore,
+					A.SHM->P.ClockSrc,
+					A.SHM->P.IdleTime);
+	strcat(fullStr, localStr);
+
+	unsigned int i=0;
+	for(i=0; i < A.SHM->P.CPU; i++)
 	{
-		sprintf(jsonStr,
-						"{"					\
-						"\"Transmission\":"			\
-							"{"				\
-							"\"What\":%u,"			\
-							"\"Suspended\":false"		\
-							"},"				\
-						"\"P\":"				\
-							"{", what);
-		if(what & 0x00000001)
-		{
-			char localStr[64], Array[32]={0}, Boost[4];
-			unsigned int i=0;
-			for(i=0; i < 10; i++)  {
-				sprintf(Boost, "%2u%c", A.SHM->P.Boost[i], (i < 9) ? ',':'\0');
-				strcat(Array, Boost);
-			}
-			sprintf(localStr,		"\"ClockSpeed\":%f,"		\
-							"\"CPU\":%u,"			\
-							"\"OnLine\":%u,"		\
-							"\"Boost\":[%s]",
-							A.SHM->P.ClockSpeed,
-							A.SHM->P.CPU,
-							A.SHM->P.OnLine,
-							Array);
-			strcat(jsonStr, localStr);
-		}
-		if(what & 0x80000000)
-		{
-			char localStr[256];
-			sprintf(localStr,		"\"Avg\":"			\
-								"{"			\
-								"\"Turbo\":%f,"		\
-								"\"C0\":%f,"		\
-								"\"C1\":%f,"		\
-								"\"C3\":%f,"		\
-								"\"C6\":%f,"		\
-								"\"C7\":%f"		\
-								"},"			\
-							"\"Top\":%u,"			\
-							"\"Hot\":%u,"			\
-							"\"Cold\":%u,"			\
-							"\"PerCore\":%u,"		\
-							"\"ClockSrc\":%u,"		\
-							"\"IdleTime\":%u",
-								100.f * A.SHM->P.Avg.Turbo,
-								100.f * A.SHM->P.Avg.C0,
-								100.f * A.SHM->P.Avg.C1,
-								100.f * A.SHM->P.Avg.C3,
-								100.f * A.SHM->P.Avg.C6,
-								100.f * A.SHM->P.Avg.C7,
-							A.SHM->P.Top,
-							A.SHM->P.Hot,
-							A.SHM->P.Cold,
-							A.SHM->P.PerCore,
-							A.SHM->P.ClockSrc,
-							A.SHM->P.IdleTime);
-			strcat(jsonStr, localStr);
-		}
-		strcat(jsonStr,				"}");
-		if(what & 0x80000000)
-		{
-			char *Core=malloc(1024), *Array=calloc(A.SHM->P.CPU, 1024);
-			unsigned int i=0;
-			for(i=0; i < A.SHM->P.CPU; i++)
-			{
-				sprintf(Core,	"{"					\
+		sprintf(localStr,		"{"					\
 						"\"Cycles\":"				\
 							"{"				\
 							"\"INST\":[%llu,%llu],"		\
@@ -303,21 +295,50 @@ size_t jsonStringify(unsigned int what, char *jsonStr)
 						A.SHM->C[i].RelativeFreq,
 						A.SHM->C[i].TjMax.Target,
 						A.SHM->C[i].ThermStat.DTS,
-						(i < (A.SHM->P.CPU - 1)) ? "},":"}");
-				strcat(Array, Core);
-			}
-			strcat(jsonStr,		","					\
-						"\"C\":"				\
-							"[");
-			strcat(jsonStr, Array);
-			strcat(jsonStr,			"]");
-			free(Array);
-			free(Core);
-		}
-		strcat(jsonStr,			"}");
+
+						(i < (A.SHM->P.CPU - 1)) ?
+						"},"
+						:
+						"}"			\
+					"]");
+		strcat(fullStr, localStr);
 	}
-	size_t fullLen=strlen(jsonStr);
-	return(fullLen);
+	free(localStr);
+	return(fullStr);
+}
+
+char *jsonStringify(unsigned int stage, size_t *jsonLen)
+{
+	char *jsonStr=NULL;
+	if(A.fSuspended)
+	{
+		jsonStr=malloc(64);
+		strcpy(jsonStr,
+				"{"					\
+				"\"Transmission\":"			\
+					"{"				\
+					"\"Suspended\":true"		\
+					"}"				\
+				"}");
+		*jsonLen=strlen(jsonStr);
+	}
+	else
+	{
+		char *(*jsonStage[])()={jsonStage0, jsonStage1};
+		char *localStr=jsonStage[stage]();
+		jsonStr=malloc(16384/*strlen(localStr + 64)*/);
+		*jsonLen=sprintf(jsonStr,
+				"{"					\
+				"\"Transmission\":"			\
+					"{"				\
+					"\"Stage\":%u,"			\
+					"\"Suspended\":false"		\
+					"},"				\
+				"%s"					\
+				"}", stage, localStr);
+		free(localStr);
+	}
+	return(jsonStr);
 }
 
 
@@ -418,8 +439,8 @@ static int callback_http(struct libwebsocket_context *ctx,
 
 typedef struct
 {
-	int prefixSum;
-	int remainder;
+	size_t prefixSum;
+	size_t remainder;
 	unsigned char *buffer;
 } SESSION_JSON;
 
@@ -435,8 +456,7 @@ static int callback_json(struct libwebsocket_context *ctx,
 	{
 		case LWS_CALLBACK_ESTABLISHED:
 		{
-			char *jsonString=malloc(16384);
-			session->remainder=jsonStringify(0x00000001, jsonString);
+			char *jsonString=jsonStringify(0, &session->remainder);
 			session->prefixSum=0;
 			session->buffer=malloc(	LWS_SEND_BUFFER_PRE_PADDING
 						+ session->remainder
@@ -450,8 +470,8 @@ static int callback_json(struct libwebsocket_context *ctx,
 		case LWS_CALLBACK_RECEIVE:
 			if(len > 0)
 			{
-				char *jsonStr=calloc(len+1, 1);
-				strncpy(jsonStr, in, len);
+				char *jsonString=calloc(len+1, 1);
+				strncpy(jsonString, in, len);
 				const char jsonCmp[2][12+1]=
 				{
 					{QUOTES,'R','e','s','u','m','e','B','t','n',QUOTES,'\0'},
@@ -459,53 +479,72 @@ static int callback_json(struct libwebsocket_context *ctx,
 				};
 				int i=0;
 				for(i=0; i < 2; i++)
-					if(!strcmp(jsonStr, jsonCmp[i]))
+					if(!strcmp(jsonString, jsonCmp[i]))
 					{
 						A.fSuspended=i;
 						break;
 					}
-				free(jsonStr);
+				free(jsonString);
 			}
 		break;
 		case LWS_CALLBACK_SERVER_WRITEABLE:
-		{
-			int written;
-			if(session->remainder > 0)
+			if(A.LOOP == TRUE)
 			{
-				written=libwebsocket_write(wsi,
+				int written;
+				if(session->remainder > 0)
+				{
+					written=libwebsocket_write(wsi,
 						&session->buffer[session->prefixSum + LWS_SEND_BUFFER_PRE_PADDING],
 							session->remainder, LWS_WRITE_TEXT);
-				if(written < 0) {
-					rc=1;
-					break;
+					if(written < 0) {
+						rc=1;
+						break;
+					}
+					else {
+						session->prefixSum+=written;
+						session->remainder-=written;
+						if(session->remainder)
+							libwebsocket_callback_on_writable(ctx, wsi);
+					}
 				}
-				else {
-					session->prefixSum+=written;
-					session->remainder-=written;
-					if(session->remainder)
-						libwebsocket_callback_on_writable(ctx, wsi);
-				}
-			}
-			else
-			{
-				char *jsonString=malloc(16384);
-				session->remainder=jsonStringify(0x80000000, jsonString);
-				session->prefixSum=0;
-				session->buffer=(unsigned char*) realloc(session->buffer,
+				else
+				{
+					char *jsonString=jsonStringify(1, &session->remainder);
+					session->prefixSum=0;
+					session->buffer=(unsigned char*) realloc(session->buffer,
 									LWS_SEND_BUFFER_PRE_PADDING
 									+ session->remainder
 									+ LWS_SEND_BUFFER_POST_PADDING);
-				strncpy((char *) &session->buffer[LWS_SEND_BUFFER_PRE_PADDING],
-						jsonString,
-						session->remainder);
-				free(jsonString);
+					strncpy((char *) &session->buffer[LWS_SEND_BUFFER_PRE_PADDING],
+							jsonString,
+							session->remainder);
+					free(jsonString);
+				}
 			}
-		}
+			else	// Flush the remaining buffer.
+			{
+				int written;
+				if(session->remainder > 0)
+				{
+					written=libwebsocket_write(wsi,
+						&session->buffer[session->prefixSum + LWS_SEND_BUFFER_PRE_PADDING],
+							session->remainder, LWS_WRITE_TEXT);
+					if(written < 0) {
+						rc=1;
+						break;
+					}
+					else {
+						session->prefixSum+=written;
+						session->remainder-=written;
+						if(session->remainder)
+							libwebsocket_callback_on_writable(ctx, wsi);
+					}
+				}
+			}
 		break;
 		case LWS_CALLBACK_CLOSED:
 		{
 			free(session->buffer);
-			lwsl_notice("JSON DISC\n");
 		}
 		break;
 		default:
@@ -520,6 +559,31 @@ static struct libwebsocket_protocols protocols[]=
 	{"json-lite", callback_json, sizeof(SESSION_JSON)},
 	{NULL, NULL, 0}
 };
+
+void uEmergency(int caught)
+{
+	switch(caught)
+	{
+		case SIGINT:
+		case SIGQUIT:
+		case SIGTERM:
+		{
+			A.LOOP=FALSE;
+			libwebsocket_callback_on_writable_all_protocol(&protocols[1]);
+		}
+		break;
+		case SIGUSR1:
+		{
+			A.fSuspended=TRUE;
+		}
+		break;
+		case SIGUSR2:
+		{
+			A.fSuspended=FALSE;
+		}
+		break;
+	}
+}
 
 // Verify the prerequisites & start the threads.
 int main(int argc, char *argv[])
@@ -544,6 +608,12 @@ int main(int argc, char *argv[])
 			|| ((A.SmBIOS=mmap(A.SHM->B, smbStat.st_size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_FIXED, A.FD.SmBIOS, 0)) == MAP_FAILED))
 				tracerr("Error: opening the SmBIOS shared memory");
 
+			signal(SIGINT, uEmergency);
+			signal(SIGQUIT, uEmergency);
+			signal(SIGUSR1, uEmergency);
+			signal(SIGUSR2, uEmergency);
+
+			lws_set_log_level(LLL_ERR|LLL_WARN, NULL);
 			struct libwebsocket_context *context;
 			struct lws_context_creation_info info;
 			memset(&info, 0, sizeof(info));
@@ -553,16 +623,21 @@ int main(int argc, char *argv[])
 			info.protocols=protocols;
 			if((context=libwebsocket_create_context(&info)) != NULL)
 			{
+				printf("\n%s Ready with [%s]\n\n", _APPNAME, A.SHM->AppName);
 				while(A.LOOP)
 				{
+					libwebsocket_service(context, 50);
 					const unsigned long int roomBit=(unsigned long long int) 1<<A.Room, roomCmp=~roomBit;
 					if(atomic_load(&A.SHM->Sync.IF) & roomBit)
 					{
 						libwebsocket_callback_on_writable_all_protocol(&protocols[1]);
 						atomic_fetch_and(&A.SHM->Sync.IF, roomCmp);
 					}
-					libwebsocket_service(context, 50);
 				}
+				int countDown=30;
+				do {
+					libwebsocket_service(context, 50);
+				} while(--countDown);
 				libwebsocket_context_destroy(context);
 			}
 

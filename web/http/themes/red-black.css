@@ -7,33 +7,45 @@
  */
 
 body {
-        background-color: #2a0308;
+        background-color: black;
         color: white;
 }
-#SocketState {
-	color: #c0c0c0;
-	margin: 2px 0;
+#Chart {
+	background-color: #2a0308;
+	border: pink 1px solid;
+	margin: 0px 0px;
+	padding: 0px 0px;
 }
 #LogHistory {
-	background-color: black;
+	background-color: #2a0308;
 	color: white;
 	font-size: smaller;
-	height: 600px;
+	height: 400px;
 	overflow: auto;
 	width: auto;
 }
 #ControlBar {
 	background-color: black;
-	border: #c0c0c0 2px solid;
+	border: #c0c0c0 1px solid;
+	display: inline-block;
 	font-size: small;
 	margin-top: 2px;
 	padding: 6px 6px;
+	width: 99%;
 }
-#ControlBar div {
-	float: right;
+#ControlBar #SocketState {
+	color: #c0c0c0;
+	float: left;
+	margin: 2px 1em 2px 0;
+}
+#ControlBar #CtrlButtons {
+	float: left;
 }
 #ControlBar div, #SuspendBtn, #ResumeBtn {
 	font-size: small;
+}
+#ControlBar #HistoryCtrl {
+	float: right;
 }
 #ControlBar div #HistoryDepth {
 	font-size: small;

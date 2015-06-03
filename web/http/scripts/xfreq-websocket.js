@@ -7,51 +7,59 @@
  */
 
 
-var XFreqWS;
+var XFreq={WS:null, Host:location.hostname, Port:location.port, Protocol: "json-lite", Transmission:{}};
 
 function XFreqWebSocket()
 {
 	try {
-		XFreqWS=new WebSocket("ws://" + location.hostname + ":" + location.port, "json-lite");
+		XFreq.WS=new WebSocket("ws://" + XFreq.Host + ":" + XFreq.Port, XFreq.Protocol);
 	}
 	catch(err) {
 		document.getElementById("SocketState").innerHTML="XFreq WebSocket [" + err + "]";
 	}
-	XFreqWS.onopen=function(evt)
+	XFreq.WS.onopen=function(evt)
 	{
 		document.getElementById("SocketState").innerHTML="XFreq WebSocket [" + evt.type + "]";
 		document.getElementById("SuspendBtn").disabled=false;
 	}
 
-	XFreqWS.onclose=function(evt)
+	XFreq.WS.onclose=function(evt)
 	{
 		document.getElementById("SocketState").innerHTML="XFreq WebSocket [" + evt.type + "]";
 		document.getElementById("SuspendBtn").disabled=true;
 	}
-	XFreqWS.onmessage=function(evt)
+	XFreq.WS.onmessage=function(evt)
 	{
-		var SHM;
+		var Obj={};
 		try {
-			SHM=JSON.parse(evt.data);
+			var Obj=JSON.parse(evt.data);
+			XFreq.Transmission=Obj.Transmission;
 		}
 		catch(err) {
 			History.LogWindow(err + evt);
 		}
-		var str;
-		try {
-			str=JSON.stringify(SHM, null, 2);
-		}
-		catch(err) {
-			str=err.message;
-		}
-		History.LogWindow(str);
-
-		if(!SHM.Transmission.Suspended) {
+		if(XFreq.Transmission.Suspended == false) {
 			document.getElementById("SuspendBtn").disabled=false;
 			document.getElementById("ResumeBtn").disabled=true;
 		} else {
 			document.getElementById("SuspendBtn").disabled=true;
 			document.getElementById("ResumeBtn").disabled=false;
 		}
+		switch(XFreq.Transmission.Stage)
+		{
+		case 0:
+			SHM.H=Obj.H;
+			SHM.P[0]=Obj.P;
+
+			uBuild();
+		break;
+		case 1:
+			SHM.P[1]=Obj.P;
+			SHM.C=Obj.C;
+
+			uDraw();
+		break;
+		}
+		History.LogWindow(JSON.stringify(SHM, null, 2));
 	}
 }
