@@ -15,18 +15,18 @@ function XFreqWebSocket()
 		XFreq.WS=new WebSocket("ws://" + XFreq.Host + ":" + XFreq.Port, XFreq.Protocol);
 	}
 	catch(err) {
-		document.getElementById("SocketState").innerHTML="XFreq WebSocket [" + err + "]";
+		ControlBar.UpdateState("XFreq WebSocket [" + err + "]");
 	}
 	XFreq.WS.onopen=function(evt)
 	{
-		document.getElementById("SocketState").innerHTML="XFreq WebSocket [" + evt.type + "]";
-		document.getElementById("SuspendBtn").disabled=false;
+		ControlBar.UpdateState("XFreq WebSocket [" + evt.type + "]");
+		ControlBar.ToggleBtn(false);
 	}
 
 	XFreq.WS.onclose=function(evt)
 	{
-		document.getElementById("SocketState").innerHTML="XFreq WebSocket [" + evt.type + "]";
-		document.getElementById("SuspendBtn").disabled=true;
+		ControlBar.UpdateState("XFreq WebSocket [" + evt.type + "]");
+		ControlBar.ToggleBtn(true);
 	}
 	XFreq.WS.onmessage=function(evt)
 	{
@@ -36,30 +36,28 @@ function XFreqWebSocket()
 			XFreq.Transmission=Obj.Transmission;
 		}
 		catch(err) {
-			History.LogWindow(err + evt);
+			Trace.LogWindow(err + evt);
 		}
-		if(XFreq.Transmission.Suspended == false) {
-			document.getElementById("SuspendBtn").disabled=false;
-			document.getElementById("ResumeBtn").disabled=true;
-		} else {
-			document.getElementById("SuspendBtn").disabled=true;
-			document.getElementById("ResumeBtn").disabled=false;
-		}
+		ControlBar.ToggleBtn(XFreq.Transmission.Suspended);
+
 		switch(XFreq.Transmission.Stage)
 		{
 		case 0:
 			SHM.H=Obj.H;
 			SHM.P[0]=Obj.P;
 
-			uBuild();
+			document.getElementById("Brand").innerHTML=SHM.P[0].Brand;
 		break;
 		case 1:
 			SHM.P[1]=Obj.P;
 			SHM.C=Obj.C;
 
-			uDraw();
+			for(i in Win) {
+				Win[i].Draw();
+			}
 		break;
 		}
-		History.LogWindow(JSON.stringify(SHM, null, 2));
+		if(document.getElementById("Log").style.display != "none")
+			Trace.LogWindow(JSON.stringify(SHM, null, 2));
 	}
 }

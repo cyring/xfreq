@@ -7,16 +7,31 @@
  */
 
 body {
-        background-color: black;
+        background-color: #303030;
+        border: #2a0308 1px solid;
         color: white;
 }
-#Chart {
+#New {
 	background-color: #2a0308;
-	border: pink 1px solid;
+	color: white;
+	float: right;
+	font-size: xx-large;
+	padding: 4px;
+}
+#Brand {
+	float: left;
+}
+.Widget {
+	background-color: #2a0308;
+	border: #8fcefa 1px solid;
 	margin: 0px 0px;
 	padding: 0px 0px;
+	position: absolute;
 }
-#LogHistory {
+#Log {
+	border: #8fcefa 1px solid;
+}
+#Trace {
 	background-color: #2a0308;
 	color: white;
 	font-size: smaller;
@@ -25,17 +40,19 @@ body {
 	width: auto;
 }
 #ControlBar {
-	background-color: black;
-	border: #c0c0c0 1px solid;
+	background-color: #303030;
+	border: #8fcefa 1px solid;
 	display: inline-block;
 	font-size: small;
-	margin-top: 2px;
-	padding: 6px 6px;
-	width: 99%;
+	margin-left: 0.5em;
+	margin-top: 0.5em;
+	padding: 0.25em 0.5em;
+	width: 97%;
 }
 #ControlBar #SocketState {
-	color: #c0c0c0;
+	color: white;
 	float: left;
+	font-size: initial;
 	margin: 2px 1em 2px 0;
 }
 #ControlBar #CtrlButtons {
@@ -44,10 +61,10 @@ body {
 #ControlBar div, #SuspendBtn, #ResumeBtn {
 	font-size: small;
 }
-#ControlBar #HistoryCtrl {
+#ControlBar #TraceCtrl {
 	float: right;
 }
-#ControlBar div #HistoryDepth {
+#ControlBar div #TraceDepth {
 	font-size: small;
 	width: 4em;
 }
