@@ -14,14 +14,17 @@
 		<script src="scripts/xfreq-webui.js"></script>
 		<script src="scripts/xfreq-websocket.js"></script>
 	</head>
-	<body onload="XFreqWebUI(); XFreqWebSocket();" ondrop="uDrop(event);" ondragover="event.preventDefault();">
-		<span><h1 id="Brand"></h1>
-		<button id="New" onclick='Win.push(new Widget("core" + Math.round(100*Math.random())));'>+</button>
+	<body onload="UI.Init(window.innerWidth, window.innerHeight, 4); new XFreq(location.hostname, location.port);" ondrop="Widget.Drop(event);" ondragover="event.preventDefault();">
+		<ul id="Launcher" class="RunBar">
+			<li id="New" class="RunBar" onclick='UI.Add("Core");'>+</li>
+		</ul>
+		<span>
+			<h1 id="Brand"></h1>
 		</span>
-		<div id="Log" style="display: none;">
-		<div id="Trace"></div>
-		<div id="ControlBar">
-			<div id="SocketState"></div>
+<!--		<div id="Log" style="display: none;">
+			<div id="Trace"></div>
+			<div id="ControlBar">
+				<div id="SocketState"></div>
 				<div id="CtrlButtons">
 					<button id="SuspendBtn" type="button" disabled onclick='BtnHandler("SuspendBtn")'>Suspend</button>
 					<button id="ResumeBtn" type="button" disabled onclick='BtnHandler("ResumeBtn")'>Resume</button>
@@ -31,6 +34,6 @@
 					<input id="SubmitDepth" type="button" value="&crarr;" onclick='BtnHandler("TraceDepth")'>
 				</div>
 			</div>
-		</div>
+		</div>-->
 	</body>
 </html>

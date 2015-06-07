@@ -7,57 +7,61 @@
  */
 
 
-var XFreq={WS:null, Host:location.hostname, Port:location.port, Protocol: "json-lite", Transmission:{}};
+var SHM={ H:{}, P:[], C:[] };
 
-function XFreqWebSocket()
+function XFreq(host, port)
 {
+	this.WS=null;
+	this.Host=host;
+	this.Port=port;
+	this.Protocol="json-lite";
+	this.Transmission={};
+
 	try {
-		XFreq.WS=new WebSocket("ws://" + XFreq.Host + ":" + XFreq.Port, XFreq.Protocol);
+		this.WS=new WebSocket("ws://" + this.Host + ":" + this.Port, this.Protocol);
 	}
 	catch(err) {
-		ControlBar.UpdateState("XFreq WebSocket [" + err + "]");
+		UI.WinStack[0].UpdateState("XFreq WebSocket [" + err + "]");
 	}
-	XFreq.WS.onopen=function(evt)
+	this.WS.onopen=function(event)
 	{
-		ControlBar.UpdateState("XFreq WebSocket [" + evt.type + "]");
-		ControlBar.ToggleBtn(false);
+		UI.WinStack[0].UpdateState("XFreq WebSocket [" + event.type + "]");
+		UI.WinStack[0].ToggleBtn(false);
 	}
 
-	XFreq.WS.onclose=function(evt)
+	this.WS.onclose=function(event)
 	{
-		ControlBar.UpdateState("XFreq WebSocket [" + evt.type + "]");
-		ControlBar.ToggleBtn(true);
+		UI.WinStack[0].UpdateState("XFreq WebSocket [" + event.type + "]");
+		UI.WinStack[0].ToggleBtn(true);
 	}
-	XFreq.WS.onmessage=function(evt)
+	this.WS.onmessage=function(event)
 	{
 		var Obj={};
 		try {
-			var Obj=JSON.parse(evt.data);
-			XFreq.Transmission=Obj.Transmission;
+			var Obj=JSON.parse(event.data);
+			this.Transmission=Obj.Transmission;
 		}
 		catch(err) {
-			Trace.LogWindow(err + evt);
+			WinStack[0].Trace(err + event);
 		}
-		ControlBar.ToggleBtn(XFreq.Transmission.Suspended);
+		UI.WinStack[0].ToggleBtn(this.Transmission.Suspended);
 
-		switch(XFreq.Transmission.Stage)
+		switch(this.Transmission.Stage)
 		{
 		case 0:
 			SHM.H=Obj.H;
 			SHM.P[0]=Obj.P;
 
-			document.getElementById("Brand").innerHTML=SHM.P[0].Brand;
+			UI.Brand("Brand");
 		break;
 		case 1:
 			SHM.P[1]=Obj.P;
 			SHM.C=Obj.C;
 
-			for(i in Win) {
-				Win[i].Draw();
-			}
+			UI.Refresh();
 		break;
 		}
-		if(document.getElementById("Log").style.display != "none")
-			Trace.LogWindow(JSON.stringify(SHM, null, 2));
+		if(UI.WinStack[0].div.style.display != "none")
+			UI.WinStack[0].Trace(JSON.stringify(SHM, null, 2));
 	}
 }
