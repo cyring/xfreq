@@ -12,13 +12,13 @@ var SHM={ H:{}, P:[], C:[] };
 function XFreq(host, port)
 {
 	this.WS=null;
-	this.Host=host;
-	this.Port=port;
-	this.Protocol="json-lite";
-	this.Transmission={};
+	var Host=host;
+	var Port=port;
+	var Protocol="json-lite";
+	var Transmission={};
 
 	try {
-		this.WS=new WebSocket("ws://" + this.Host + ":" + this.Port, this.Protocol);
+		this.WS=new WebSocket("ws://" + Host + ":" + Port, Protocol);
 	}
 	catch(err) {
 		UI.WinStack[0].UpdateState("XFreq WebSocket [" + err + "]");
@@ -39,14 +39,14 @@ function XFreq(host, port)
 		var Obj={};
 		try {
 			var Obj=JSON.parse(event.data);
-			this.Transmission=Obj.Transmission;
+			Transmission=Obj.Transmission;
 		}
 		catch(err) {
 			WinStack[0].Trace(err + event);
 		}
-		UI.WinStack[0].ToggleBtn(this.Transmission.Suspended);
+		UI.WinStack[0].ToggleBtn(Transmission.Suspended);
 
-		switch(this.Transmission.Stage)
+		switch(Transmission.Stage)
 		{
 		case 0:
 			SHM.H=Obj.H;
@@ -61,7 +61,13 @@ function XFreq(host, port)
 			UI.Refresh();
 		break;
 		}
-		if(UI.WinStack[0].div.style.display != "none")
-			UI.WinStack[0].Trace(JSON.stringify(SHM, null, 2));
 	}
+}
+
+var CX=[];
+
+CX.Init=function(hostName, hostPort)
+{
+	var cx=new XFreq(hostName, hostPort);
+	CX.push(cx);
 }

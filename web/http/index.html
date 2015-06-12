@@ -14,26 +14,20 @@
 		<script src="scripts/xfreq-webui.js"></script>
 		<script src="scripts/xfreq-websocket.js"></script>
 	</head>
-	<body onload="UI.Init(window.innerWidth, window.innerHeight, 4); new XFreq(location.hostname, location.port);" ondrop="Widget.Drop(event);" ondragover="event.preventDefault();">
+	<body onload="UI.Init(window.innerWidth, window.innerHeight, 4); CX.Init(location.hostname, location.port);" ondrop="UI.Drop(event);" ondragover="event.preventDefault();">
 		<ul id="Launcher" class="RunBar">
-			<li id="New" class="RunBar" onclick='UI.Add("Core");'>+</li>
+			<li id="New" class="RunBar">+
+				<ul class="RunBar SubBar">
+					<li onclick='UI.Add("CORES");'>Core</li>
+					<li onclick='UI.Add("CSTATES");'>C-States</li>
+					<li onclick='UI.Add("TEMPS");'>Temps</li>
+				</ul>
+			</li>
 		</ul>
-		<span>
-			<h1 id="Brand"></h1>
-		</span>
-<!--		<div id="Log" style="display: none;">
-			<div id="Trace"></div>
-			<div id="ControlBar">
-				<div id="SocketState"></div>
-				<div id="CtrlButtons">
-					<button id="SuspendBtn" type="button" disabled onclick='BtnHandler("SuspendBtn")'>Suspend</button>
-					<button id="ResumeBtn" type="button" disabled onclick='BtnHandler("ResumeBtn")'>Resume</button>
-				</div>
-				<div id="TraceCtrl">
-					<input id="TraceDepth" type="number" min="1" max="9" maxlength="2">
-					<input id="SubmitDepth" type="button" value="&crarr;" onclick='BtnHandler("TraceDepth")'>
-				</div>
-			</div>
-		</div>-->
+		<div id="footerZone">
+			<span>
+				<p id="Brand"></p>
+			</span>
+		</div>
 	</body>
 </html>

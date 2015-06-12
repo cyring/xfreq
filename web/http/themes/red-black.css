@@ -24,8 +24,23 @@ li {
 }
 ul li {
 	display: inline;
+	margin-left: 1.5em;
+	margin-right: 0.25em;
 }
-li:hover{
+ul li ul {
+	display: none;
+}
+ul li ul li {
+	border-right: #2a0308 2px solid;
+	display: block;
+	margin-bottom: 0.5em;
+	margin-left: 0.25em;
+	margin-top: 0.5em;
+	padding-left: 0.25em;
+	padding-right: 0.5em;
+	white-space: nowrap;
+}
+li:hover {
 	cursor: pointer;
 }
 .RunBar {
@@ -34,13 +49,31 @@ li:hover{
 	font-size: large;
 	margin: 0 0;
 	padding: 0 0;
+	position: absolute;
 	vertical-align: middle;
 }
+.SubBar {
+	background-color: #2a0308;
+	border: gray 1px solid;
+	padding-bottom: 0.25em;
+	padding-top: 0.25em;
+}
 #Launcher {
+	position: inherit;
 }
 #New {
 	color: #8fcefa;
-	font-size: x-large;
+}
+#New:hover ul, ul li ul:hover ul li ul {
+	display: block;
+}
+ul li ul li:hover {
+	border-right: #8fcefa 2px solid;
+}
+#footerZone {
+	font-size: small;
+	position: absolute;
+	top: 95%;
 }
 #Brand {
 	float: left;
@@ -77,7 +110,6 @@ li:hover{
 #ControlBar #SocketState {
 	color: white;
 	float: left;
-	font-size: initial;
 	margin: 2px 1em 2px 0;
 }
 #ControlBar #CtrlButtons {

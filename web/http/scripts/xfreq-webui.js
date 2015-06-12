@@ -8,16 +8,12 @@
 
 function Log(depth)
 {
-	this.depth=this.count=depth;
-/*
-	this.GetDepth=function() {
-		return(this.depth);
-	}
-*/
+	var _depth=_count=depth;
+
 	this.div=document.createElement("div");
 	this.div.id="Log";
 	this.div.draggable=true;
-	this.div.setAttribute("ondragstart", "Widget.Drag(event)");
+	this.div.setAttribute("ondragstart", "UI.Drag(event)");
 
 	this.trace=document.createElement("div");
 	this.trace.id="Trace";
@@ -25,7 +21,7 @@ function Log(depth)
 
 	this.controlBar=document.createElement("div");
 	this.controlBar.id="ControlBar";
-	this.trace.appendChild(this.controlBar);
+	this.div.appendChild(this.controlBar);
 
 	this.socketState=document.createElement("div");
 	this.socketState.id="SocketState";
@@ -39,7 +35,7 @@ function Log(depth)
 	this.suspendBtn.id="SuspendBtn";
 	this.suspendBtn.type="button";
 	this.suspendBtn.disabled=true;
-	this.suspendBtn.onclick=function() {this.BtnHandler("SuspendBtn")};
+	this.suspendBtn.addEventListener("click", this, false);
 	this.suspendText=document.createTextNode("Suspend");
 	this.suspendBtn.appendChild(this.suspendText);
 	this.ctrlButtons.appendChild(this.suspendBtn);
@@ -48,7 +44,7 @@ function Log(depth)
 	this.resumeBtn.id="ResumeBtn";
 	this.resumeBtn.type="button";
 	this.resumeBtn.disabled=true;
-	this.resumeBtn.onclick=function() {this.BtnHandler("ResumeBtn")};
+	this.resumeBtn.addEventListener("click", this, false);
 	this.resumeText=document.createTextNode("Resume");
 	this.resumeBtn.appendChild(this.resumeText);
 	this.ctrlButtons.appendChild(this.resumeBtn);
@@ -63,17 +59,17 @@ function Log(depth)
 	this.traceDepth.min=1;
 	this.traceDepth.max=9;
 	this.traceDepth.maxlength=2;
-	this.traceDepth.value=this.depth;
+	this.traceDepth.value=_depth.toString();
 	this.traceCtrl.appendChild(this.traceDepth);
 
 	this.submitDepth=document.createElement("input");
 	this.submitDepth.id="SubmitDepth";
 	this.submitDepth.type="button";
 	this.submitDepth.value="OK";
-	this.submitDepth.onclick=function() {this.BtnHandler("TraceDepth")};
+	this.submitDepth.addEventListener("click", this, false);
 	this.traceCtrl.appendChild(this.submitDepth);
 
-	this.div.style.display="block";
+	this.div.style.display="none";
 	document.body.appendChild(this.div);
 
 	this.div.style.left=Math.round((document.body.clientWidth - this.div.offsetWidth)
@@ -81,63 +77,60 @@ function Log(depth)
 	this.div.style.top=Math.round((document.body.clientHeight - this.div.offsetHeight)
 				* Math.random()) + "px";
 
+	this.handleEvent=function(event)
+	{
+		switch(event.target.id) {
+		case "SubmitDepth":
+			_depth=parseInt(this.traceDepth.value, 10);
+		break;
+		default:
+			CX[0].WS.send(JSON.stringify(event.target.id));
+		}
+	}
+
 	this.Trace=function(str) {
 		var tag="<pre>" + str + "</pre>";
 
-		if(!--this.count)
+		if(!--_count)
 		{
 			this.trace.innerHTML=tag;
-			this.count=this.depth;
+			_count=_depth;
 		}
 		else
-			this.trace.innerHTML=tag + this.Trace.innerHTML;
+			this.trace.innerHTML=tag + "<hr>" + this.trace.innerHTML;
 	}
 
 	this.UpdateState=function(str)
 	{
-		this.socketState.innerHTML="XFreq WebSocket [" + str + "]";
+		this.socketState.innerHTML=str;
 	}
 
-	this.BtnHandler=function(id)
+	this.ToggleBtn=function(state)
 	{
-		switch(id) {
-		case "TraceDepth":
-			this.depth=this.traceDepth.value;
-		break;
-		default:
-			XFreq.WS.send(JSON.stringify(id));
-		}
-	}
-
-	this.ToggleBtn=function(v)
-	{
-		if(v == false) {
-			this.suspendBtn.disabled=false;
-			this.resumeBtn.disabled=true;
-		} else {
-			this.suspendBtn.disabled=true;
-			this.resumeBtn.disabled=false;
-		}
+		this.suspendBtn.disabled=state;
+		this.resumeBtn.disabled=!state;
 	}
 
 	this.Draw=function()
 	{
+		if(this.div.style.display != "none")
+			this.Trace(JSON.stringify(SHM, null, 2));
 	}
 }
 
 
 function Widget(id)
 {
+	this.kind=id;
 	this.div=null;
 	this.gfx=null;
 	this.gtx=null;
-	this.thickness=0;
 
 	this.div=document.createElement("div");
 	this.div.setAttribute("class", "Widget");
-	this.div.setAttribute("id", id);
+	this.div.setAttribute("id", id + "_" + ++UI.Widgets);
 	this.div.setAttribute("draggable", "true");
-	this.div.setAttribute("ondragstart", "Widget.Drag(event)");
+	this.div.setAttribute("ondragstart", "UI.Drag(event)");
 
 	this.gfx=document.createElement("canvas");
 	this.gtx=this.gfx.getContext("2d");
@@ -156,64 +149,77 @@ function Widget(id)
 
 	this.Draw=function()
 	{
-		var Bar=[
-			"#6666b0",
-			"#00aa66",
-			"#e49400",
-			"#e49400",
-			"#e49400",
-			"#e49400",
-			"#e49400",
-			"#e49400",
-			"#fd0000",
-			"#fd0000"
-			];
-
-		var cpu=0, h=this.div.offsetHeight / SHM.P[0].CPU;
-		this.thickness=h - 4;
-
-		this.gtx.clearRect(0, 0, this.div.offsetWidth, this.div.offsetHeight);
-
-		for(cpu=0; cpu < SHM.P[0].CPU; cpu++)
+		switch(this.kind)
 		{
-			for(i=0; i < 9; i++)
-				if(SHM.P[0].Boost[i] != 0)
-					if(!(SHM.C[cpu].RelativeRatio > SHM.P[0].Boost[i]))
-						break;
-			this.gtx.strokeStyle=Bar[i];
+		case "CORES":
+		{
+			var Bar=[
+				"#6666b0",
+				"#00aa66",
+				"#e49400",
+				"#e49400",
+				"#e49400",
+				"#e49400",
+				"#e49400",
+				"#e49400",
+				"#fd0000",
+				"#fd0000"
+				];
 
-			var x=Math.round(SHM.C[cpu].RelativeRatio * 16), y=(h * cpu) + 2;
-			this.gtx.strokeRect(0, y, x, this.thickness);
+			var cpu=0, h=this.div.offsetHeight / SHM.P[0].CPU;
+			var thickness=h - 4;
+
+			this.gtx.clearRect(0, 0, this.div.offsetWidth, this.div.offsetHeight);
 			this.gtx.fillStyle="#8fcefa";
-			this.gtx.fillText(SHM.C[cpu].RelativeRatio.toFixed(1), this.gfx.width - 20, y + 8);
+			for(cpu=0; cpu < SHM.P[0].CPU; cpu++)
+			{
+				for(i=0; i < 9; i++)
+					if(SHM.P[0].Boost[i] != 0)
+						if(!(SHM.C[cpu].RelativeRatio > SHM.P[0].Boost[i]))
+							break;
+				this.gtx.strokeStyle=Bar[i];
+
+				var x=Math.round(SHM.C[cpu].RelativeRatio * 16), y=(h * cpu) + 2;
+				this.gtx.strokeRect(0, y, x, thickness);
+				this.gtx.fillText(SHM.C[cpu].RelativeRatio.toFixed(1), this.gfx.width - 24, y + 8);
+			}
+		}
+		break;
+		case "CSTATES":
+		{
+			var cpu=0, h=this.div.offsetHeight / SHM.P[0].CPU;
+			var thickness=h - 4;
+
+			this.gtx.clearRect(0, 0, this.div.offsetWidth, this.div.offsetHeight);
+			this.gtx.strokeStyle=this.gtx.fillStyle="#8fcefa";
+			for(cpu=0; cpu < SHM.P[0].CPU; cpu++)
+			{
+				var x=Math.round(SHM.C[cpu].State.C0 * this.div.offsetWidth - 40), y=(h * cpu) + 2;
+				this.gtx.strokeRect(0, y, x, thickness);
+				this.gtx.fillText(100 * SHM.C[cpu].State.C0.toFixed(1) + "%", this.gfx.width - 32, y + 8);
+			}
+		}
+		break;
+		case "TEMPS":
+		{
+			var cpu=0, h=this.div.offsetHeight / SHM.P[0].CPU;
+			this.gtx.clearRect(0, 0, this.div.offsetWidth, this.div.offsetHeight);
+			this.gtx.fillStyle="#8fcefa";
+			for(cpu=0; cpu < SHM.P[0].CPU; cpu++)
+			{
+				var y=(h * cpu) + 10;
+				this.gtx.fillText("#" + cpu, 2, y);
+				this.gtx.fillText(SHM.C[cpu].TjMax.Target - SHM.C[cpu].ThermStat.DTS, this.gfx.width - 20, y);
+			}
+		}
+		break;
 		}
 	}
 }
 
-Widget.Drag=function(event)
-{
-	var style=window.getComputedStyle(event.target, null);
-	event.dataTransfer.setData("text",
-				event.target.id
-				+ ','
-				+ (parseInt(style.getPropertyValue("left"),10) - event.clientX)
-				+ ','
-				+ (parseInt(style.getPropertyValue("top"),10) - event.clientY));
-}
-
-Widget.Drop=function(event)
-{
-	var item=event.dataTransfer.getData("text").split(',');
-	var src=document.getElementById(item[0]);
-	src.style.left=(event.clientX + parseInt(item[1],10)) + "px";
-	src.style.top=(event.clientY + parseInt(item[2],10)) + "px";
-	event.preventDefault();
-	return(false);
-}
 
 
-
-var UI={ WinStack:[], Launcher:null };
+var UI={ WinStack:[], Launcher:null, Widgets:0 };
 
 UI.Init=function(bodyWidth, bodyHeight, allMargins)
 {
@@ -230,6 +236,27 @@ UI.Brand=function(id)
 	document.getElementById(id).innerHTML=SHM.P[0].Brand;
 }
 
+UI.Drag=function(event)
+{
+	var style=window.getComputedStyle(event.target, null);
+	event.dataTransfer.setData("text",
+				event.target.id
+				+ ','
+				+ (parseInt(style.getPropertyValue("left"),10) - event.clientX)
+				+ ','
+				+ (parseInt(style.getPropertyValue("top"),10) - event.clientY));
+}
+
+UI.Drop=function(event)
+{
+	var item=event.dataTransfer.getData("text").split(',');
+	var src=document.getElementById(item[0]);
+	src.style.left=(event.clientX + parseInt(item[1],10)) + "px";
+	src.style.top=(event.clientY + parseInt(item[2],10)) + "px";
+	event.preventDefault();
+	return(false);
+}
+
 UI.Add=function(kind)
 {
 	var widget=null;
@@ -238,8 +265,8 @@ UI.Add=function(kind)
 	case "Log":
 		widget=new Log(1);
 	break;
-	case "Core":
-		widget=new Widget(kind + Math.round(1000*Math.random()));
+	default:
+		widget=new Widget(kind);
 	break;
 	}
 	if(widget != null)
@@ -247,7 +274,7 @@ UI.Add=function(kind)
 		UI.WinStack.push(widget);
 
 		var node=document.createElement("li");
-		node.onclick=function()
+		node.addEventListener("click", function()
 				{
 					switch(widget.div.style.display)
 					{
@@ -258,8 +285,8 @@ UI.Add=function(kind)
 						widget.div.style.display="none";
 					break;
 					}
-				}
-		var text=document.createTextNode(kind);
+				}, false);
+		var text=document.createTextNode(widget.div.id);
 		node.appendChild(text);
 
 		UI.Launcher.appendChild(node);
