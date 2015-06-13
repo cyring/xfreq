@@ -134,9 +134,53 @@ function Widget(id)
 
 	this.gfx=document.createElement("canvas");
 	this.gtx=this.gfx.getContext("2d");
-	this.gfx.height=SHM.P[0].CPU * 16;
-	this.gfx.width=SHM.P[0].Boost[9] * 16;
-	this.div.style.height=(this.gfx.height - 0) + "px";
+	switch(this.kind)
+	{
+		case "CORES":
+		{
+			this.gfx.width=26 + (SHM.P[0].Boost[9] * 16);
+			this.gfx.height=SHM.P[0].CPU * 16;
+
+			var barStyle=[
+				UI.Colors["Low"],
+				UI.Colors["Medium"],
+				UI.Colors["High"],
+				UI.Colors["High"],
+				UI.Colors["High"],
+				UI.Colors["High"],
+				UI.Colors["High"],
+				UI.Colors["High"],
+				UI.Colors["Turbo"],
+				UI.Colors["Turbo"],
+			];
+		}
+		break;
+		case "CSTATES":
+		{
+			this.gfx.width=(SHM.P[0].CPU * 48) + 8;
+			this.gfx.height=(10 + 2) * 16;
+		}
+		break;
+		case "TEMPS":
+		{
+			this.gfx.width=8 * 32;
+			this.gfx.height=(10 + 2) * 16;
+
+			var hsv=[]; hsv=rgbToHsv(rgbToTriple(UI.Colors["Temps"]));
+			var barStyle=[];
+			var Temps=[[]], cpu=0;
+			for(cpu=0; cpu < SHM.P[0].CPU; cpu++)
+			{
+				hsv[0]+=0.1;
+				barStyle[cpu]=tripleToRgb(hsvToRgb(hsv));
+
+				for(i=0; i < 9; i++)
+					Temps[cpu]=[];
+			}
+		}
+		break;
+	}		
+	this.div.style.height=this.gfx.height + "px";
 	this.div.style.width=this.gfx.width + "px";
 	this.div.style.left=Math.round((document.body.clientWidth - this.gfx.width)
 				* Math.random()) + "px";
@@ -153,63 +197,150 @@ function Widget(id)
 		{
 		case "CORES":
 		{
-			var Bar=[
-				"#6666b0",
-				"#00aa66",
-				"#e49400",
-				"#e49400",
-				"#e49400",
-				"#e49400",
-				"#e49400",
-				"#e49400",
-				"#fd0000",
-				"#fd0000"
-				];
-
-			var cpu=0, h=this.div.offsetHeight / SHM.P[0].CPU;
+			var cpu=0, h=this.gfx.height / SHM.P[0].CPU;
 			var thickness=h - 4;
 
-			this.gtx.clearRect(0, 0, this.div.offsetWidth, this.div.offsetHeight);
-			this.gtx.fillStyle="#8fcefa";
+			this.gtx.clearRect(0, 0, this.gfx.width, this.gfx.height);
+			this.gtx.fillStyle=UI.Colors["Label"];
 			for(cpu=0; cpu < SHM.P[0].CPU; cpu++)
 			{
 				for(i=0; i < 9; i++)
 					if(SHM.P[0].Boost[i] != 0)
 						if(!(SHM.C[cpu].RelativeRatio > SHM.P[0].Boost[i]))
 							break;
-				this.gtx.strokeStyle=Bar[i];
+				this.gtx.strokeStyle=barStyle[i];
 
-				var x=Math.round(SHM.C[cpu].RelativeRatio * 16), y=(h * cpu) + 2;
-				this.gtx.strokeRect(0, y, x, thickness);
+				var x=Math.round(SHM.C[cpu].RelativeRatio * 16),
+				    y=(h * cpu) + 2;
+				this.gtx.strokeRect(24, y, x, thickness);
+
+				this.gtx.fillText("#" + cpu, 2, y + 8);
 				this.gtx.fillText(SHM.C[cpu].RelativeRatio.toFixed(1), this.gfx.width - 24, y + 8);
 			}
 		}
 		break;
 		case "CSTATES":
 		{
-			var cpu=0, h=this.div.offsetHeight / SHM.P[0].CPU;
-			var thickness=h - 4;
+			var cpu=0, x=0, y=0, w=0, h=0;
 
-			this.gtx.clearRect(0, 0, this.div.offsetWidth, this.div.offsetHeight);
-			this.gtx.strokeStyle=this.gtx.fillStyle="#8fcefa";
+			this.gtx.clearRect(0, 0, this.gfx.width, this.gfx.height);
 			for(cpu=0; cpu < SHM.P[0].CPU; cpu++)
 			{
-				var x=Math.round(SHM.C[cpu].State.C0 * this.div.offsetWidth - 40), y=(h * cpu) + 2;
-				this.gtx.strokeRect(0, y, x, thickness);
-				this.gtx.fillText(100 * SHM.C[cpu].State.C0.toFixed(1) + "%", this.gfx.width - 32, y + 8);
+				x=(cpu * 48) + 8;
+				this.gtx.fillStyle=UI.Colors["Label"];
+				this.gtx.fillText("#" + cpu, x, 16);
+
+				this.gtx.beginPath();
+				x=(cpu * 48) + 8;
+				w=Math.round(10 * SHM.C[cpu].State.C0);
+				if(w > 0)
+				{
+					h=w * 16;
+					y=this.gfx.height - h - 16;
+					this.gtx.moveTo(x, y);
+					this.gtx.lineTo(x, y + h);
+					this.gtx.lineTo(x + 4, y + h);
+					this.gtx.lineTo(x + 4, y);
+					this.gtx.closePath();
+				}
+				this.gtx.fillStyle=UI.Colors["C0"];
+				this.gtx.fill();
+
+				this.gtx.beginPath();
+				x=x + 8;
+				w=Math.round(10 * SHM.C[cpu].State.C1);
+				if(w > 0)
+				{
+					h=w * 16;
+					y=this.gfx.height - h - 16;
+					this.gtx.moveTo(x, y);
+					this.gtx.lineTo(x, y + h);
+					this.gtx.lineTo(x + 4, y + h);
+					this.gtx.lineTo(x + 4, y);
+					this.gtx.closePath();
+				}
+				this.gtx.fillStyle=UI.Colors["C1"];
+				this.gtx.fill();
+
+				this.gtx.beginPath();
+				x=x + 8;
+				w=Math.round(10 * SHM.C[cpu].State.C3);
+				if(w > 0)
+				{
+					h=w * 16;
+					y=this.gfx.height - h - 16;
+					this.gtx.moveTo(x, y);
+					this.gtx.lineTo(x, y + h);
+					this.gtx.lineTo(x + 4, y + h);
+					this.gtx.lineTo(x + 4, y);
+					this.gtx.closePath();
+				}
+				this.gtx.fillStyle=UI.Colors["C3"];
+				this.gtx.fill();
+
+				this.gtx.beginPath();
+				x=x + 8;
+				w=Math.round(10 * SHM.C[cpu].State.C6);
+				if(w > 0)
+				{
+					h=w * 16;
+					y=this.gfx.height - h - 16;
+					this.gtx.moveTo(x, y);
+					this.gtx.lineTo(x, y + h);
+					this.gtx.lineTo(x + 4, y + h);
+					this.gtx.lineTo(x + 4, y);
+					this.gtx.closePath();
+				}
+				this.gtx.fillStyle=UI.Colors["C6"];
+				this.gtx.fill();
+
+				this.gtx.beginPath();
+				x=x + 8;
+				w=Math.round(10 * SHM.C[cpu].State.C7);
+				if(w > 0)
+				{
+					h=w * 16;
+					y=this.gfx.height - h - 16;
+					this.gtx.moveTo(x, y);
+					this.gtx.lineTo(x, y + h);
+					this.gtx.lineTo(x + 4, y + h);
+					this.gtx.lineTo(x + 4, y);
+					this.gtx.closePath();
+				}
+				this.gtx.fillStyle=UI.Colors["C7"];
+				this.gtx.fill();
 			}
 		}
 		break;
 		case "TEMPS":
 		{
-			var cpu=0, h=this.div.offsetHeight / SHM.P[0].CPU;
-			this.gtx.clearRect(0, 0, this.div.offsetWidth, this.div.offsetHeight);
-			this.gtx.fillStyle="#8fcefa";
+			var cpu=0, x=0, h=0;
+			this.gtx.clearRect(0, 0, this.gfx.width, this.gfx.height);
 			for(cpu=0; cpu < SHM.P[0].CPU; cpu++)
 			{
-				var y=(h * cpu) + 10;
-				this.gtx.fillText("#" + cpu, 2, y);
-				this.gtx.fillText(SHM.C[cpu].TjMax.Target - SHM.C[cpu].ThermStat.DTS, this.gfx.width - 20, y);
+				x=(32 * cpu) + 8;
+				this.gtx.fillStyle=UI.Colors["Label"];
+				this.gtx.fillText("#" + cpu, x, 16);
+				this.gtx.fillStyle=barStyle[cpu];
+				this.gtx.fillText(SHM.C[cpu].TjMax.Target - SHM.C[cpu].ThermStat.DTS, x, this.gfx.height - 8);
+
+				this.gtx.beginPath();
+				this.gtx.strokeStyle=barStyle[cpu];
+				var i=0;
+				Temps[cpu][i]=Temps[cpu][i + 1];
+				x=(32 * i) + 8;
+				this.gtx.moveTo(x, Temps[cpu][i]);
+
+				for(i=1; i < 8; i++) {
+					Temps[cpu][i]=Temps[cpu][i + 1];
+					x=(32 * i) + 8;
+					this.gtx.lineTo(x, Temps[cpu][i]);
+				}
+
+				Temps[cpu][i]=2 * SHM.C[cpu].ThermStat.DTS;
+				x=(32 * i) + 8;
+				this.gtx.lineTo(x, Temps[cpu][i]);
+				this.gtx.stroke();
 			}
 		}
 		break;
@@ -218,8 +349,24 @@ function Widget(id)
 }
 
 
+GetStyleValue=function(selector, property)
+{
+	var id=document.getElementById(selector), tmp=null, value=null;
 
-var UI={ WinStack:[], Launcher:null, Widgets:0 };
+	if(id == null) {
+		id=tmp=document.createElement("div");
+		id.setAttribute("id", selector);
+		id.style.display="none";
+		document.body.appendChild(id);
+	}
+	value=window.getComputedStyle(id).getPropertyValue(property);
+
+	if(tmp != null)
+		tmp.parentElement.removeChild(id);
+	return(value);
+}
+
+var UI={ WinStack:[], Launcher:null, Widgets:0, Colors:[] };
 
 UI.Init=function(bodyWidth, bodyHeight, allMargins)
 {
@@ -228,6 +375,11 @@ UI.Init=function(bodyWidth, bodyHeight, allMargins)
 	document.body.style.margin=allMargins + "px";
 
 	UI.Launcher=document.getElementById("Launcher");
+
+	var P=["Label", "Low", "Medium", "High", "Turbo", "C0", "C1", "C3", "C6", "C7", "Temps"];
+	for(i in P)
+		UI.Colors[P[i]]=GetStyleValue("Colors_" + P[i], "color");
+
 	UI.Add("Log");
 }
 
@@ -310,4 +462,77 @@ UI.Refresh=function()
 	for(i in UI.WinStack) {
 		UI.WinStack[i].Draw();
 	}
+}
+
+UI.Settings=function(what)
+{
+
+	switch(what)
+	{
+		case "COLORS":
+		{
+		}
+		break;
+	}
+}
+
+function rgbToHsv(triple)
+{
+	r=triple[0]/255, g=triple[1]/255, b=triple[2]/255;
+	var max=Math.max(r, g, b), min=Math.min(r, g, b);
+	var h, s, v=max;
+
+	var d=max - min;
+	s=max == 0 ? 0 : d / max;
+
+	if(max == min){
+		h = 0; // achromatic
+	} else {
+		switch(max) {
+			case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+			case g: h = (b - r) / d + 2; break;
+			case b: h = (r - g) / d + 4; break;
+		}
+		h /= 6;
+	}
+	return([h, s, v]);
+}
+
+function hsvToRgb(triple)
+{
+	var h=triple[0], s=triple[1], v=triple[2];
+	var r, g, b;
+
+	var i=Math.floor(h * 6);
+	var f=h * 6 - i;
+	var p=v * (1 - s);
+	var q=v * (1 - f * s);
+	var t=v * (1 - (1 - f) * s);
+
+	switch(i % 6) {
+		case 0: r=v, g=t, b=p; break;
+		case 1: r=q, g=v, b=p; break;
+		case 2: r=p, g=v, b=t; break;
+		case 3: r=p, g=q, b=v; break;
+		case 4: r=t, g=p, b=v; break;
+		case 5: r=v, g=p, b=q; break;
+	}
+	return([r * 255, g * 255, b * 255]);
+}
+
+function rgbToTriple(rgb)
+{
+	var str=rgb.match(/(\d+)/g);
+	var triple=[];
+	triple[0]=parseInt(str[0]);
+	triple[1]=parseInt(str[1]);
+	triple[2]=parseInt(str[2]);
+	return(triple);
+}
+
+function tripleToRgb(triple)
+{
+	return("rgb("	+ Math.round(triple[0])	+ ", "
+			+ Math.round(triple[1])	+ ", "
+			+ Math.round(triple[2]) + ")");
 }

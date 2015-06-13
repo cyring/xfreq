@@ -64,13 +64,26 @@ li:hover {
 #New {
 	color: #8fcefa;
 }
+#NewSubBar {
+	left: 0;
+}
+#Settings {
+	color: #8fcefa;
+	right: 16px;
+}
+#SettingsSubBar {
+	right: 0;
+}
 #New:hover ul, ul li ul:hover ul li ul {
+	display: block;
+}
+#Settings:hover ul, ul li ul:hover ul li ul {
 	display: block;
 }
 ul li ul li:hover {
 	border-right: #8fcefa 2px solid;
 }
-#footerZone {
+#FooterZone {
 	font-size: small;
 	position: absolute;
 	top: 95%;
@@ -128,4 +141,37 @@ ul li ul li:hover {
 #ControlBar div #SubmitDepth {
 	padding-left: 2px;
 	padding-right: 2px;
+}
+#Colors_Label {
+	color: #8fcefa;
+}
+#Colors_Low {
+	color: #6666b0;
+}
+#Colors_Medium {
+	color: #00aa66;
+}
+#Colors_High {
+	color: #e49400;
+}
+#Colors_Turbo {
+	color: #fd0000;
+}
+#Colors_C0 {
+	color: #adadff;
+}
+#Colors_C1 {
+	color: #50508a;
+}
+#Colors_C3 {
+	color: #515172;
+}
+#Colors_C6 {
+	color: #39395a;
+}
+#Colors_C7 {
+	color: #29292a;
+}
+#Colors_Temps {
+	color: #ffadad;
 }

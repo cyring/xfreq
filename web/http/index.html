@@ -17,14 +17,19 @@
 	<body onload="UI.Init(window.innerWidth, window.innerHeight, 4); CX.Init(location.hostname, location.port);" ondrop="UI.Drop(event);" ondragover="event.preventDefault();">
 		<ul id="Launcher" class="RunBar">
 			<li id="New" class="RunBar">+
-				<ul class="RunBar SubBar">
+				<ul id="NewSubBar" class="RunBar SubBar">
 					<li onclick='UI.Add("CORES");'>Core</li>
 					<li onclick='UI.Add("CSTATES");'>C-States</li>
 					<li onclick='UI.Add("TEMPS");'>Temps</li>
 				</ul>
 			</li>
+			<li id="Settings" class="RunBar">=
+				<ul id="SettingsSubBar" class="RunBar SubBar">
+					<li onclick='UI.Settings("COLORS");'>Colors</li>
+				</ul>
+			</li>
 		</ul>
-		<div id="footerZone">
+		<div id="FooterZone">
 			<span>
 				<p id="Brand"></p>
 			</span>
