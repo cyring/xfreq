@@ -1416,7 +1416,7 @@ int	OpenWidgets(uARG *A)
 						int cpu=0;
 						for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
 						{
-							if(A->SHM->C[cpu].T.Thread_ID == 0)
+							if((A->SHM->C[cpu].T.Thread_ID == 0) && (A->SHM->C[cpu].T.Offline != TRUE))
 								A->L.Play.showTemps[cpu]=TRUE;
 
 							A->L.Temps[cpu].N=TEMPS_TEXT_WIDTH;
@@ -2393,7 +2393,7 @@ void	BuildLayout(uARG *A, int G)
 							A->SHM->C[cpu].T.Thread_ID,
 							enabled(1));
 					else
-						sprintf(str, "%03u        -       -       -   [%3s]\n",
+						sprintf(str, "   %03u        -       -       -   [%3s]\n",
 							cpu,
 							enabled(0));
 					strcat(buf[0], str);

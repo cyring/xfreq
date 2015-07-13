@@ -174,8 +174,10 @@
  *
  * [HISTORY]
  *
- * R 2.1.53: 07/13/2015
+ * R 2.1.53-a: 07/13/2015
  *         - Fixed C7 average.
+ *         - Fixed offline Cores in the TEMPS widget.
+ *         - Left aligned topology list in the SYSINFO widget.
  *
  * R 2.1.52: 05/16/2015
  *         - Bit set calculator.
