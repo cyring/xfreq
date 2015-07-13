@@ -2232,7 +2232,7 @@ int main(int argc, char *argv[])
 								A.SHM->P.Avg.C0+=A.SHM->C[cpu].State.C0;
 								A.SHM->P.Avg.C3+=A.SHM->C[cpu].State.C3;
 								A.SHM->P.Avg.C6+=A.SHM->C[cpu].State.C6;
-								A.SHM->P.Avg.C6+=A.SHM->C[cpu].State.C7;
+								A.SHM->P.Avg.C7+=A.SHM->C[cpu].State.C7;
 								A.SHM->P.Avg.C1+=A.SHM->C[cpu].State.C1;
 
 								// Index the Top CPU speed.

@@ -174,8 +174,11 @@
  *
  * [HISTORY]
  *
+ * R 2.1.53: 07/13/2015
+ *         - Fixed C7 average.
+ *
  * R 2.1.52: 05/16/2015
- *         - Bit set calculator
+ *         - Bit set calculator.
  *
  * R 2.1.51-a: 03/21/2015
  *         - Centered the header of the CORE widget.
