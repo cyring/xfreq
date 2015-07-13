@@ -2411,7 +2411,7 @@ void	BuildLayout(uARG *A, int G)
 							A->SHM->C[cpu].FixedPerfCounter.EN2_Usr,
 							A->SHM->C[cpu].FixedPerfCounter.AnyThread_EN2);
 					else
-						sprintf(str, "      %03u      -     -     -            -     -     -            -     -     -\n", cpu);
+						sprintf(str, "      %03u  -     -     -           -     -    -            -     -     -\n", cpu);
 					strcat(buf[1], str);
 				}
 				strcat(items, buf[0]);
