@@ -14,7 +14,7 @@ XFreq is also programmed for Core 2 and other Intel 64-bits architectures.
 XFreq provides functionalities to play with:
  * Core Frequencies, Ratios and *Turbo Boost*
  * CPU Cycles, IPS, IPC, CPI
- * CPU C-States `C0 C1 C3 C6`
+ * CPU C-States `C0 C1 C3 C6 C7`
  * Discrete Temperature per thread core
  * Processor features `[Yes]|[No]` and their activation state `[ON]|[OFF]`
  * Read and write MSR registers
@@ -249,7 +249,7 @@ $ xfreq-gui
  * Bit set calculator.
  * Added Performance Monitor Features.
  * New commands to enable, disable C3 and C1 auto demotion.
- * C7 state is implemented. (_need alpha testers to confirm ?_)
+ * C7 state is implemented.
  * ![alt text](http://blog.cyring.free.fr/images/xfreq-cstates-R2148.png "CSTATES")
  * 3 performance ratios:
   * IPS (Instructions Per Second)
