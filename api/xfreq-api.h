@@ -13,7 +13,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "53"
+#define _NIGHTLY "54"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #if defined(Linux)
@@ -702,6 +702,11 @@ enum {	GenuineIntel,		\
 	Atom_Saltwell,		\
 	Silvermont_637,		\
 	Silvermont_64D,		\
+	Atom_Airmont,		\
+	Atom_Goldmont,		\
+	Atom_Sofia,		\
+	Atom_Merrifield,	\
+	Atom_Moorefield,	\
 	Nehalem_Bloomfield,	\
 	Nehalem_Lynnfield,	\
 	Nehalem_MB,		\
@@ -717,6 +722,13 @@ enum {	GenuineIntel,		\
 	Haswell_MB,		\
 	Haswell_ULT,		\
 	Haswell_ULX,		\
+	Broadwell,		\
+	Broadwell_EP,		\
+	Broadwell_H,		\
+	Broadwell_EX,		\
+	Skylake_UY,		\
+	Skylake_S,		\
+	Skylake_E,		\
 	ARCHITECTURES
 };
 

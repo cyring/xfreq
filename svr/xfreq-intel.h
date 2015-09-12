@@ -111,6 +111,16 @@ int	Write_MSR(int FD, int msr, unsigned long long int *data) \
 //	[Silvermont]	06_37H, 06_4DH
 #define	_Silvermont_637			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x3, .Model=0x7}
 #define	_Silvermont_64D			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x4, .Model=0xD}
+//	[Airmont]	06_4CH
+#define	_Atom_Airmont			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x4, .Model=0xC}
+//	[Goldmont]	06_5CH
+#define	_Atom_Goldmont			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x5, .Model=0xC}
+//	[SoFIA]		06_5DH
+#define	_Atom_Sofia			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x5, .Model=0xD}
+//	[Merrifield]	06_4AH
+#define	_Atom_Merrifield		{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x4, .Model=0xA}
+//	[Moorefield]	06_5AH
+#define	_Atom_Moorefield		{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x5, .Model=0xA}
 //	[Nehalem]	06_1AH, 06_1EH, 06_1FH, 06_2EH
 #define	_Nehalem_Bloomfield		{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x1, .Model=0xA}
 #define	_Nehalem_Lynnfield		{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x1, .Model=0xE}
@@ -131,6 +141,15 @@ int	Write_MSR(int FD, int msr, unsigned long long int *data) \
 #define	_Haswell_MB			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x3, .Model=0xF}
 #define	_Haswell_ULT			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x4, .Model=0x5}
 #define	_Haswell_ULX			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x4, .Model=0x6}
+//	[Broadwell]	06_3DH, 06_56H, 06_47H, 06_4FH
+#define	_Broadwell			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x3, .Model=0xD}
+#define	_Broadwell_EP			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x5, .Model=0x6}
+#define	_Broadwell_H			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x4, .Model=0x7}
+#define	_Broadwell_EX			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x4, .Model=0xF}
+//	[Skylake]	06_4EH, 06_5EH, 06_55H
+#define	_Skylake_UY			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x4, .Model=0xE}
+#define	_Skylake_S			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x5, .Model=0xE}
+#define	_Skylake_E			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x5, .Model=0x5}
 
 typedef	struct
 {

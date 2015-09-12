@@ -135,18 +135,18 @@
  *  Hardware
  * ----------
  *
- * + power energy performance counters
+ * + power energy performance counters : Postponed.
  *
- * + kernel module : to reduce cpu usage near to 0.01% : In Progress.
+ * + kernel module : to reduce cpu usage near to 0.01% : Merge with CoreFreq Linux driver.
  *
- * + memory fetch : to remove dependancies with the dmi_sysfs & msr Linux modules.
+ * + memory fetch : to remove dependancies with the dmi_sysfs & msr Linux modules : Canceled.
  *     using a R/O mmap to "/dev/mem".
  *     rather use the msr assembler instruction.
  *
  * + GPU sensors.
- *     compile with the NVIDIA (first), the AMD & Intel frameworks (seconds) ?
+ *     compile with the NVIDIA (first), the AMD & Intel frameworks (seconds) : Postponed.
  *
- * + scripting, editor, push alarms : write user defined bit values in MSR.
+ * + scripting, editor, push alarms : write user defined bit values in MSR : Terminated.
  *
  *
  *  Graphical
@@ -156,23 +156,29 @@
  *     select a Policy Preference in IA32_ENERGY_PERF_BIAS , MSR_MISC_PWR_MGMT(0x1aa),
  *     set On-Demand Clock Modulation in IA32_CLOCK_MODULATION(0x19a) (duplicated for each Thread),
  *     enable / disable C1E in MSR_POWER_CTL(0x1fc): Done,
- *     C-State auto demotion with MSR_PKG_CST_CONFIG_CONTROL(0xe2).
+ *     C-State auto demotion with MSR_PKG_CST_CONFIG_CONTROL(0xe2): Done.
  * + some button-switchs & sliders to enable/disable/set the PKG/Core features in the System Info Widget.
- * + full transparency & opacity.
- * + integrate XCB, wayland ?
- * + screenshot key.
- * + resize footer separator w/ MDI.
+ * + full transparency & opacity: Canceled.
+ * + integrate XCB, wayland : Canceled.
+ * + screenshot key : Canceled.
+ * + resize footer separator w/ MDI : Postponed.
  *
  *
  *  Source code
  * -------------
  * + provide some configure and install scripts,
  *     ArchLinux PKGBUILD : Done.
- *     FreeBSD port: ToDo.
- * + threads asynchronism changed to Atomic Variables
+ *     FreeBSD port: Partial.
  *
  *
  * [HISTORY]
+ *
+ * R 2.1.54 : 09/12/2015
+ *         - Architectures added into database:
+ *             Atom_Airmont, Atom_Goldmont, Atom_Sofia, Atom_Merrifield, Atom_Moorefield,
+ *             Broadwell, Broadwell_EP, Broadwell_H, Broadwell_EX,
+ *             Skylake_UY, Skylake_S, Skylake_E
+ *         - Default Atom base clock speed set to 100 MHz
  *
  * R 2.1.53-a: 07/13/2015
  *         - Fixed C7 average.

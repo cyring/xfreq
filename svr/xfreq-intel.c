@@ -610,12 +610,12 @@ double	ClockSpeed_Atom()
 				return(166.40f);
 				break;
 			default:
-				return(83.20f);
+				return(100.00f);
 				break;
 		}
 	}
 	else
-		return(83.00f);
+		return(100.00f);
 };
 
 // [Silvermont]
@@ -1949,6 +1949,11 @@ int main(int argc, char *argv[])
 			{ _Atom_Saltwell,        2,  ClockSpeed_Atom,                 "Atom/Saltwell",             uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
 			{ _Silvermont_637,       4,  ClockSpeed_Silvermont,           "Silvermont",                uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
 			{ _Silvermont_64D,       4,  ClockSpeed_Silvermont,           "Silvermont",                uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Atom_Airmont,         4,  ClockSpeed_Atom,                 "Atom/Airmont",              uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Atom_Goldmont,        4,  ClockSpeed_Atom,                 "Atom/Goldmont",             uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Atom_Sofia,           4,  ClockSpeed_Atom,                 "Atom/Sofia",                uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Atom_Merrifield,      2,  ClockSpeed_Atom,                 "Atom/Merrifield",           uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Atom_Moorefield,      4,  ClockSpeed_Atom,                 "Atom/Moorefield",           uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
 			{ _Nehalem_Bloomfield,   4,  ClockSpeed_Nehalem_Bloomfield,   "Nehalem/Bloomfield",        uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
 			{ _Nehalem_Lynnfield,    4,  ClockSpeed_Nehalem_Lynnfield,    "Nehalem/Lynnfield",         uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
 			{ _Nehalem_MB,           2,  ClockSpeed_Nehalem_MB,           "Nehalem/Mobile",            uCycle_Nehalem,      Init_MSR_Nehalem,      Close_MSR_Counters },
@@ -1964,6 +1969,13 @@ int main(int argc, char *argv[])
 			{ _Haswell_MB,           4,  ClockSpeed_Haswell_MB,           "Haswell/Mobile",            uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
 			{ _Haswell_ULT,          2,  ClockSpeed_Haswell_ULT,          "Haswell/Ultra Low TDP",     uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
 			{ _Haswell_ULX,          2,  ClockSpeed_Haswell_ULX,          "Haswell/Ultra Low eXtreme", uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Broadwell,            2,  ClockSpeed_Haswell_DT,           "Broadwell/Mobile",          uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Broadwell_EP,        22,  ClockSpeed_Haswell_DT,           "Broadwell/EP",              uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Broadwell_H,          4,  ClockSpeed_Haswell_DT,           "Broadwell/H",               uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Broadwell_EX,        24,  ClockSpeed_Haswell_DT,           "Broadwell/EX",              uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Skylake_UY,           2,  ClockSpeed_Haswell_DT,           "Skylake/UY",                uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Skylake_S,            4,  ClockSpeed_Haswell_DT,           "Skylake/S",                 uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters },
+			{ _Skylake_E,            4,  ClockSpeed_Haswell_DT,           "Skylake/E",                 uCycle_SandyBridge,  Init_MSR_Nehalem,      Close_MSR_Counters }
 		},
 		.Loader={.Monitor=TRUE, .Array=DUMP_LOADER},
 		.LOOP=TRUE,
