@@ -173,6 +173,9 @@
  *
  * [HISTORY]
  *
+ * R 2.1.55 : 09/13/2015
+ *         - Core2/Conroe/Yonah architecture added into database.
+ *
  * R 2.1.54 : 09/12/2015
  *         - Architectures added into database:
  *             Atom_Airmont, Atom_Goldmont, Atom_Sofia, Atom_Merrifield, Atom_Moorefield,

@@ -1940,6 +1940,7 @@ int main(int argc, char *argv[])
 			{ _Core_Yonah,           2,  ClockSpeed_Core,                 "Core/Yonah",                uCycle_GenuineIntel, Init_MSR_GenuineIntel, Close_MSR_Only     },
 			{ _Core_Conroe,          2,  ClockSpeed_Core2,                "Core2/Conroe",              uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
 			{ _Core_Kentsfield,      4,  ClockSpeed_Core2,                "Core2/Kentsfield",          uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
+			{ _Core_Conroe_616,      4,  ClockSpeed_Core2,                "Core2/Conroe/Yonah",          uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
 			{ _Core_Yorkfield,       4,  ClockSpeed_Core2,                "Core2/Yorkfield",           uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
 			{ _Core_Dunnington,      6,  ClockSpeed_Core2,                "Xeon/Dunnington",           uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },
 			{ _Atom_Bonnell,         2,  ClockSpeed_Atom,                 "Atom/Bonnell",              uCycle_Core,         Init_MSR_Core,         Close_MSR_Counters },

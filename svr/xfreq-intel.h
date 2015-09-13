@@ -100,6 +100,7 @@ int	Write_MSR(int FD, int msr, unsigned long long int *data) \
 //	[Core2]		06_0FH, 06_15H, 06_17H, 06_1D
 #define	_Core_Conroe			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x0, .Model=0xF}
 #define	_Core_Kentsfield		{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x1, .Model=0x5}
+#define	_Core_Conroe_616		{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x1, .Model=0x6}
 #define	_Core_Yorkfield			{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x1, .Model=0x7}
 #define	_Core_Dunnington		{.ExtFamily=0x0, .Family=0x6, .ExtModel=0x1, .Model=0xD}
 //	[Atom]		06_1CH, 06_26H, 06_27H (32 bits), 06_35H (32 bits), 06_36H

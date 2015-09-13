@@ -13,7 +13,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "54"
+#define _NIGHTLY "55"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #if defined(Linux)
@@ -693,6 +693,7 @@ enum {	GenuineIntel,		\
 	Core_Yonah,		\
 	Core_Conroe,		\
 	Core_Kentsfield,	\
+	Core_Conroe_616,	\
 	Core_Yorkfield,		\
 	Core_Dunnington,	\
 	Atom_Bonnell,		\
