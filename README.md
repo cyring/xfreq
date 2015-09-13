@@ -1,6 +1,6 @@
 # XFreq
 ## Purpose
-XFreq provides a GUI to monitor the Processor frequencies (including Turbo Boost), the temperatures, C-States; and alter the operational features of the Intel Core i7 processor.
+XFreq provides a GUI to monitor the Processor frequencies (including Turbo Boost), the temperatures, C-States, and to alter the operational features of the Intel Core i7 processor.  
 XFreq is also programmed for Core 2 and other Intel 64-bits architectures.
 
 ![alt text](http://blog.cyring.free.fr/images/XFreq-core-R2151.png "CORE")
@@ -29,7 +29,8 @@ XFreq provides functionalities to play with:
  * The GUI Gadgets can be started as one MDI window or spanned in several Widgets, using the built-in window manager:
   * Right mouse button to move the Widgets on screen.
   * Left, to scroll Widgets, or push the GUI buttons and run the associated command.
- * A commands set allows to drive the Processor features, such as enabling, disabling `SpeedStep`, `Turbo Boost`, `Thermal Control`; but also, miscellaneous XFreq functionalities, such as setting the RGB colors, font and layout; save and load from the configuration file.
+ * A commands set allows to drive the Processor features, such as enabling, disabling `SpeedStep`, `Turbo Boost`, `Thermal Control`;  
+   but also, miscellaneous XFreq functionalities, such as setting the RGB colors, font and layout; save and load from the configuration file.
  * The Widgets disposal is specified with the program options. See the help below.
  * The tasks scheduled by the kernel among the CPU Cores are shown in real time.
 ![alt text](http://blog.cyring.free.fr/images/xfreq-task-scheduling.png "TASKS, lets you know what's going on in your system !")
@@ -71,25 +72,55 @@ make
 
  6- To display the help, enter:
 ```
-xfreq-gui -h
-Usage: xfreq-gui [-option argument] .. [-option argument]
+$ xfreq-gui -h
+XFreq-Gui usage:
+        xfreq-gui [-option argument] .. [-option argument]
 
-        -h      Print out this message
+where options include:
         -C      Path & file configuration name (String)
                   this option must be first
                   default is '$HOME/.xfreq'
         -D      Run as a MDI Window (Bool) [0/1]
         -U      Bitmap of unmap Widgets (Hex) eq. 0b00111111
                   where each bit set in the argument is a hidden Widget
+        -u      Set the cursor shape (Bool) [0/1]
         -F      Font name (String)
                   default font is 'Fixed'
         -x      Enable or disable the X ACL (Char) ['Y'/'N']
         -g      Widgets geometries (String)
-                  argument is a series of '[cols]x[rows]+[x]+[y], .. ,'
+                  argument is a series of '#:[cols]x[rows]+[x]+[y], .. ,'
         -b      Background color (Hex) {RGB}
                   argument is coded with primary colors 0xRRGGBB
         -f      Foreground color (Hex) {RGB}
-        -c      Pick up an architecture # (Char)
+        -l      Fill or not the graphics (Bool) [0/1]
+        -z      Show the Core frequency (Bool) [0/1]
+        -y      Show the Core Cycles (Bool) [0/1]
+        -j      Show the Instructions Per Second (Bool) [0/1]
+        -J      Show the Instructions Per Cycle (Bool) [0/1]
+        -i      Show the Cycles Per Instructions (Bool) [0/1]
+        -r      Show the Core Ratio (Bool) [0/1]
+        -p      Show the Core C-State percentage (Bool) [0/1]
+        -w      Scroll the Processor brand wallboard (Bool) [0/1]
+        -o      Keep the Widgets always on top of the screen (Bool) [0/1]
+        -n      Remove the Window Manager decorations (Bool) [0/1]
+        -N      Remove the Widgets title name from the WM taskbar (Bool) [0/1]
+        -I      Splash screen attributes 0x{H}{NNN} (Hex)
+                  where {H} bit:13 hides Splash and {NNN} (usec) defers start-up
+        -v      Print version information
+        -h      Print out this message
+
+Exit status:
+0       if OK,
+1       if problems,
+2       if serious trouble.
+```
+```
+# xfreq-intel -h
+XFreq-Intel usage:
+        xfreq-intel [-option argument] .. [-option argument]
+
+where options include:
+        -c      Pick up an architecture # (Int)
                   refer to the '-A' option
         -S      Clock source (Int)
                   argument is one of the [0]TSC [1]BIOS [2]SPEC [3]ROM [4]USER
@@ -97,22 +128,15 @@ Usage: xfreq-gui [-option argument] .. [-option argument]
                   argument is the BCLK memory address to read from
         -s      Idle time multiplier (Int)
                   argument is a coefficient multiplied by 50000 usec
-        -l      Fill or not the graphics (Bool) [0/1]
-        -z      Show the Core frequency (Bool) [0/1]
-        -y      Show the Core Cycles (Bool) [0/1]
-        -r      Show the Core Ratio (Bool) [0/1]
+        -d      Registers dump enablement (Bool)
         -t      Task scheduling monitoring sorted by 0x{R}0{N} (Hex)
                   where {R} bit:8 is set to reverse sorting
                   and {N} is one '/proc/sched_debug' field# from [0x1] to [0xb]
-        -p      Show the Core C-State percentage (Bool) [0/1]
-        -w      Scroll the Processor brand wallboard (Bool) [0/1]
-        -o      Keep the Widgets always on top of the screen (Bool) [0/1]
-        -n      Remove the Window Manager decorations (Bool) [0/1]
-        -N      Remove the Widgets title name from the WM taskbar (Bool) [0/1]
-        -i      Splash screen attributes 0x{H}{NNN} (Hex)
-                  where {H} bit:11 hides Splash and {NNN} (usec) defers start-up
+        -z      Reset the MSR counters (Bool)
+        -B      Enable SmBIOS (Bool)
         -A      Print out the built-in architectures
         -v      Print version information
+        -h      Print out this message
 
 Exit status:
 0       if OK,
@@ -128,34 +152,47 @@ The algorithms employed are introduced in the [Algorithms Wiki]
      Architecture              Family         CPU        FSB Clock
   #                            _Model        [max]        [ MHz ]
 
-  0  Genuine                   00_00            2         100.00
+  0  GenuineIntel              00_00            2         100.00
   1  Core/Yonah                06_0E            2         100.00
   2  Core2/Conroe              06_0F            2         266.67
   3  Core2/Kentsfield          06_15            4         266.67
-  4  Core2/Yorkfield           06_17            4         266.67
-  5  Xeon/Dunnington           06_1D            6         266.67
-  6  Atom/Bonnell              06_1C            2          83.00
-  7  Atom/Silvermont           06_26            8          83.00
-  8  Atom/Lincroft             06_27            1          83.00
-  9  Atom/Clovertrail          06_35            2          83.00
- 10  Atom/Saltwell             06_36            2          83.00
- 11  Silvermont                06_37            4          83.30
- 12  Silvermont                06_4D            4          83.30
- 13  Nehalem/Bloomfield        06_1A            4         133.33
- 14  Nehalem/Lynnfield         06_1E            4         133.33
- 15  Nehalem/Mobile            06_1F            2         133.33
- 16  Nehalem/eXtreme.EP        06_2E            8         133.33
- 17  Westmere                  06_25            2         133.33
- 18  Westmere/EP               06_2C            6         133.33
- 19  Westmere/eXtreme          06_2F           10         133.33
- 20  SandyBridge               06_2A            4         100.00
- 21  SandyBridge/eXtreme.EP    06_2D            6         100.00
- 22  IvyBridge                 06_3A            4         100.00
- 23  IvyBridge/EP              06_3E            6         100.00
- 24  Haswell/Desktop           06_3C            4         100.00
- 25  Haswell/Mobile            06_3F            4         100.00
- 26  Haswell/Ultra Low TDP     06_45            2         100.00
- 27  Haswell/Ultra Low eXtreme 06_46            2         100.00
+  4  Core2/Conroe/Yonah        06_16            4         266.67
+  5  Core2/Yorkfield           06_17            4         266.67
+  6  Xeon/Dunnington           06_1D            6         266.67
+  7  Atom/Bonnell              06_1C            2         100.00
+  8  Atom/Silvermont           06_26            8         100.00
+  9  Atom/Lincroft             06_27            1         100.00
+ 10  Atom/Clovertrail          06_35            2         100.00
+ 11  Atom/Saltwell             06_36            2         100.00
+ 12  Silvermont                06_37            4          83.30
+ 13  Silvermont                06_4D            4          83.30
+ 14  Atom/Airmont              06_4C            4         100.00
+ 15  Atom/Goldmont             06_5C            4         100.00
+ 16  Atom/Sofia                06_5D            4         100.00
+ 17  Atom/Merrifield           06_4A            2         100.00
+ 18  Atom/Moorefield           06_5A            4         100.00
+ 19  Nehalem/Bloomfield        06_1A            4         133.33
+ 20  Nehalem/Lynnfield         06_1E            4         133.33
+ 21  Nehalem/Mobile            06_1F            2         133.33
+ 22  Nehalem/eXtreme.EP        06_2E            8         133.33
+ 23  Westmere                  06_25            2         133.33
+ 24  Westmere/EP               06_2C            6         133.33
+ 25  Westmere/eXtreme          06_2F           10         133.33
+ 26  SandyBridge               06_2A            4         100.00
+ 27  SandyBridge/eXtreme.EP    06_2D            6         100.00
+ 28  IvyBridge                 06_3A            4         100.00
+ 29  IvyBridge/EP              06_3E            6         100.00
+ 30  Haswell/Desktop           06_3C            4         100.00
+ 31  Haswell/Mobile            06_3F            4         100.00
+ 32  Haswell/Ultra Low TDP     06_45            2         100.00
+ 33  Haswell/Ultra Low eXtreme 06_46            2         100.00
+ 34  Broadwell/Mobile          06_3D            2         100.00
+ 35  Broadwell/EP              06_56           22         100.00
+ 36  Broadwell/H               06_47            4         100.00
+ 37  Broadwell/EX              06_4F           24         100.00
+ 38  Skylake/UY                06_4E            2         100.00
+ 39  Skylake/S                 06_5E            4         100.00
+ 40  Skylake/E                 06_55            4         100.00
 ```
 _Tips_: you can force an architecture with the `-c` option.
 
@@ -227,7 +264,7 @@ The files repository is the following:
 ### Build
 The v2.1 is delivered with [Code::Blocks](http://www.codeblocks.org) project files.
 
-An Arch Linux PKGBUILD is available in the [aur](https://aur.archlinux.org/packages/xfreq) repository.
+An Arch Linux PKGBUILD is available in the [aur](http://aur.archlinux.org/packages/xfreq-git) repository.
 
 Package is systemd compliant.
 
@@ -244,6 +281,7 @@ $ xfreq-gui
 ... and in the reverse order to shutdown.
 
 ## News
+ * New architectures implemented: Skylake, Broadwell
  * Web UI alpha release preview.
  * ![alt text](http://blog.cyring.free.fr/images/XFreq-WebUI.png "XFreq Web UI")
  * Bit set calculator.
