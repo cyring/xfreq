@@ -2268,8 +2268,8 @@ void	BuildLayout(uARG *A, int G)
 			if(A->L.Page[G].Pageable)
 			{
 				char 		*items=calloc(12288, 1);
-				#define		powered(bit) ((bit == 1) ? 'Y' : 'N')
-				#define		enabled(bit) ((bit == 1) ? "ON" : "OFF")
+				#define		powered(bit) ((bit) ? 'Y' : 'N')
+				#define		enabled(bit) ((bit) ? "ON" : "OFF")
 				const char	*ClockSrcStr[SRC_COUNT]={"TSC", "BIOS", "SPEC", "ROM", "AUX"};
 
 				sprintf(items, PROC_FORMAT,

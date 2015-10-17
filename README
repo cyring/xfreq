@@ -173,6 +173,9 @@
  *
  * [HISTORY]
  *
+ * R 2.1.57 : 10/17/2015
+ *         - GUI: fixed warning [-Wlogical-not-parentheses]
+ *
  * R 2.1.55 : 09/13/2015
  *         - Core2/Conroe/Yonah architecture added into database.
  *
