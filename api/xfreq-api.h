@@ -13,7 +13,7 @@
 
 #define _MAJOR   "2"
 #define _MINOR   "1"
-#define _NIGHTLY "57"
+#define _NIGHTLY "58"
 #define AutoDate _APPNAME" "_MAJOR"."_MINOR"-"_NIGHTLY" (C) CYRIL INGENIERIE "__DATE__"\n"
 
 #if defined(Linux)
@@ -763,6 +763,7 @@ typedef	struct
 			nsec_low;
 } RUNTIME;
 
+#define	CACHE_MAX_LEVEL	3
 typedef	struct
 {
 	Bool32		Offline;
@@ -770,6 +771,49 @@ typedef	struct
 			APIC_ID	 : 32-0,
 			Core_ID	 : 32-0,
 			Thread_ID: 32-0;
+	struct
+	{
+		union
+		{
+			struct
+			{
+				unsigned int
+				Type:	 5-0,
+				Level:	 8-5,
+				Init:	 9-8,
+				Assoc:	10-9,
+				Unused:	14-10,
+				MaxID:	26-14,
+				PerPkg:	32-26;
+			};
+			unsigned int AX;
+		};
+		union
+		{
+			struct
+			{
+				unsigned int
+				Linez:	12-0,
+				Parts:	22-12,
+				Ways:	32-22;
+			};
+			unsigned int BX;
+		};
+		unsigned int	Sets;
+		union
+		{
+			struct
+			{
+				unsigned int
+				WrBack:	 1-0,
+				Inclus:	 2-1,
+				Direct:	 3-2,
+				Resrvd: 32-3;
+			};
+			unsigned int DX;
+		};
+		unsigned int	Size;
+	} Cache[CACHE_MAX_LEVEL];
 } TOPOLOGY;
 
 typedef	struct {

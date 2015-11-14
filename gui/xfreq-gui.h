@@ -360,9 +360,9 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"\n"											\
 			"Base Clock [%5.2f] MHz                                  Source [%s]\n"			\
 			"\n"											\
-			" Family               Model             Stepping              Max# of\n"		\
-			"  Code                 No.                 ID                 Threads\n"		\
-			"[%6X]            [%6X]            [%6d]             [%6d]\n"				\
+			" Family               Model             Stepping              Online /\n"		\
+			"  Code                 No.                 ID                 Max CPU\n"		\
+			"[%6X]            [%6X]            [%6d]             [%3u/%3d]\n"				\
 			"\n"											\
 			"Architecture [%s]\n"									\
 			"\n"											\
@@ -429,9 +429,9 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"|- SYSCALL   [%c][%3s]                    IA32e[%3s]\n"				\
 			"\n"
 
-#define	TOPOLOGY_SECTION "Processor Topology                                           %3u x CPU Online\n"	\
-			"|- CPU#    APIC    Core  Thread   State\n"
-#define	TOPOLOGY_FORMAT	"   %03u %8u%8u%8u   [%3s]\n"
+#define	TOPOLOGY_SECTION "Processor & Caches Topology\n"							\
+			"|- CPU#    APIC    Core  Thread   State |    Inst    Data  Unified\n"
+#define	TOPOLOGY_FORMAT	"   %03u %8u%8u%8u   [%3s] |%s\n"
 
 #define	PERF_SECTION	"\n"											\
 			"Performance Monitoring\n"								\

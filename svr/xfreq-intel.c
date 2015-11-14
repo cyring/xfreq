@@ -967,6 +967,31 @@ void	Read_Features(FEATURES *features)
 	}
 }
 
+void Cache_Topology(TOPOLOGY *T)
+{
+	unsigned int level=0x0;
+	for(level=0; level < CACHE_MAX_LEVEL; level++)
+	{
+		asm volatile
+		(
+			"cpuid"
+			: "=a"	(T->Cache[level].AX),
+			  "=b"	(T->Cache[level].BX),
+			  "=c"	(T->Cache[level].Sets),
+			  "=d"	(T->Cache[level].DX)
+			: "a"	(0x4),
+			  "c"	(level)
+#if defined(FreeBSD)
+			: "rax", "rbx", "rcx", "rdx"
+#endif
+		);
+		T->Cache[level].Size	= (T->Cache[level].Sets + 1)
+					* (T->Cache[level].Linez + 1)
+					* (T->Cache[level].Parts + 1)
+					* (T->Cache[level].Ways + 1);
+	}
+}
+
 // Enumerate the Processor's Cores and Threads topology.
 static void *uReadAPIC(void *uApic)
 {
@@ -1034,11 +1059,15 @@ static void *uReadAPIC(void *uApic)
 
 		A->SHM->C[cpu].T.APIC_ID=ExtTopology.DX.x2APIC_ID;
 		A->SHM->C[cpu].T.Offline=FALSE;
+
+		Cache_Topology(&A->SHM->C[cpu].T);
 	}
 	else
 	{
 		A->SHM->C[cpu].T.APIC_ID=-1;
 		A->SHM->C[cpu].T.Offline=TRUE;
+
+		memset(&A->SHM->C[cpu].T.Cache, 0, CACHE_MAX_LEVEL * sizeof(A->SHM->C[cpu].T.Cache));
 	}
 	return(NULL);
 }
@@ -1084,7 +1113,7 @@ unsigned int inl(int fd, unsigned int addr)
 }
 void outl(int fd, unsigned int addr, unsigned int val)
 {
-	struct	iodev_pio_req out={.access=IODEV_PIO_READ, .port=addr, .width=4, .val=val};
+	struct	iodev_pio_req out={.access=IODEV_PIO_WRITE, .port=addr, .width=4, .val=val};
 	int rc=ioctl(fd, IODEV_PIO, &out);
 }
 
@@ -1096,7 +1125,7 @@ Bool32	IMC_Read_Info(uARG *A)
 		unsigned int bus=0xff, dev=0x4, func=0;
 		outl(fd, PCI_CONFIG_ADDRESS(bus, 3, 0, 0x48), 0xcf8);
 		int code=(inw(fd, 0xcfc + (0x48 & 2)) >> 8) & 0x7;
-		A->SHM->M.ChannelCount=(code == 7 ? 3 : code == 4 ? 1 : code == 2 ? 1 : code == 1 ? 1 : 2);
+		A->SHM->M.ChannelCount=(code == 7 ? 3 : code == 4 ? 1 : code == 2 ? 1 : code == 1 ? 1 : code != 0 ? 2 : 0);
 
 		unsigned int cha=0;
 		for(cha=0; cha < MIN(A->SHM->M.ChannelCount, IMC_MAX); cha++)
@@ -1140,8 +1169,8 @@ Bool32	IMC_Read_Info(uARG *A)
 		unsigned int bus=0xff, dev=0x4, func=0;
 		outl(PCI_CONFIG_ADDRESS(bus, 3, 0, 0x48), 0xcf8);
 		int code=(inw(0xcfc + (0x48 & 2)) >> 8) & 0x7;
-		A->SHM->M.ChannelCount=(code == 7 ? 3 : code == 4 ? 1 : code == 2 ? 1 : code == 1 ? 1 : 2);
-
+		A->SHM->M.ChannelCount=(code == 7 ? 3 : code == 4 ? 1 : code == 2 ? 1 : code == 1 ? 1 : code != 0 ? 2 : 0);
+/*	printf("inw(%x):[%x]\n", (0xcfc + (0x48 & 2)), inw(0xcfc + (0x48 & 2)));*/
 		unsigned int cha=0;
 		for(cha=0; cha < MIN(A->SHM->M.ChannelCount, IMC_MAX); cha++)
 		{

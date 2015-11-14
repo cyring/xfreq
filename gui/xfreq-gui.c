@@ -2278,7 +2278,7 @@ void	BuildLayout(uARG *A, int G)
 					A->SHM->P.Features.Std.AX.ExtFamily + A->SHM->P.Features.Std.AX.Family,
 					(A->SHM->P.Features.Std.AX.ExtModel << 4) + A->SHM->P.Features.Std.AX.Model,
 					A->SHM->P.Features.Std.AX.Stepping,
-					A->SHM->P.Features.ThreadCount,
+					A->SHM->P.OnLine, A->SHM->P.Features.ThreadCount,
 					A->SHM->H.Architecture,
 					powered(A->SHM->P.Features.Std.DX.VME),
 					powered(A->SHM->P.Features.Std.DX.DE),
@@ -2361,7 +2361,7 @@ void	BuildLayout(uARG *A, int G)
 					(A->SHM->P.ExtFeature.LMA) ? "ON" : "DIS");
 
 				char *buf[2]={malloc(1024), malloc(2048)};
-				sprintf(buf[0], TOPOLOGY_SECTION, A->SHM->P.OnLine);
+				sprintf(buf[0], TOPOLOGY_SECTION);
 				sprintf(buf[1], PERF_SECTION, A->SHM->P.Features.Perf_Monitoring_Leaf.AX.Version,
 						powered(!A->SHM->P.Features.Perf_Monitoring_Leaf.BX.CoreCycles),
 						powered(!A->SHM->P.Features.Perf_Monitoring_Leaf.BX.InstrRetired),
@@ -2386,12 +2386,22 @@ void	BuildLayout(uARG *A, int G)
 				for(cpu=0; cpu < A->SHM->P.CPU; cpu++)
 				{
 					if(A->SHM->C[cpu].T.Offline != TRUE)
+					{
+						char caches[64]={0}, size[16];
+						unsigned int level=0x0;
+						for(level=0; level < CACHE_MAX_LEVEL; level++)
+						{
+							sprintf(size, "  %6u", A->SHM->C[cpu].T.Cache[level].Size);
+							strcat(caches, size);
+						}
 						sprintf(str, TOPOLOGY_FORMAT,
 							cpu,
 							A->SHM->C[cpu].T.APIC_ID,
 							A->SHM->C[cpu].T.Core_ID,
 							A->SHM->C[cpu].T.Thread_ID,
-							enabled(1));
+							enabled(1),
+							caches);
+					}
 					else
 						sprintf(str, "   %03u        -       -       -   [%3s]\n",
 							cpu,

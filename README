@@ -158,9 +158,6 @@
  *     enable / disable C1E in MSR_POWER_CTL(0x1fc): Done,
  *     C-State auto demotion with MSR_PKG_CST_CONFIG_CONTROL(0xe2): Done.
  * + some button-switchs & sliders to enable/disable/set the PKG/Core features in the System Info Widget.
- * + full transparency & opacity: Canceled.
- * + integrate XCB, wayland : Canceled.
- * + screenshot key : Canceled.
  * + resize footer separator w/ MDI : Postponed.
  *
  *
@@ -172,6 +169,9 @@
  *
  *
  * [HISTORY]
+ *
+ * R 2.1.58 : 11/14/2015
+ *         - Caches topology.
  *
  * R 2.1.57 : 10/17/2015
  *         - GUI: fixed warning [-Wlogical-not-parentheses]
