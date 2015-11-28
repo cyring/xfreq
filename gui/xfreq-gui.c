@@ -422,25 +422,7 @@ void	DestroyButton(uARG *A, int G, char ID)
 			cButton=cButton->Chain;
 		}
 }
-/*
-void	DestroyDecorationByLabel(uARG *A, int G, char ID, char label)
-{
-	WBUTTON *wButton=A->W[G].wButton[HEAD], *cButton=A->W[G].wButton[HEAD];
-	while(cButton != NULL)
-		if((cButton->ID == ID) && (cButton->Type == DECORATION) && (cButton->Resource.Label == label))
-		{
-			if(cButton == A->W[G].wButton[TAIL])
-				A->W[G].wButton[TAIL]=wButton;
-			wButton->Chain=cButton->Chain;
-			free(cButton);
-			break;
-		}
-		else {
-			wButton=cButton;
-			cButton=cButton->Chain;
-		}
-}
-*/
+
 void	DestroyAllButtons(uARG *A, int G)
 {
 	WBUTTON *wButton=A->W[G].wButton[HEAD], *cButton=NULL;
@@ -941,15 +923,6 @@ int	OpenDisplay(uARG *A)
 	return(noerr);
 }
 
-// Release the Widget resources.
-/*
-void	CancelToggle(uARG *A, WBUTTON *wButton)
-{
-	int bit=0;
-	for(bit=0; bit < 64; bit++)
-		DestroyDecorationByLabel(A, wButton->Target, ID_TOGGLEBIT, bit);
-}
-*/
 void	CloseWidgets(uARG *A)
 {
 	if(A->L.Output)
@@ -991,20 +964,20 @@ void	GeometriesToLayout(uARG *A)
 	if((A->Geometries != NULL) && (strlen(A->Geometries) > 0))
 	{
 		char *pGeometry=A->Geometries;
-		int G=0, n=0, c=0, r=0, x=0, y=0,
-			ws=(!_IS_MDI_ ? WidthOfScreen(A->screen)  : A->W[MAIN].width), hs=(!_IS_MDI_ ? HeightOfScreen(A->screen) : A->W[MAIN].height);
+		int G=0, n=0, c=0, r=0, mw=0, mh=0;
 
 		while(pGeometry != NULL)
 			if(strlen(pGeometry) > 0)
 			{
-				sscanf(pGeometry, GEOMETRY_PARSER, &G, &c, &r, &x, &y, &n);
+				sscanf(pGeometry, GEOMETRY_PARSER, &G, &c, &r, &mw, &mh, &n);
 
 				if((G >= MAIN) && (G <= LAST_WIDGET))
 				{
 					A->L.Page[G].Geometry.cols=(c > 0) ? c : A->L.Page[G].Geometry.cols;
 					A->L.Page[G].Geometry.rows=(r > 0) ? r : A->L.Page[G].Geometry.rows;
-					A->W[G].x=(x < 0) ? ws + x : x;
-					A->W[G].y=(y < 0) ? hs + y : y;
+					// Store temporarily margins into the Page structure.
+					A->L.Page[G].width=mw;
+					A->L.Page[G].height=mh;
 				}
 				pGeometry=(n > 0) ? pGeometry + n : NULL;
 			}
@@ -1634,7 +1607,7 @@ int	OpenWidgets(uARG *A)
 										&Loader[i].WBState);
 
 						// Prepare a Wallboard string with the Processor information.
-						int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 10;
+						int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - WALLBOARD_PADDING;
 						sprintf(str, OVERCLOCK, A->SHM->P.Features.BrandString, A->SHM->P.Boost[1] * A->SHM->P.ClockSpeed);
 						A->L.WB.Length=strlen(str) + (padding << 1);
 						A->L.WB.String=calloc(A->L.WB.Length, 1);
@@ -1803,6 +1776,11 @@ int	OpenWidgets(uARG *A)
 						free(RSC1.Text);
 					}
 						break;
+				}
+				if(!_IS_MDI_)	// Now apply Widget margins from screen.
+				{
+					A->W[G].x=(A->L.Page[G].width < 0) ? WidthOfScreen(A->screen) + A->L.Page[G].width - A->W[G].width : A->L.Page[G].width;
+					A->W[G].y=(A->L.Page[G].height < 0) ? HeightOfScreen(A->screen) + A->L.Page[G].height - A->W[G].height : A->L.Page[G].height;
 				}
 				ReSizeMoveWidget(A, G);
 			}
@@ -2255,7 +2233,7 @@ void	BuildLayout(uARG *A, int G)
 
 			char *str=calloc(512, 1);
 
-			int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 6;
+			int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - WALLBOARD_PADDING;
 			sprintf(str, OVERCLOCK, A->SHM->P.Features.BrandString, A->SHM->P.Boost[1] * A->SHM->P.ClockSpeed);
 			memcpy(&A->L.WB.String[padding], str, strlen(str));
 
@@ -3094,9 +3072,9 @@ void	DrawLayout(uARG *A, int G)
 					A->L.WB.Scroll++;
 				else
 					A->L.WB.Scroll=0;
-				int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - 10;
+				int padding=SYSINFO_TEXT_WIDTH - strlen(A->L.Page[G].Title) - WALLBOARD_PADDING;
 
-				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_LABEL].RGB);
+				XSetForeground(A->display, A->W[G].gc, A->L.Colors[COLOR_PRINT].RGB);
 				XDrawString(	A->display, A->W[G].pixmap.F, A->W[G].gc,
 						One_Char_Width(G) * (strlen(A->L.Page[G].Title) + 2),
 						One_Char_Height(G),

@@ -170,6 +170,9 @@
  *
  * [HISTORY]
  *
+ * R 2.1.59 : 11/28/2015
+ *         - GUI: improved the geometry option.
+ *
  * R 2.1.58 : 11/14/2015
  *         - Caches topology.
  *
