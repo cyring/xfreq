@@ -170,6 +170,9 @@
  *
  * [HISTORY]
  *
+ * R 2.1.60 : 12/11/2015
+ *         - GUI: geometry is able of such position -0-0
+ *
  * R 2.1.59 : 11/28/2015
  *         - GUI: improved the geometry option.
  *

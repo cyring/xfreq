@@ -203,6 +203,12 @@ typedef struct
 			border_width;
 	struct
 	{
+		int	bitmask,
+			xoffset,
+			yoffset;
+	} Position;
+	struct
+	{
 	    XCharStruct	overall;
 		int	dir,
 			ascent,
@@ -308,7 +314,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	DUMP_TEXT_WIDTH		MAX(GEOMETRY_DUMP_COLS, A->L.Page[DUMP].Geometry.cols)
 #define	DUMP_TEXT_HEIGHT	MAX(GEOMETRY_DUMP_ROWS, A->L.Page[DUMP].Geometry.rows)
 
-#define	GEOMETRY_PARSER	"%d:%dx%d%d%d,%n"
+#define	GEOMETRY_PARSER	"%d:%dx%d%c%d%c%d,%n"
 #define	GEOMETRY_FORMAT	"%d:%dx%d%+d%+d,"
 #define	GEOMETRY_SIZE	strlen("0:640x360+5120+2880,")
 

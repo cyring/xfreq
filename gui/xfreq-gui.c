@@ -578,6 +578,23 @@ void	ScaleMDI(uARG *A)
 	SetVFrame(MAIN, GetVViewport(MAIN) << MAIN_FRAME_VIEW_VSHIFT);
 }
 
+// Compute the position with a screen offset.
+void	OffsetWidget(uARG *A, int G)
+{
+	if(A->W[G].Position.bitmask & XNegative)
+		A->W[G].x=WidthOfScreen(A->screen) - A->W[G].Position.xoffset - A->W[G].width;
+	else if(A->W[G].Position.bitmask & XValue)
+		A->W[G].x=A->W[G].Position.xoffset;
+	if(A->W[G].Position.bitmask & YNegative)
+		A->W[G].y=HeightOfScreen(A->screen) - A->W[G].Position.yoffset - A->W[G].height;
+	else if(A->W[G].Position.bitmask & YValue)
+		A->W[G].y=A->W[G].Position.yoffset;
+/*	{
+		A->W[G].x=(A->W[G].Position.xoffset < 0) ? WidthOfScreen(A->screen) + A->W[G].Position.xoffset - A->W[G].width : A->W[G].Position.xoffset;
+		A->W[G].y=(A->W[G].Position.yoffset < 0) ? HeightOfScreen(A->screen) + A->W[G].Position.yoffset - A->W[G].height : A->W[G].Position.yoffset;
+	}*/
+}
+
 // ReSize a Widget window & inform WM.
 void	ReSizeMoveWidget(uARG *A, int G)
 {
@@ -963,21 +980,24 @@ void	GeometriesToLayout(uARG *A)
 {
 	if((A->Geometries != NULL) && (strlen(A->Geometries) > 0))
 	{
-		char *pGeometry=A->Geometries;
-		int G=0, n=0, c=0, r=0, mw=0, mh=0;
+		char *pGeometry=A->Geometries, xs='\0', ys='\0';
+		int G=0, n=0, c=0, r=0, xo=0, yo=0;
 
 		while(pGeometry != NULL)
 			if(strlen(pGeometry) > 0)
 			{
-				sscanf(pGeometry, GEOMETRY_PARSER, &G, &c, &r, &mw, &mh, &n);
+				sscanf(pGeometry, GEOMETRY_PARSER, &G, &c, &r, &xs, &xo, &ys, &yo, &n);
 
 				if((G >= MAIN) && (G <= LAST_WIDGET))
 				{
 					A->L.Page[G].Geometry.cols=(c > 0) ? c : A->L.Page[G].Geometry.cols;
 					A->L.Page[G].Geometry.rows=(r > 0) ? r : A->L.Page[G].Geometry.rows;
-					// Store temporarily margins into the Page structure.
-					A->L.Page[G].width=mw;
-					A->L.Page[G].height=mh;
+					// Store position offsets for later computation.
+					A->W[G].Position.bitmask=NoValue;
+					A->W[G].Position.bitmask+=(xs == '-') ? XNegative : (xs == '+') ? XValue : NoValue;
+					A->W[G].Position.bitmask+=(ys == '-') ? YNegative : (ys == '+') ? YValue : NoValue;
+					A->W[G].Position.xoffset=xo;
+					A->W[G].Position.yoffset=yo;
 				}
 				pGeometry=(n > 0) ? pGeometry + n : NULL;
 			}
@@ -1777,11 +1797,9 @@ int	OpenWidgets(uARG *A)
 					}
 						break;
 				}
-				if(!_IS_MDI_)	// Now apply Widget margins from screen.
-				{
-					A->W[G].x=(A->L.Page[G].width < 0) ? WidthOfScreen(A->screen) + A->L.Page[G].width - A->W[G].width : A->L.Page[G].width;
-					A->W[G].y=(A->L.Page[G].height < 0) ? HeightOfScreen(A->screen) + A->L.Page[G].height - A->W[G].height : A->L.Page[G].height;
-				}
+				if(!_IS_MDI_)
+					OffsetWidget(A, G);	// Now apply Widget margins from screen.
+
 				ReSizeMoveWidget(A, G);
 			}
 			else	noerr=FALSE;
@@ -4743,6 +4761,7 @@ int main(int argc, char *argv[])
 				.width=(GEOMETRY_MAIN_COLS * DEFAULT_FONT_CHAR_WIDTH),
 				.height=((1 + GEOMETRY_MAIN_ROWS + 1) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
+				.Position={.bitmask=0x0, .xoffset=0, .yoffset=0},
 				.extents={
 					.overall={0},
 					.dir=0,
@@ -4765,6 +4784,7 @@ int main(int argc, char *argv[])
 				.width=(((GEOMETRY_CORES_COLS << 1) + 4 + 1) * DEFAULT_FONT_CHAR_WIDTH),
 				.height=((2 + GEOMETRY_CORES_ROWS + 2) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
+				.Position={.bitmask=0x0, .xoffset=0, .yoffset=0},
 				.extents={
 					.overall={0},
 					.dir=0,
@@ -4787,6 +4807,7 @@ int main(int argc, char *argv[])
 				.width=((((GEOMETRY_CSTATES_COLS * CSTATES_TEXT_SPACING) << 1) + 2) * DEFAULT_FONT_CHAR_WIDTH),
 				.height=((2 + GEOMETRY_CSTATES_ROWS + 2) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
+				.Position={.bitmask=0x0, .xoffset=0, .yoffset=0},
 				.extents={
 					.overall={0},
 					.dir=0,
@@ -4809,6 +4830,7 @@ int main(int argc, char *argv[])
 				.width=((GEOMETRY_TEMPS_COLS + 6) * DEFAULT_FONT_CHAR_WIDTH),
 				.height=((2 + GEOMETRY_TEMPS_ROWS + 2) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
+				.Position={.bitmask=0x0, .xoffset=0, .yoffset=0},
 				.extents={
 					.overall={0},
 					.dir=0,
@@ -4831,6 +4853,7 @@ int main(int argc, char *argv[])
 				.width=(GEOMETRY_SYSINFO_COLS * DEFAULT_FONT_CHAR_WIDTH),
 				.height=((1 + GEOMETRY_SYSINFO_ROWS + 1) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
+				.Position={.bitmask=0x0, .xoffset=0, .yoffset=0},
 				.extents={
 					.overall={0},
 					.dir=0,
@@ -4853,6 +4876,7 @@ int main(int argc, char *argv[])
 				.width=(GEOMETRY_DUMP_COLS * DEFAULT_FONT_CHAR_WIDTH),
 				.height=((1 + GEOMETRY_DUMP_ROWS + 1) * DEFAULT_FONT_CHAR_HEIGHT),
 				.border_width=1,
+				.Position={.bitmask=0x0, .xoffset=0, .yoffset=0},
 				.extents={
 					.overall={0},
 					.dir=0,
