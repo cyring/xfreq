@@ -669,7 +669,7 @@ typedef struct
 } OPTIONS;
 
 
-#define	COMMANDS_COUNT	15
+#define	COMMANDS_COUNT	17
 typedef	struct
 {
 	char	*Inst,
@@ -686,8 +686,10 @@ typedef	struct
 	{"restart", NULL, Proc_Restart},		\
 	{"version", NULL, Proc_Release},		\
 	{"history", NULL, Proc_History},		\
+	{"list colors", NULL, List_Colors},		\
 	{"get color", "%d", Get_Color},			\
 	{"set color", "%d %x", Set_Color},		\
+	{"list fonts", "%s %c", List_Fonts},		\
 	{"set font", "%s", Set_Font},			\
 	{"dump msr", "%x %hu %hhu", Svr_Dump_MSR},	\
 	{"read msr", "%x %hu", Svr_Read_MSR},		\

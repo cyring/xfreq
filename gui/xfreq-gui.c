@@ -925,7 +925,7 @@ int	OpenDisplay(uARG *A)
 
 		// Try to load the requested font.
 		if(strlen(A->fontName) == 0)
-			strcpy(A->fontName, "Fixed");
+			strcpy(A->fontName, "fixed");
 
 		if((A->xfont=XLoadQueryFont(A->display, A->fontName)) == NULL)
 			noerr=FALSE;
@@ -3684,16 +3684,42 @@ void	Proc_History(uARG *A)
 	free(items);
 }
 
+void	List_Colors(uARG *A, int cmd)
+{
+	char stringNL[80]={0};
+	sprintf(stringNL, "%d", COLOR_COUNT);
+	size_t sizeNL=strlen(stringNL);
+	char *formatNL=calloc(sizeNL + sizeof("[%d] %-32s: 0x%lx\n"), 1);
+
+	int idx=0;
+	for(idx=0; idx < COLOR_COUNT; idx++)
+	{
+		char xrmKey[32]={0};
+		sprintf(xrmKey, "%s.%s", A->L.Colors[idx].xrmClass, A->L.Colors[idx].xrmKey);
+		sprintf(formatNL, "[%%%zdd] %%-32s: 0x%%lx\n", sizeNL);
+		sprintf(stringNL, formatNL, idx, xrmKey, A->L.Colors[idx].RGB);
+		Output(A, stringNL);
+	}
+	free(formatNL);
+}
+
 void	Get_Color(uARG *A, int cmd)
 {
 	int idx=0;
 
 	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &idx) == 1) && (idx < COLOR_COUNT))
 	{
-		char stringNL[16]={0};
+		char stringNL[80]={0};
+		sprintf(stringNL, "%d", COLOR_COUNT);
+		size_t sizeNL=strlen(stringNL);
+		char *formatNL=calloc(sizeNL + sizeof("[%d] %-32s: 0x%lx\n"), 1);
 
-		sprintf(stringNL, "0x%lx\n", A->L.Colors[idx].RGB);
+		char xrmKey[32]={0};
+		sprintf(xrmKey, "%s.%s", A->L.Colors[idx].xrmClass, A->L.Colors[idx].xrmKey);
+		sprintf(formatNL, "[%%%zdd] %%-32s: 0x%%lx\n", sizeNL);
+		sprintf(stringNL, formatNL, idx, xrmKey, A->L.Colors[idx].RGB);
 		Output(A, stringNL);
+		free(formatNL);
 	}
 	else
 		Output(A,	"Usage: get color p1\n"	\
@@ -3708,17 +3734,82 @@ void	Set_Color(uARG *A, int cmd)
 	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &idx, &RGB) == 2) && (idx < COLOR_COUNT))
 	{
 		A->L.Colors[idx].RGB=RGB;
+
+		char stringNL[80]={0};
+		sprintf(stringNL, "%d", COLOR_COUNT);
+		size_t sizeNL=strlen(stringNL);
+		char *formatNL=calloc(sizeNL + sizeof("[%d] %-32s: 0x%lx\n"), 1);
+
+		char xrmKey[32]={0};
+		sprintf(xrmKey, "%s.%s", A->L.Colors[idx].xrmClass, A->L.Colors[idx].xrmKey);
+		sprintf(formatNL, "[%%%zdd] %%-32s: 0x%%lx\n", sizeNL);
+		sprintf(stringNL, formatNL, idx, xrmKey, A->L.Colors[idx].RGB);
+		Output(A, stringNL);
+		free(formatNL);
 	}
 	else
 		Output(A,	"Usage: set color p1 p2\n"	\
 				"Where: p1=index (Int), p2=RGB (Hex)\n");
 }
 
+void	List_Fonts(uARG *A, int cmd)
+{
+	char *pattern=malloc(256), unexpected='\0';
+	int items=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, pattern, &unexpected);
+	switch(items)
+	{
+		case -1:
+			strcpy(pattern, "*");
+		case 1:
+			{
+				int listCount=MAIN_TEXT_HEIGHT;
+				char **list=NULL;
+				if((list=XListFonts(A->display, pattern, listCount, &listCount)) != NULL)
+				{
+					int idx=0;
+					for(idx=0; idx < listCount; idx++) {
+						Output(A, list[idx]);
+						Output(A, "\n");
+					}
+					XFreeFontNames(list);
+				}
+				else
+					Output(A, "No matching font names.\n");
+			}
+		break;
+		default:
+			Output(A,	"Usage: list fonts [p1]\n"	\
+					"Where: p1=pattern (String)\n");
+		break;
+	}
+
+	free(pattern);
+}
+
 void	Set_Font(uARG *A, int cmd)
 {
-	if(sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, A->fontName) != 1)
+	char *pattern=calloc(256, sizeof(char));
+	if(sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, pattern) != 1)
 		Output(A,	"Usage: set font p1\n"	\
 				"Where: p1=font name (String)\n");
+	else
+		{
+		int listCount=1;
+		char **list=NULL;
+		if((list=XListFonts(A->display, pattern, listCount, &listCount)) != NULL)
+		{
+			if(listCount == 1)
+			{
+				strcpy(A->fontName, pattern);
+				Output(A, list[0]);
+				Output(A, "\n");
+			}
+			XFreeFontNames(list);
+		}
+		else
+			Output(A, "No matching font names.\n");
+		}
+	free(pattern);
 }
 
 void	Svr_Dump_MSR(uARG *A, int cmd)
@@ -5064,7 +5155,7 @@ int main(int argc, char *argv[])
 								       "\t\t  where each bit set in the argument is a hidden Widget",          NULL                                       },
 				{"-u", "%u",  &A.L.Play.cursorShape,   "Set the cursor shape (Bool) [0/1]",                                    XDB_CLASS_MAIN"."XDB_KEY_CURSOR_SHAPE      },
 				{"-F", "%s",  A.fontName,              "Font name (String)\n" \
-				                                       "\t\t  default font is 'Fixed'",                                        XDB_CLASS_MAIN"."XDB_KEY_FONT              },
+				                                       "\t\t  default font is 'fixed'",                                        XDB_CLASS_MAIN"."XDB_KEY_FONT              },
 				{"-x", "%c",  &A.xACL,                 "Enable or disable the X ACL (Char) ['Y'/'N']",                         NULL                                       },
 				{"-g", "%ms", &A.Geometries,           "Widgets geometries (String)\n" \
 				                                       "\t\t  argument is a series of '#:[cols]x[rows]+[x]+[y], .. ,'",        NULL                                       },

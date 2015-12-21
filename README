@@ -170,6 +170,9 @@
  *
  * [HISTORY]
  *
+ * R 2.1.61 : 12/21/2015
+ *         - GUI: improved management of colors and fonts.
+ *
  * R 2.1.60 : 12/11/2015
  *         - GUI: geometry is able of such position -0-0
  *
