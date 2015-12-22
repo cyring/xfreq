@@ -114,8 +114,10 @@ unsigned long long int
 	return(DecVal);
 }
 
-void	ClearMsg(uARG *A) {
-	if(A->L.Output != NULL) {
+void	ClearMsg(uARG *A)
+{
+	if(A->L.Output != NULL)
+	{
 		free(A->L.Output);
 		A->L.Output=NULL;
 
@@ -133,19 +135,26 @@ void	ClearMsg(uARG *A) {
 	}
 }
 
-void	Output(uARG *A, const char *message)
+void	Output(uARG *A, char *message)
 {
-	if(A->L.Output != NULL && GetVListing(MAIN) > GetVFrame(MAIN))
-		ClearMsg(A);
+	size_t requestBlock=(message != NULL) ? strlen(message) + 1 : 0;
+	if(requestBlock > 0)
+	{
+		if(GetVListing(MAIN) > GetVFrame(MAIN))
+			ClearMsg(A);
 
-	const size_t requestBlock=strlen(message) + 1;
-	if(A->L.Output == NULL)
-		A->L.Output=calloc(1, requestBlock);
-	else {
-		const size_t allocBlock=strlen(A->L.Output) + 1;
-		A->L.Output=realloc(A->L.Output, allocBlock + requestBlock);
+		if(A->L.Output != NULL)
+			requestBlock+=strlen(A->L.Output);
+
+		char *newBlock=realloc(A->L.Output, requestBlock);
+		if(newBlock != NULL)
+		{
+			if(A->L.Output == NULL)
+				newBlock[0]='\0';
+			A->L.Output=newBlock;
+			strcat(A->L.Output, message);
+		}
 	}
-	strcat(A->L.Output, message);
 }
 
 // Drawing Button functions.
@@ -896,10 +905,10 @@ void	CloseDisplay(uARG *A)
 		}
 	} while(MC);
 
-	if(A->xfont)
+	if(A->font.Info)
 	{
-		XFreeFont(A->display, A->xfont);
-		A->xfont=NULL;
+		XFreeFont(A->display, A->font.Info);
+		A->font.Info=NULL;
 	}
 	if(A->display)
 		XCloseDisplay(A->display);
@@ -924,10 +933,10 @@ int	OpenDisplay(uARG *A)
 		}
 
 		// Try to load the requested font.
-		if(strlen(A->fontName) == 0)
-			strcpy(A->fontName, "fixed");
+		if(strlen(A->font.Name) == 0)
+			strcpy(A->font.Name, "fixed");
 
-		if((A->xfont=XLoadQueryFont(A->display, A->fontName)) == NULL)
+		if((A->font.Info=XLoadQueryFont(A->display, A->font.Name)) == NULL)
 			noerr=FALSE;
 		if(noerr)
 		{
@@ -1075,7 +1084,7 @@ int	OpenWidgets(uARG *A)
 
 			if((A->W[G].gc=XCreateGC(A->display, A->W[G].window, 0, NULL)))
 			{
-				XSetFont(A->display, A->W[G].gc, A->xfont->fid);
+				XSetFont(A->display, A->W[G].gc, A->font.Info->fid);
 
 				switch(G)
 				{
@@ -1087,12 +1096,12 @@ int	OpenWidgets(uARG *A)
 						SetHFrame(G, GetHViewport(G) << MAIN_FRAME_VIEW_HSHIFT);
 						SetVFrame(G, GetVViewport(G) << MAIN_FRAME_VIEW_VSHIFT);
 
-						XTextExtents(	A->xfont, DEFAULT_HEADER_STR, MAIN_TEXT_WIDTH,
+						XTextExtents(	A->font.Info, DEFAULT_HEADER_STR, MAIN_TEXT_WIDTH,
 								&A->W[G].extents.dir, &A->W[G].extents.ascent,
 								&A->W[G].extents.descent, &A->W[G].extents.overall);
 
-						A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
-									- A->xfont->min_bounds.lbearing;
+						A->W[G].extents.charWidth=A->font.Info->max_bounds.rbearing
+									- A->font.Info->min_bounds.lbearing;
 						A->W[G].extents.charHeight=A->W[G].extents.ascent
 									+ A->W[G].extents.descent;
 
@@ -1194,12 +1203,12 @@ int	OpenWidgets(uARG *A)
 						SetHFrame(G, GetHViewport(G));
 						SetVFrame(G, GetVViewport(G));
 
-						XTextExtents(	A->xfont, DEFAULT_HEADER_STR, CORES_TEXT_WIDTH << 1,
+						XTextExtents(	A->font.Info, DEFAULT_HEADER_STR, CORES_TEXT_WIDTH << 1,
 								&A->W[G].extents.dir, &A->W[G].extents.ascent,
 								&A->W[G].extents.descent, &A->W[G].extents.overall);
 
-						A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
-									- A->xfont->min_bounds.lbearing;
+						A->W[G].extents.charWidth=A->font.Info->max_bounds.rbearing
+									- A->font.Info->min_bounds.lbearing;
 						A->W[G].extents.charHeight=A->W[G].extents.ascent
 										+ A->W[G].extents.descent;
 
@@ -1293,12 +1302,12 @@ int	OpenWidgets(uARG *A)
 						SetHFrame(G, GetHViewport(G));
 						SetVFrame(G, GetVViewport(G));
 
-						XTextExtents(	A->xfont, DEFAULT_HEADER_STR, CSTATES_TEXT_WIDTH,
+						XTextExtents(	A->font.Info, DEFAULT_HEADER_STR, CSTATES_TEXT_WIDTH,
 								&A->W[G].extents.dir, &A->W[G].extents.ascent,
 								&A->W[G].extents.descent, &A->W[G].extents.overall);
 
-						A->W[G].extents.charWidth	= A->xfont->max_bounds.rbearing
-										- A->xfont->min_bounds.lbearing;
+						A->W[G].extents.charWidth	= A->font.Info->max_bounds.rbearing
+										- A->font.Info->min_bounds.lbearing;
 						A->W[G].extents.charHeight	= A->W[G].extents.ascent
 										+ A->W[G].extents.descent;
 
@@ -1384,12 +1393,12 @@ int	OpenWidgets(uARG *A)
 						SetHFrame(G, GetHViewport(G));
 						SetVFrame(G, GetVViewport(G));
 
-						XTextExtents(	A->xfont, DEFAULT_HEADER_STR, TEMPS_TEXT_WIDTH,
+						XTextExtents(	A->font.Info, DEFAULT_HEADER_STR, TEMPS_TEXT_WIDTH,
 								&A->W[G].extents.dir, &A->W[G].extents.ascent,
 								&A->W[G].extents.descent, &A->W[G].extents.overall);
 
-						A->W[G].extents.charWidth	= A->xfont->max_bounds.rbearing
-										- A->xfont->min_bounds.lbearing;
+						A->W[G].extents.charWidth	= A->font.Info->max_bounds.rbearing
+										- A->font.Info->min_bounds.lbearing;
 						A->W[G].extents.charHeight	= A->W[G].extents.ascent
 										+ A->W[G].extents.descent;
 
@@ -1503,12 +1512,12 @@ int	OpenWidgets(uARG *A)
 						SetHFrame(G, GetHViewport(G) << SYSINFO_FRAME_VIEW_HSHIFT);
 						SetVFrame(G, GetVViewport(G) << SYSINFO_FRAME_VIEW_VSHIFT);
 
-						XTextExtents(	A->xfont, DEFAULT_HEADER_STR, SYSINFO_TEXT_WIDTH,
+						XTextExtents(	A->font.Info, DEFAULT_HEADER_STR, SYSINFO_TEXT_WIDTH,
 								&A->W[G].extents.dir, &A->W[G].extents.ascent,
 								&A->W[G].extents.descent, &A->W[G].extents.overall);
 
-						A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
-									- A->xfont->min_bounds.lbearing;
+						A->W[G].extents.charWidth=A->font.Info->max_bounds.rbearing
+									- A->font.Info->min_bounds.lbearing;
 						A->W[G].extents.charHeight=A->W[G].extents.ascent
 									+ A->W[G].extents.descent;
 
@@ -1643,12 +1652,12 @@ int	OpenWidgets(uARG *A)
 						SetHFrame(G, GetHViewport(G) << DUMP_FRAME_VIEW_HSHIFT);
 						SetVFrame(G, GetVViewport(G) << DUMP_FRAME_VIEW_VSHIFT);
 
-						XTextExtents(	A->xfont, DEFAULT_HEADER_STR, DUMP_TEXT_WIDTH,
+						XTextExtents(	A->font.Info, DEFAULT_HEADER_STR, DUMP_TEXT_WIDTH,
 								&A->W[G].extents.dir, &A->W[G].extents.ascent,
 								&A->W[G].extents.descent, &A->W[G].extents.overall);
 
-						A->W[G].extents.charWidth=A->xfont->max_bounds.rbearing
-									- A->xfont->min_bounds.lbearing;
+						A->W[G].extents.charWidth=A->font.Info->max_bounds.rbearing
+									- A->font.Info->min_bounds.lbearing;
 						A->W[G].extents.charHeight=A->W[G].extents.ascent
 									+ A->W[G].extents.descent;
 
@@ -3626,43 +3635,87 @@ Bool32	SaveSettings(uARG *A)
 }
 
 // Commands set.
-void	Proc_Menu(uARG *A)
+void	Proc_Usage(uARG *A, int cmd)
 {
-	Output(A, MENU_FORMAT);
-}
-
-void	Proc_Help(uARG *A)
-{
-	char *items=calloc(COMMANDS_COUNT, 16), *stringNL=calloc(16, 1);
-
-	int cmd=0;
-	for(cmd=1; cmd < COMMANDS_COUNT; cmd++)
-	{
-		sprintf(stringNL, "%s\n", A->Commands[cmd].Inst);
-		strcat(items, stringNL);
-	}
+	char *items=malloc(88), *stringNL=malloc(80);
+	strcpy(items, "Usage: ");
+	sprintf(stringNL, A->Commands[cmd].Usage, A->Commands[cmd].Inst);
+	strcat(items, stringNL);
 	Output(A, items);
-
 	free(stringNL);
 	free(items);
 }
 
-void	Proc_Release(uARG *A)
+void	Proc_Help(uARG *A, int cmd)
 {
-	Output(A, Version);
+	char *items=calloc(COMMANDS_COUNT, 80), *stringNL=calloc(80, 1), *str=malloc(INSTRUCTION_LEN);
+	int matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst) + 1], A->Commands[cmd].Spec, str);
+	switch(matches)
+	{
+		case -1:
+		{
+			int idx=0;
+			for(idx=1; idx < COMMANDS_COUNT; idx++)
+			{
+				sprintf(stringNL, "%s\n", A->Commands[idx].Inst);
+				strcat(items, stringNL);
+			}
+			Output(A, items);
+		}
+		break;
+		case 1:
+		{
+			int idx=0;
+			for(idx=0; idx < COMMANDS_COUNT; idx++)
+				if(!strncmp(str, A->Commands[idx].Inst, strlen(str))
+				&& !strncmp(str, A->Commands[idx].Inst, strlen(A->Commands[idx].Inst)))
+					break;
+				if(idx < COMMANDS_COUNT)
+				{
+					strcpy(items, "Usage: ");
+					sprintf(stringNL, A->Commands[idx].Usage, A->Commands[idx].Inst);
+					strcat(items, stringNL);
+				}
+				else	sprintf(items, "%s: command not found\n", str);
+			Output(A, items);
+		}
+		break;
+		default:
+			Proc_Usage(A, cmd);
+		break;
+	}
+
+	free(stringNL);
+	free(items);
+	free(str);
 }
 
-void	Proc_Quit(uARG *A)
+void	Proc_Menu(uARG *A, int cmd)
+{
+	Output(A, MENU_FORMAT);
+}
+
+void	Proc_Quit(uARG *A, int cmd)
 {
 	Output(A, "Shutting down ...\n");
 	A->LOOP=FALSE;
 }
 
-void	Proc_Restart(uARG *A)
+void	Proc_Clear(uARG *A, int cmd)
+{
+	ClearMsg(A);
+}
+
+void	Proc_Restart(uARG *A, int cmd)
 {
 	Output(A, "Restarting ...\n");
 	A->RESTART=TRUE;
 	A->LOOP=FALSE;
+}
+
+void	Proc_Release(uARG *A, int cmd)
+{
+	Output(A, Version);
 }
 
 void	Proc_History(uARG *A)
@@ -3686,10 +3739,10 @@ void	Proc_History(uARG *A)
 
 void	List_Colors(uARG *A, int cmd)
 {
-	char stringNL[80]={0};
+	char *items=calloc(COLOR_COUNT, 80), *stringNL=malloc(80), *formatNL=malloc(32);
+
 	sprintf(stringNL, "%d", COLOR_COUNT);
 	size_t sizeNL=strlen(stringNL);
-	char *formatNL=calloc(sizeNL + sizeof("[%d] %-32s: 0x%lx\n"), 1);
 
 	int idx=0;
 	for(idx=0; idx < COLOR_COUNT; idx++)
@@ -3698,9 +3751,12 @@ void	List_Colors(uARG *A, int cmd)
 		sprintf(xrmKey, "%s.%s", A->L.Colors[idx].xrmClass, A->L.Colors[idx].xrmKey);
 		sprintf(formatNL, "[%%%zdd] %%-32s: 0x%%lx\n", sizeNL);
 		sprintf(stringNL, formatNL, idx, xrmKey, A->L.Colors[idx].RGB);
-		Output(A, stringNL);
+		strcat(items, stringNL);
 	}
+	Output(A, items);
 	free(formatNL);
+	free(stringNL);
+	free(items);
 }
 
 void	Get_Color(uARG *A, int cmd)
@@ -3709,21 +3765,22 @@ void	Get_Color(uARG *A, int cmd)
 
 	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &idx) == 1) && (idx < COLOR_COUNT))
 	{
-		char stringNL[80]={0};
+		char *stringNL=malloc(80), *formatNL=malloc(32);
+
 		sprintf(stringNL, "%d", COLOR_COUNT);
 		size_t sizeNL=strlen(stringNL);
-		char *formatNL=calloc(sizeNL + sizeof("[%d] %-32s: 0x%lx\n"), 1);
 
 		char xrmKey[32]={0};
 		sprintf(xrmKey, "%s.%s", A->L.Colors[idx].xrmClass, A->L.Colors[idx].xrmKey);
 		sprintf(formatNL, "[%%%zdd] %%-32s: 0x%%lx\n", sizeNL);
 		sprintf(stringNL, formatNL, idx, xrmKey, A->L.Colors[idx].RGB);
+
 		Output(A, stringNL);
 		free(formatNL);
+		free(stringNL);
 	}
 	else
-		Output(A,	"Usage: get color p1\n"	\
-				"Where: p1=index (Int)\n");
+		Proc_Usage(A, cmd);
 }
 
 void	Set_Color(uARG *A, int cmd)
@@ -3735,51 +3792,85 @@ void	Set_Color(uARG *A, int cmd)
 	{
 		A->L.Colors[idx].RGB=RGB;
 
-		char stringNL[80]={0};
+		char *stringNL=malloc(80), *formatNL=malloc(32);
+
 		sprintf(stringNL, "%d", COLOR_COUNT);
 		size_t sizeNL=strlen(stringNL);
-		char *formatNL=calloc(sizeNL + sizeof("[%d] %-32s: 0x%lx\n"), 1);
 
 		char xrmKey[32]={0};
 		sprintf(xrmKey, "%s.%s", A->L.Colors[idx].xrmClass, A->L.Colors[idx].xrmKey);
 		sprintf(formatNL, "[%%%zdd] %%-32s: 0x%%lx\n", sizeNL);
 		sprintf(stringNL, formatNL, idx, xrmKey, A->L.Colors[idx].RGB);
+
 		Output(A, stringNL);
 		free(formatNL);
+		free(stringNL);
 	}
 	else
-		Output(A,	"Usage: set color p1 p2\n"	\
-				"Where: p1=index (Int), p2=RGB (Hex)\n");
+		Proc_Usage(A, cmd);
+}
+
+void	Browse_Fonts(uARG *A)
+{
+	int PAGE_HEIGHT=MAIN_TEXT_HEIGHT - 2;
+	char *items=calloc(PAGE_HEIGHT, 256), *stringNL=malloc(256);
+
+	int idx=0;
+	for(idx=A->font.Index; (idx < A->font.Count) && (idx < A->font.Index + PAGE_HEIGHT); idx++)
+	{
+		sprintf(stringNL, "[%3x] %s\n", idx, A->font.List[idx]);
+		strcat(items, stringNL);
+	}
+	if(idx < A->font.Count)
+		A->font.Index=idx;
+	else
+		A->font.Index=0;
+
+	Output(A, items);
+
+	free(stringNL);
+	free(items);
+}
+
+Bool32	Search_Fonts(uARG *A, char *pattern)
+{
+	if(A->font.List != NULL)
+	{
+		XFreeFontNames(A->font.List);
+		A->font.Index=0;
+	}
+	if((A->font.List=XListFonts(A->display, pattern, A->font.Count, &A->font.Count)) != NULL)
+		return(TRUE);
+	else
+		return(FALSE);
 }
 
 void	List_Fonts(uARG *A, int cmd)
 {
 	char *pattern=malloc(256), unexpected='\0';
-	int items=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, pattern, &unexpected);
-	switch(items)
+	int matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, pattern, &unexpected);
+	switch(matches)
 	{
 		case -1:
-			strcpy(pattern, "*");
-		case 1:
 			{
-				int listCount=MAIN_TEXT_HEIGHT;
-				char **list=NULL;
-				if((list=XListFonts(A->display, pattern, listCount, &listCount)) != NULL)
+				if(A->font.List != NULL)
 				{
-					int idx=0;
-					for(idx=0; idx < listCount; idx++) {
-						Output(A, list[idx]);
-						Output(A, "\n");
-					}
-					XFreeFontNames(list);
+					Browse_Fonts(A);
+					break;
 				}
 				else
+					strcpy(pattern, "*");
+			}
+		case 1:
+			{
+				if(Search_Fonts(A, pattern) == FALSE)
 					Output(A, "No matching font names.\n");
+				else
+					Browse_Fonts(A);
 			}
 		break;
 		default:
-			Output(A,	"Usage: list fonts [p1]\n"	\
-					"Where: p1=pattern (String)\n");
+			Proc_Usage(A, cmd);
 		break;
 	}
 
@@ -3788,10 +3879,9 @@ void	List_Fonts(uARG *A, int cmd)
 
 void	Set_Font(uARG *A, int cmd)
 {
-	char *pattern=calloc(256, sizeof(char));
+	char *pattern=malloc(256);
 	if(sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, pattern) != 1)
-		Output(A,	"Usage: set font p1\n"	\
-				"Where: p1=font name (String)\n");
+		Proc_Usage(A, cmd);
 	else
 		{
 		int listCount=1;
@@ -3800,7 +3890,7 @@ void	Set_Font(uARG *A, int cmd)
 		{
 			if(listCount == 1)
 			{
-				strcpy(A->fontName, pattern);
+				strcpy(A->font.Name, pattern);
 				Output(A, list[0]);
 				Output(A, "\n");
 			}
@@ -3822,8 +3912,7 @@ void	Svr_Dump_MSR(uARG *A, int cmd)
 		Play(A, MAIN, ID_DUMPMSR, &XChange);
 	}
 	else
-		Output(A,	"Usage: dump msr p1 p2 p3\n"	\
-				"Where: p1=address (Hex), p2=Core# (Int), p3=index (Int)\n");
+		Proc_Usage(A, cmd);
 }
 
 void	Svr_Read_MSR(uARG *A, int cmd)
@@ -3836,8 +3925,7 @@ void	Svr_Read_MSR(uARG *A, int cmd)
 		Play(A, MAIN, ID_READMSR, &XChange);
 	}
 	else
-		Output(A,	"Usage: read msr p1 p2\n"	\
-				"Where: p1=address (Hex), p2=Core# (Int)\n");
+		Proc_Usage(A, cmd);
 }
 
 void	Svr_Write_MSR(uARG *A, int cmd)
@@ -3852,8 +3940,7 @@ void	Svr_Write_MSR(uARG *A, int cmd)
 		Play(A, MAIN, ID_WRITEMSR, &XChange);
 	}
 	else
-		Output(A,	"Usage: write msr p1 p2 p3\n"	\
-				"Where: p1=address (Hex), p2=Core# (Int), p3=value (Hex)\n");
+		Proc_Usage(A, cmd);
 }
 
 unsigned int Ctl_Feature_Transcode(char *pStr)
@@ -3884,7 +3971,7 @@ void	Ctl_Feature_Help(char *items)
 void	Svr_Enable_Feature(uARG *A, int cmd)
 {
 	XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_NULL}};
-	char *str=malloc(16);
+	char *str=malloc(INSTRUCTION_LEN);
 	Bool32 noerr=TRUE;
 
 	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, str) == 1) && (str != NULL))
@@ -3900,10 +3987,9 @@ void	Svr_Enable_Feature(uARG *A, int cmd)
 
 	if(noerr != TRUE)
 	{
+		Proc_Usage(A, cmd);
 		char *items=calloc(128,1);
-		strcpy(items,	"Usage: enable p1\n"		\
-				"Where: p1=feature (String)\n"	\
-				"and  : feature={");
+		strcpy(items, "and  : feature={");
 		Ctl_Feature_Help(items);
 		strcat(items, "}\n");
 		Output(A, items);
@@ -3915,7 +4001,7 @@ void	Svr_Enable_Feature(uARG *A, int cmd)
 void	Svr_Disable_Feature(uARG *A, int cmd)
 {
 	XCHG_MAP XChange={.Map={.Addr=0, .Core=0, .Arg=0, .ID=ID_NULL}};
-	char *str=malloc(16);
+	char *str=malloc(INSTRUCTION_LEN);
 	Bool32 noerr=TRUE;
 
 	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, str) == 1) && (str != NULL))
@@ -3931,10 +4017,9 @@ void	Svr_Disable_Feature(uARG *A, int cmd)
 
 	if(noerr != TRUE)
 	{
+		Proc_Usage(A, cmd);
 		char *items=calloc(128,1);
-		strcpy(items,	"Usage: disable p1\n"	\
-				"Where: p1=feature (String)\n"	\
-				"and  : feature={");
+		strcpy(items, "and  : feature={");
 		Ctl_Feature_Help(items);
 		strcat(items, "}\n");
 		Output(A, items);
@@ -4052,7 +4137,7 @@ void	CallBackSave(uARG *A, WBUTTON *wButton)
 
 void	CallBackQuit(uARG *A, WBUTTON *wButton)
 {
-	Proc_Quit(A);
+	Proc_Quit(A, -1);
 	fDraw(MAIN, TRUE, FALSE);
 }
 void	CallBackMinimizeWidget(uARG *A, WBUTTON *wButton)
@@ -4166,7 +4251,7 @@ static void *uDraw(void *uArg)
 			}
 		}
 	else
-		Proc_Quit(A);
+		Proc_Quit(A, -1);
 	return(NULL);
 }
 
@@ -4195,7 +4280,7 @@ static void *uLoop(uARG *A)
 			case ClientMessage:
 				if(E.xclient.data.l[0] == A->atom[0])
 				{
-					Proc_Quit(A);
+					Proc_Quit(A, -1);
 					fDraw(MAIN, TRUE, FALSE);
 				}
 				break;
@@ -4213,7 +4298,7 @@ static void *uLoop(uARG *A)
 							&ComposeStatus)) )
 					if(!(E.xkey.state & AllModMask)
 					&& (	((KeySymPressed >= XK_space) && (KeySymPressed <= XK_asciitilde))
-					||	((KeySymPressed >= XK_KP_0) && (KeySymPressed <= XK_KP_9))	)
+					||	((KeySymPressed >= XK_KP_Multiply) && (KeySymPressed <= XK_KP_9))	)
 					&& ((A->L.Input.KeyLength + xkLength) < (KEYINPUT_DEPTH - 1))
 					&& (G == MAIN))
 					{
@@ -4364,7 +4449,7 @@ static void *uLoop(uARG *A)
 					case XK_Q:
 						if(E.xkey.state & ControlMask)
 						{
-							Proc_Quit(A);
+							Proc_Quit(A, -1);
 							fDraw(MAIN, TRUE, FALSE);
 						}
 						break;
@@ -4500,14 +4585,16 @@ static void *uLoop(uARG *A)
 						}
 						break;
 					case XK_KP_Add:
-						Play(A, G, ID_DECLOOP, NULL);
+						if(E.xkey.state & ControlMask)
+							Play(A, G, ID_DECLOOP, NULL);
 						break;
 					case XK_KP_Subtract:
-						Play(A, G, ID_INCLOOP, NULL);
+						if(E.xkey.state & ControlMask)
+							Play(A, G, ID_INCLOOP, NULL);
 						break;
 					case XK_F1:
 					{
-						Proc_Menu(A);
+						Proc_Menu(A, -1);
 						fDraw(MAIN, TRUE, FALSE);
 					}
 						break;
@@ -4837,8 +4924,13 @@ int main(int argc, char *argv[])
 			.screen=NULL,
 			.TID_Draw=0,
 			.Geometries=NULL,
-			.fontName=calloc(256, sizeof(char)),
-			.xfont=NULL,
+			.font=	{
+				.List=NULL,
+				.Name=calloc(256, sizeof(char)),
+				.Info=NULL,
+				.Count=0xfff,
+				.Index=0,
+				},
 			.MouseCursor={0},
 			.Splash={.window=0, .gc=0, .x=0, .y=0, .w=splash_width + (splash_width >> 2), .h=splash_height << 1, .attributes=0x0014},
 			.W={
@@ -5154,7 +5246,7 @@ int main(int argc, char *argv[])
 				{"-U", "%x",  &A.L.UnMapBitmask,       "Bitmap of unmap Widgets (Hex) eq. 0b00111111\n" \
 								       "\t\t  where each bit set in the argument is a hidden Widget",          NULL                                       },
 				{"-u", "%u",  &A.L.Play.cursorShape,   "Set the cursor shape (Bool) [0/1]",                                    XDB_CLASS_MAIN"."XDB_KEY_CURSOR_SHAPE      },
-				{"-F", "%s",  A.fontName,              "Font name (String)\n" \
+				{"-F", "%s",  A.font.Name,             "Font name (String)\n" \
 				                                       "\t\t  default font is 'fixed'",                                        XDB_CLASS_MAIN"."XDB_KEY_FONT              },
 				{"-x", "%c",  &A.xACL,                 "Enable or disable the X ACL (Char) ['Y'/'N']",                         NULL                                       },
 				{"-g", "%ms", &A.Geometries,           "Widgets geometries (String)\n" \
@@ -5245,7 +5337,7 @@ int main(int argc, char *argv[])
 				if(((A.FD.SmBIOS=shm_open(SMB_FILENAME, O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) == -1)
 				|| (fstat(A.FD.SmBIOS, &smbStat) == -1)
 				|| ((A.SmBIOS=mmap(A.SHM->B, smbStat.st_size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_FIXED, A.FD.SmBIOS, 0)) == MAP_FAILED))
-					strcat(BootLog, "Error: opening the SmBIOS shared memory");
+					strcat(BootLog, "Error: opening the SmBIOS shared memory.\n");
 #if defined(DEBUG)
 
 					printf(	"\n--- SHM Map ---\n"
@@ -5279,9 +5371,13 @@ int main(int argc, char *argv[])
 				}
 				if(!pthread_create(&A.TID_Draw, NULL, uDraw, &A))
 				{
-					sprintf(BootLog, "%s\n%s Ready with [%s]\n\n", BootLog, _APPNAME, A.SHM->AppName);
+					const size_t serverLen=sizeof(" Ready with []\n\n") + sizeof(_APPNAME) + TASK_COMM_LEN;
+					char *serverName=malloc(serverLen);
+					sprintf(serverName, "%s Ready with [%s]\n\n", _APPNAME, A.SHM->AppName);
+					strcat(BootLog, serverName);
+					free(serverName);
+					strcat(BootLog, "Enter help to list commands.\n");
 					Output(&A, BootLog);
-					Output(&A, "Enter help to list commands.\n");
 
 					uLoop(&A);
 
@@ -5347,8 +5443,10 @@ int main(int argc, char *argv[])
 		free(A.L.Input.KeyBuffer);
 	if(A.Geometries != NULL)
 		free(A.Geometries);
-	if(A.fontName != NULL)
-		free(A.fontName);
+	if(A.font.List != NULL)
+		XFreeFontNames(A.font.List);
+	if(A.font.Name != NULL)
+		free(A.font.Name);
 	if(A.configFile != NULL)
 		free(A.configFile);
 

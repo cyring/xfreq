@@ -321,8 +321,7 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	MENU_FORMAT	"[F1]      Help             [F2]     Core\n"			\
 			"[F3]      C-States         [F4]     Temps \n"			\
 			"[F5]      System Info      [F6]     Dump\n"			\
-			"KeyPad[+] Faster Loop     KeyPad[-] Slower Loop\n"		\
-			"[Pause]   Suspend/Resume display\n"				\
+			"[Pause]   Suspend/Resume Widget\n"				\
 			"\nw/[Shift] key:\n"						\
 			"                                  [Up]\n"			\
 			"  Page Scrolling           [Left]      [Right]\n"		\
@@ -334,7 +333,8 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 			"[L][l]   Refresh page      [Q][q]   Quit\n"			\
 			"[Y][y]   Cycles            [W][w]   Wallboard\n"		\
 			"[Z][z]   Frequency Hz      [P][p]   C-States %\n"		\
-			"[R][r]   Ratio values      [T][t]   Task schedule\n\n"		\
+			"[R][r]   Ratio values      [T][t]   Task schedule\n"		\
+			"KeyPad[+] Faster Loop     KeyPad[-] Slower Loop\n\n"		\
 			"Command keys:\n"						\
 			"[Left] | [Right] | [Home] | [End] Move the cursor insertion\n"	\
 			"[Up] | [Down]  Browse forward, backward the commands history\n"\
@@ -668,34 +668,35 @@ typedef struct
 	char		*xrmName;
 } OPTIONS;
 
-
+#define	INSTRUCTION_LEN	16
 #define	COMMANDS_COUNT	17
 typedef	struct
 {
-	char	*Inst,
-		*Spec;
 	void	(*Proc)();
+	char	*Spec,
+		*Inst,
+		*Usage;
 } COMMANDS;
 
-#define	COMMANDS_LIST					\
-{							\
-	{"help", NULL, Proc_Help},			\
-	{"menu", NULL, Proc_Menu},			\
-	{"quit", NULL, Proc_Quit},			\
-	{"clear", NULL, ClearMsg},			\
-	{"restart", NULL, Proc_Restart},		\
-	{"version", NULL, Proc_Release},		\
-	{"history", NULL, Proc_History},		\
-	{"list colors", NULL, List_Colors},		\
-	{"get color", "%d", Get_Color},			\
-	{"set color", "%d %x", Set_Color},		\
-	{"list fonts", "%s %c", List_Fonts},		\
-	{"set font", "%s", Set_Font},			\
-	{"dump msr", "%x %hu %hhu", Svr_Dump_MSR},	\
-	{"read msr", "%x %hu", Svr_Read_MSR},		\
-	{"write msr", "%x %hu %llx", Svr_Write_MSR},	\
-	{"enable", "%s", Svr_Enable_Feature},		\
-	{"disable", "%s", Svr_Disable_Feature}		\
+#define	COMMANDS_LIST																\
+{																		\
+	{ Proc_Help,		"%[^\n]",	"help",		"%s [p1]\nWhere: p1=command (String)\n" },					\
+	{ Proc_Menu,		NULL,		"menu",		"%s\n" },									\
+	{ Proc_Quit,		NULL,		"quit",		"%s\n" },									\
+	{ Proc_Clear,		NULL,		"clear",	"%s\n" },									\
+	{ Proc_Restart,		NULL,		"restart",	"%s\n" },									\
+	{ Proc_Release,		NULL,		"version",	"%s\n" },									\
+	{ Proc_History,		NULL,		"history",	"%s\n" },									\
+	{ List_Colors,		NULL,		"list colors",	"%s\n" },									\
+	{ Get_Color,		"%d",		"get color",	"%s p1\nWhere: p1=index (Int)\n" },						\
+	{ Set_Color,		"%d %x",	"set color",	"%s p1 p2\nWhere: p1=index (Int), p2=RGB (Hex)\n" },				\
+	{ List_Fonts,		"%s %c",	"list fonts",	"%s [p1]\nWhere: p1=pattern (String)\n" },					\
+	{ Set_Font,		"%s",		"set font",	"%s p1\nWhere: p1=font name (String)\n" },					\
+	{ Svr_Dump_MSR,		"%x %hu %hhu",	"dump msr",	"%s p1 p2 p3\nWhere: p1=address (Hex), p2=Core# (Int), p3=index (Int)\n" },	\
+	{ Svr_Read_MSR,		"%x %hu",	"read msr",	"%s p1 p2\nWhere: p1=address (Hex), p2=Core# (Int)\n" },			\
+	{ Svr_Write_MSR,	"%x %hu %llx",	"write msr",	"%s p1 p2 p3\nWhere: p1=address (Hex), p2=Core# (Int), p3=value (Hex)\n" },	\
+	{ Svr_Enable_Feature,	"%s",		"enable",	"%s p1\nWhere: p1=feature (String)\n" },					\
+	{ Svr_Disable_Feature,	"%s",		"disable",	"%s p1\nWhere: p1=feature (String)\n" }						\
 }
 
 typedef	struct
@@ -730,8 +731,13 @@ typedef struct
 	Display		*display;
 	Screen		*screen;
 	char		*Geometries;
-	char		*fontName;
-	XFontStruct	*xfont;
+	struct{
+		char		**List,
+				*Name;
+		XFontStruct	*Info;
+		int		Count,
+				Index;
+	} font;
 	Atom		atom[5];
 	Cursor		MouseCursor[MC_COUNT];
 	XSPLASH		Splash;
