@@ -318,34 +318,34 @@ typedef enum {MAIN, CORES, CSTATES, TEMPS, SYSINFO, DUMP, WIDGETS} LAYOUTS;
 #define	GEOMETRY_FORMAT	"%d:%dx%d%+d%+d,"
 #define	GEOMETRY_SIZE	strlen("0:640x360+5120+2880,")
 
-#define	MENU_FORMAT	"[F1]      Help             [F2]     Core\n"			\
-			"[F3]      C-States         [F4]     Temps \n"			\
-			"[F5]      System Info      [F6]     Dump\n"			\
-			"[Pause]   Suspend/Resume Widget\n"				\
-			"\nw/[Shift] key:\n"						\
-			"                                  [Up]\n"			\
-			"  Page Scrolling           [Left]      [Right]\n"		\
-			"                                 [Down]\n\n"			\
-			"[PgDw]   Page Down         [PgUp]   Page Up\n"			\
-			"[Home]   Line Begin        [End]    Line End\n"		\
-			"\nw/[Control] key:\n"						\
-			"[Home]   Page start        [End]    Page end\n"		\
-			"[L][l]   Refresh page      [Q][q]   Quit\n"			\
-			"[Y][y]   Cycles            [W][w]   Wallboard\n"		\
-			"[Z][z]   Frequency Hz      [P][p]   C-States %\n"		\
-			"[R][r]   Ratio values      [T][t]   Task schedule\n"		\
-			"KeyPad[+] Faster Loop     KeyPad[-] Slower Loop\n\n"		\
-			"Command keys:\n"						\
-			"[Left] | [Right] | [Home] | [End] Move the cursor insertion\n"	\
-			"[Up] | [Down]  Browse forward, backward the commands history\n"\
-			"[F12] Substitute command line using the history index\n"	\
-			"[Backspace] Remove the character before the cursor\n"		\
-			"[Erase]     Remove the character under the cursor\n"		\
-			"[Escape]    Cancel the full command line\n"			\
-			"[Enter]     Submit the command line\n"				\
-			"[Tab]       Expand the command line\n\n"			\
-			"Mouse buttons:\n"						\
-			"[Left]  Activate Button    [Right] Grab & Move Widget\n"	\
+#define	MENU_FORMAT	"[F1]      Help              [F2]      Core\n"				\
+			"[F3]      C-States          [F4]      Temps \n"			\
+			"[F5]      System Info       [F6]      Dump\n"				\
+			"[Pause]   Suspend/Resume Widget\n"					\
+			"\nw/[Shift] key:\n"							\
+			"                                  [Up]\n"				\
+			"  Page Scrolling           [Left]      [Right]\n"			\
+			"                                 [Down]\n\n"				\
+			"[PgDw]    Page Down         [PgUp]    Page Up\n"			\
+			"[Home]    Line Begin        [End]     Line End\n"			\
+			"\nw/[Control] key:\n"							\
+			"[Home]    Page start        [End]     Page end\n"			\
+			"[L][l]    Refresh page      [Q][q]    Quit\n"				\
+			"[Y][y]    Cycles            [W][w]    Wallboard\n"			\
+			"[Z][z]    Frequency Hz      [P][p]    C-States %\n"			\
+			"[R][r]    Ratio values      [T][t]    Task schedule\n"			\
+			"KeyPad[+] Faster Loop     KeyPad[-]  Slower Loop\n"			\
+			"[Tab]     Substitute the command line using the history index\n\n"	\
+			"Command keys:\n"							\
+			"[Left] | [Right] | [Home] | [End] Move the cursor insertion\n"		\
+			"[Up] | [Down]  Browse forward, backward the commands history\n"	\
+			"[Backspace] Remove the character before the cursor\n"			\
+			"[Erase]     Remove the character under the cursor\n"			\
+			"[Escape]    Cancel the full command line\n"				\
+			"[Enter]     Submit the command line\n"					\
+			"[Tab]       Expand the command line\n\n"				\
+			"Mouse buttons:\n"							\
+			"[Left]  Activate Button    [Right] Grab & Move Widget\n"		\
 			"[Wheel Down] Page Down     [Wheel Up] Page Up\n"
 
 #define	CORE_NUM	"#%-2d"
@@ -669,7 +669,7 @@ typedef struct
 } OPTIONS;
 
 #define	INSTRUCTION_LEN	16
-#define	COMMANDS_COUNT	17
+#define	COMMANDS_COUNT	18
 typedef	struct
 {
 	void	(*Proc)();
@@ -680,7 +680,7 @@ typedef	struct
 
 #define	COMMANDS_LIST																\
 {																		\
-	{ Proc_Help,		"%[^\n]",	"help",		"%s [p1]\nWhere: p1=command (String)\n" },					\
+	{ Proc_Help,		" %[^\n]",	"help",		"%s [p1]\nWhere: p1=command (String)\n" },					\
 	{ Proc_Menu,		NULL,		"menu",		"%s\n" },									\
 	{ Proc_Quit,		NULL,		"quit",		"%s\n" },									\
 	{ Proc_Clear,		NULL,		"clear",	"%s\n" },									\
@@ -691,7 +691,8 @@ typedef	struct
 	{ Get_Color,		"%d",		"get color",	"%s p1\nWhere: p1=index (Int)\n" },						\
 	{ Set_Color,		"%d %x",	"set color",	"%s p1 p2\nWhere: p1=index (Int), p2=RGB (Hex)\n" },				\
 	{ List_Fonts,		"%s %c",	"list fonts",	"%s [p1]\nWhere: p1=pattern (String)\n" },					\
-	{ Set_Font,		"%s",		"set font",	"%s p1\nWhere: p1=font name (String)\n" },					\
+	{ Get_Font,		NULL,		"get font",	"%s\n" },									\
+	{ Set_Font,		"%s",		"set font",	"%s p1 | %%i\nWhere: p1=font name (String)\nor   : i=font index (Int)\n" },	\
 	{ Svr_Dump_MSR,		"%x %hu %hhu",	"dump msr",	"%s p1 p2 p3\nWhere: p1=address (Hex), p2=Core# (Int), p3=index (Int)\n" },	\
 	{ Svr_Read_MSR,		"%x %hu",	"read msr",	"%s p1 p2\nWhere: p1=address (Hex), p2=Core# (Int)\n" },			\
 	{ Svr_Write_MSR,	"%x %hu %llx",	"write msr",	"%s p1 p2 p3\nWhere: p1=address (Hex), p2=Core# (Int), p3=value (Hex)\n" },	\

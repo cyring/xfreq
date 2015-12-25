@@ -905,6 +905,13 @@ void	CloseDisplay(uARG *A)
 		}
 	} while(MC);
 
+	if(A->font.List != NULL)
+	{
+		XFreeFontNames(A->font.List);
+		A->font.List=NULL;
+		A->font.Count=0;
+		A->font.Index=0;
+	}
 	if(A->font.Info)
 	{
 		XFreeFont(A->display, A->font.Info);
@@ -951,11 +958,6 @@ int	OpenDisplay(uARG *A)
 
 void	CloseWidgets(uARG *A)
 {
-	if(A->L.Output)
-	{
-		free(A->L.Output);
-		A->L.Output=NULL;
-	}
 	int G=0;
 	for(G=LAST_WIDGET; G >= MAIN ; G--)
 	{
@@ -3635,6 +3637,17 @@ Bool32	SaveSettings(uARG *A)
 }
 
 // Commands set.
+Bool32	CompareWholeString(char *s1, char *s2)
+{
+	if(strncmp(s1, s2, strlen(s2)) == 0)
+	{
+		char chr=s1[strlen(s2)];
+		if((chr == 0x20) || (chr == 0x0))
+			return(TRUE);
+	}
+	return(FALSE);
+}
+
 void	Proc_Usage(uARG *A, int cmd)
 {
 	char *items=malloc(88), *stringNL=malloc(80);
@@ -3649,10 +3662,10 @@ void	Proc_Usage(uARG *A, int cmd)
 void	Proc_Help(uARG *A, int cmd)
 {
 	char *items=calloc(COMMANDS_COUNT, 80), *stringNL=calloc(80, 1), *str=malloc(INSTRUCTION_LEN);
-	int matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst) + 1], A->Commands[cmd].Spec, str);
+	int matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, str);
 	switch(matches)
 	{
-		case -1:
+		case EOF:
 		{
 			int idx=0;
 			for(idx=1; idx < COMMANDS_COUNT; idx++)
@@ -3667,8 +3680,7 @@ void	Proc_Help(uARG *A, int cmd)
 		{
 			int idx=0;
 			for(idx=0; idx < COMMANDS_COUNT; idx++)
-				if(!strncmp(str, A->Commands[idx].Inst, strlen(str))
-				&& !strncmp(str, A->Commands[idx].Inst, strlen(A->Commands[idx].Inst)))
+				if(CompareWholeString(str, A->Commands[idx].Inst) == TRUE)
 					break;
 				if(idx < COMMANDS_COUNT)
 				{
@@ -3812,20 +3824,25 @@ void	Set_Color(uARG *A, int cmd)
 
 void	Browse_Fonts(uARG *A)
 {
-	int PAGE_HEIGHT=MAIN_TEXT_HEIGHT - 2;
-	char *items=calloc(PAGE_HEIGHT, 256), *stringNL=malloc(256);
+	int pageHeight=MAIN_TEXT_HEIGHT - 3;
+	char *items=calloc(pageHeight, 256), *stringNL=malloc(256);
 
 	int idx=0;
-	for(idx=A->font.Index; (idx < A->font.Count) && (idx < A->font.Index + PAGE_HEIGHT); idx++)
+	for(idx=A->font.Index; (idx < A->font.Count) && (idx < A->font.Index + pageHeight); idx++)
 	{
-		sprintf(stringNL, "[%3x] %s\n", idx, A->font.List[idx]);
+		sprintf(stringNL, "[%5d] %s\n", idx, A->font.List[idx]);
 		strcat(items, stringNL);
 	}
 	if(idx < A->font.Count)
+	{
 		A->font.Index=idx;
-	else
+		sprintf(stringNL, "- %d more -\n", A->font.Count - A->font.Index);
+		strcat(items, stringNL);
+	}
+	else {
 		A->font.Index=0;
-
+		strcat(items, "- end of list -\n");
+	}
 	Output(A, items);
 
 	free(stringNL);
@@ -3837,8 +3854,10 @@ Bool32	Search_Fonts(uARG *A, char *pattern)
 	if(A->font.List != NULL)
 	{
 		XFreeFontNames(A->font.List);
-		A->font.Index=0;
+		A->font.List=NULL;
 	}
+	A->font.Count=0xfff;
+	A->font.Index=0;
 	if((A->font.List=XListFonts(A->display, pattern, A->font.Count, &A->font.Count)) != NULL)
 		return(TRUE);
 	else
@@ -3851,7 +3870,7 @@ void	List_Fonts(uARG *A, int cmd)
 	int matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, pattern, &unexpected);
 	switch(matches)
 	{
-		case -1:
+		case EOF:
 			{
 				if(A->font.List != NULL)
 				{
@@ -3883,23 +3902,55 @@ void	Set_Font(uARG *A, int cmd)
 	if(sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, pattern) != 1)
 		Proc_Usage(A, cmd);
 	else
+	{
+		Bool32 noerr=TRUE;
+		if(A->font.List != NULL)
 		{
-		int listCount=1;
-		char **list=NULL;
-		if((list=XListFonts(A->display, pattern, listCount, &listCount)) != NULL)
-		{
-			if(listCount == 1)
+			int idx=0;
+			if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], "%%%d", &idx) == 1))
 			{
-				strcpy(A->font.Name, pattern);
-				Output(A, list[0]);
-				Output(A, "\n");
+				if((idx >= 0) && (idx < A->font.Count))
+					strcpy(pattern, A->font.List[idx]);
+				else
+					noerr=FALSE;
 			}
-			XFreeFontNames(list);
 		}
-		else
-			Output(A, "No matching font names.\n");
+		if(noerr == TRUE)
+		{
+			int listCount=1;
+			char **list=XListFonts(A->display, pattern, listCount, &listCount);
+			if(list != NULL)
+			{
+				if(listCount == 1)
+				{
+					strcpy(A->font.Name, pattern);
+
+					char *stringNL=malloc(256);
+					sprintf(stringNL, "Font:%s\n", list[0]);
+					Output(A, stringNL);
+					free(stringNL);
+				}
+				else
+					noerr=FALSE;
+				XFreeFontNames(list);
+			}
+			else noerr=FALSE;
 		}
+		if(noerr == FALSE)
+			Output(A, "No matching font name or index.\n");
+	}
 	free(pattern);
+}
+
+void	Get_Font(uARG *A, int cmd)
+{
+	if(A->font.Name != NULL)
+	{
+		char *stringNL=malloc(256);
+		sprintf(stringNL, "Font:%s\n", A->font.Name);
+		Output(A, stringNL);
+		free(stringNL);
+	}
 }
 
 void	Svr_Dump_MSR(uARG *A, int cmd)
@@ -4033,9 +4084,8 @@ Bool32	ExecCommand(uARG *A)
 {
 	int cmd=0;
 	for(cmd=0; cmd < COMMANDS_COUNT; cmd++)
-		if(strncmp(A->L.Input.KeyBuffer, A->Commands[cmd].Inst, strlen(A->Commands[cmd].Inst)) == 0)
+		if(CompareWholeString(A->L.Input.KeyBuffer, A->Commands[cmd].Inst) == TRUE)
 			break;
-
 	if(cmd < COMMANDS_COUNT)
 	{
 		A->Commands[cmd].Proc(A, cmd);
@@ -4381,11 +4431,13 @@ static void *uLoop(uARG *A)
 							A->L.Input.Expand.KeyLength=A->L.Input.KeyInsert=A->L.Input.KeyLength=0;
 
 							fDraw(MAIN, TRUE, FALSE);
-						}
+						    }
 						break;
-					case XK_F12:
+					case XK_Tab:
 						if((G == MAIN) && (A->L.Input.KeyLength > 0))
 						{
+						    if(E.xkey.state & ControlMask)
+						    {
 							long int idx=-1;
 							char *endptr;
 							A->L.Input.KeyBuffer[A->L.Input.KeyLength]='\0';
@@ -4396,11 +4448,9 @@ static void *uLoop(uARG *A)
 								memcpy(A->L.Input.KeyBuffer, A->L.Input.History[idx].KeyBuffer, A->L.Input.KeyLength);
 							}
 							fDraw(MAIN, FALSE, TRUE);
-						}
-						break;
-					case XK_Tab:
-						if((G == MAIN) && (A->L.Input.KeyLength > 0))
-						{
+						    }
+						    else
+						    {
 							if(A->L.Input.Expand.KeyLength > 0)
 							{
 								A->L.Input.KeyInsert=A->L.Input.KeyLength=A->L.Input.Expand.KeyLength;
@@ -4423,6 +4473,7 @@ static void *uLoop(uARG *A)
 								A->L.Input.Cmd=-1;
 							else
 								fDraw(MAIN, FALSE, TRUE);
+						    }
 						}
 						break;
 					case XK_Pause:
@@ -5371,6 +5422,8 @@ int main(int argc, char *argv[])
 				}
 				if(!pthread_create(&A.TID_Draw, NULL, uDraw, &A))
 				{
+					ClearMsg(&A);
+
 					const size_t serverLen=sizeof(" Ready with []\n\n") + sizeof(_APPNAME) + TASK_COMM_LEN;
 					char *serverName=malloc(serverLen);
 					sprintf(serverName, "%s Ready with [%s]\n\n", _APPNAME, A.SHM->AppName);
@@ -5434,6 +5487,11 @@ int main(int argc, char *argv[])
 	{
 		rc=1;
 	}
+	if(A.L.Output)
+	{
+		free(A.L.Output);
+		A.L.Output=NULL;
+	}
 	for(A.L.Input.Recent=HISTORY_DEPTH - 1; A.L.Input.Recent >= 0; A.L.Input.Recent--)
 		if(A.L.Input.History[A.L.Input.Recent].KeyBuffer != NULL)
 			free(A.L.Input.History[A.L.Input.Recent].KeyBuffer);
@@ -5443,8 +5501,6 @@ int main(int argc, char *argv[])
 		free(A.L.Input.KeyBuffer);
 	if(A.Geometries != NULL)
 		free(A.Geometries);
-	if(A.font.List != NULL)
-		XFreeFontNames(A.font.List);
 	if(A.font.Name != NULL)
 		free(A.font.Name);
 	if(A.configFile != NULL)
