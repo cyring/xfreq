@@ -170,6 +170,9 @@
  *
  * [HISTORY]
  *
+ * R 2.1.64 : 12/27/2015
+ *         - GUI: Fix colors mgnt.
+ *
  * R 2.1.63 : 12/25/2015
  *         - GUI: Font mgnt improved.
  *

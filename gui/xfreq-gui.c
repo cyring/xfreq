@@ -1979,6 +1979,9 @@ int	OpenWidgets(uARG *A)
 // Draw the layout background.
 void	BuildLayout(uARG *A, int G)
 {
+	A->W[G].background=A->L.Colors[(G << 1) + 0].RGB;
+	A->W[G].foreground=A->L.Colors[(G << 1) + 1].RGB;
+
 	XSetBackground(A->display, A->W[G].gc, A->W[G].background);
 	// Clear entirely the background.
 	XSetForeground(A->display, A->W[G].gc, A->W[G].background);
@@ -4879,13 +4882,9 @@ int	LoadSettings(uARG *A, int argc, char *argv[])
 					//  Override or use loaded colors.
 					if(A->L.globalBackground != _BACKGROUND_GLOBAL)
 						A->W[G].background=A->L.Colors[(G << 1) + 0].RGB=A->L.globalBackground;
-					else
-						A->W[G].background=A->L.Colors[(G << 1) + 0].RGB;
 
 					if(A->L.globalForeground != _FOREGROUND_GLOBAL)
 						A->W[G].foreground=A->L.Colors[(G << 1) + 1].RGB=A->L.globalForeground;
-					else
-						A->W[G].foreground=A->L.Colors[(G << 1) + 1].RGB;
 				}
 			}
 		}

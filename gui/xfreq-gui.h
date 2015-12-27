@@ -688,11 +688,11 @@ typedef	struct
 	{ Proc_Release,		NULL,		"version",	"%s\n" },									\
 	{ Proc_History,		NULL,		"history",	"%s\n" },									\
 	{ List_Colors,		NULL,		"list colors",	"%s\n" },									\
-	{ Get_Color,		"%d",		"get color",	"%s p1\nWhere: p1=index (Int)\n" },						\
-	{ Set_Color,		"%d %x",	"set color",	"%s p1 p2\nWhere: p1=index (Int), p2=RGB (Hex)\n" },				\
+	{ Get_Color,		"%%%d",		"get color",	"%s %%i\nWhere: %%i=index (Int)\n" },						\
+	{ Set_Color,		"%%%d %x",	"set color",	"%s %%i p1\nWhere: %%i=index (Int), p1=RGB (Hex)\n" },				\
 	{ List_Fonts,		"%s %c",	"list fonts",	"%s [p1]\nWhere: p1=pattern (String)\n" },					\
 	{ Get_Font,		NULL,		"get font",	"%s\n" },									\
-	{ Set_Font,		"%s",		"set font",	"%s p1 | %%i\nWhere: p1=font name (String)\nor   : i=font index (Int)\n" },	\
+	{ Set_Font,		"%s",		"set font",	"%s p1 | %%i\nWhere: p1=font name (String)\nor   : %%i=font index (Int)\n" },	\
 	{ Svr_Dump_MSR,		"%x %hu %hhu",	"dump msr",	"%s p1 p2 p3\nWhere: p1=address (Hex), p2=Core# (Int), p3=index (Int)\n" },	\
 	{ Svr_Read_MSR,		"%x %hu",	"read msr",	"%s p1 p2\nWhere: p1=address (Hex), p2=Core# (Int)\n" },			\
 	{ Svr_Write_MSR,	"%x %hu %llx",	"write msr",	"%s p1 p2 p3\nWhere: p1=address (Hex), p2=Core# (Int), p3=value (Hex)\n" },	\
