@@ -598,10 +598,6 @@ void	OffsetWidget(uARG *A, int G)
 		A->W[G].y=HeightOfScreen(A->screen) - A->W[G].Position.yoffset - A->W[G].height;
 	else if(A->W[G].Position.bitmask & YValue)
 		A->W[G].y=A->W[G].Position.yoffset;
-/*	{
-		A->W[G].x=(A->W[G].Position.xoffset < 0) ? WidthOfScreen(A->screen) + A->W[G].Position.xoffset - A->W[G].width : A->W[G].Position.xoffset;
-		A->W[G].y=(A->W[G].Position.yoffset < 0) ? HeightOfScreen(A->screen) + A->W[G].Position.yoffset - A->W[G].height : A->W[G].Position.yoffset;
-	}*/
 }
 
 // ReSize a Widget window & inform WM.
@@ -3639,6 +3635,64 @@ Bool32	SaveSettings(uARG *A)
 	return(rc);
 }
 
+Bool32	ScreenShot(uARG *A, int G)
+{
+	Bool32 rc=FALSE;
+	char *scrShotFile=calloc(4096, 1);
+	const char *xrmClass[WIDGETS]={	XDB_CLASS_MAIN,
+					XDB_CLASS_CORES,
+					XDB_CLASS_CSTATES,
+					XDB_CLASS_TEMPS,
+					XDB_CLASS_SYSINFO,
+					XDB_CLASS_DUMP};
+
+	if((A->scrShotPath != NULL) && strlen(A->scrShotPath) > 0)
+		sprintf(scrShotFile, "%s/%s-%s", A->scrShotPath, _APPNAME, xrmClass[G]);
+	else
+	{
+		char *FQN=FQN_Settings(_APPNAME);
+		if(FQN != NULL)
+		{
+			sprintf(scrShotFile, "%s-%s", FQN, xrmClass[G]);
+			free(FQN);
+		}
+	}
+	if(strlen(scrShotFile) > 0)
+	{
+		strcat(scrShotFile, ".ppm");
+		int fd=creat(scrShotFile, S_IRUSR|S_IWUSR);
+		if(fd != -1)
+		{
+			XImage *image=XGetImage(A->display, A->W[G].window, 0, 0, A->W[G].width, A->W[G].height, AllPlanes, ZPixmap);
+			if(image != NULL)
+			{
+				char *fo=malloc(32);
+				sprintf(fo, "P3 %d %d 255\n", A->W[G].width, A->W[G].height);
+				write(fd, fo, strlen(fo));
+
+				int x=0, y=0;
+				for(y=0; y < A->W[G].height; y++)
+				    for(x=0; x < A->W[G].width; x++)
+				    {
+					unsigned long int pixel=XGetPixel(image, x, y);
+					sprintf(fo, "%ld %ld %ld\n", (pixel & image->red_mask) >> 16, (pixel & image->green_mask) >> 8, pixel & image->blue_mask);
+					write(fd, fo, strlen(fo));
+				    }
+				XDestroyImage(image);
+				free(fo);
+				rc=TRUE;
+			}
+			else
+				rc=FALSE;
+			close(fd);
+		}
+		else
+			rc=FALSE;
+	}
+	free(scrShotFile);
+	return(rc);
+}
+
 // Commands set.
 Bool32	CompareWholeString(char *s1, char *s2)
 {
@@ -3707,78 +3761,153 @@ void	Proc_Help(uARG *A, int cmd)
 
 void	Proc_Menu(uARG *A, int cmd)
 {
-	Output(A, MENU_FORMAT);
+	char unexpected='\0';
+	int matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &unexpected);
+	if(matches == EOF)
+		Output(A, MENU_FORMAT);
+	else
+		Proc_Usage(A, cmd);
 }
 
 void	Proc_Quit(uARG *A, int cmd)
 {
-	Output(A, "Shutting down ...\n");
-	A->LOOP=FALSE;
+	Bool32 noerr=TRUE;
+	if(cmd != -1)
+	{
+		char unexpected='\0';
+		int matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &unexpected);
+		if(matches != EOF)
+		{
+			noerr=FALSE;
+			Proc_Usage(A, cmd);
+		}
+	}
+	if(noerr == TRUE)
+	{
+		Output(A, "Shutting down ...\n");
+		A->LOOP=FALSE;
+	}
 }
 
 void	Proc_Clear(uARG *A, int cmd)
 {
-	ClearMsg(A);
+	char unexpected='\0';
+	int matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &unexpected);
+	if(matches == EOF)
+		ClearMsg(A);
+	else
+		Proc_Usage(A, cmd);
 }
 
 void	Proc_Restart(uARG *A, int cmd)
 {
-	Output(A, "Restarting ...\n");
-	A->RESTART=TRUE;
-	A->LOOP=FALSE;
+	char unexpected='\0';
+	int matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &unexpected);
+	if(matches == EOF)
+	{
+		Output(A, "Restarting ...\n");
+		A->RESTART=TRUE;
+		A->LOOP=FALSE;
+	}
+	else
+		Proc_Usage(A, cmd);
 }
 
 void	Proc_Release(uARG *A, int cmd)
 {
-	Output(A, Version);
+	char unexpected='\0';
+	int matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &unexpected);
+	if(matches == EOF)
+		Output(A, Version);
+	else
+		Proc_Usage(A, cmd);
 }
 
-void	Proc_History(uARG *A)
+void	Proc_History(uARG *A, int cmd)
 {
-	char *items=calloc(HISTORY_DEPTH, KEYINPUT_DEPTH), *str=malloc(KEYINPUT_DEPTH);
-	int idx=0;
-	while(idx < A->L.Input.Top)
+	char unexpected='\0';
+	int idx=0, matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &idx, &unexpected);
+
+	switch(matches)
 	{
-		sprintf(str, "[%2d] ", idx);
-		strcat(items, str);
-		memcpy(str, A->L.Input.History[idx].KeyBuffer, A->L.Input.History[idx].KeyLength);
-		str[A->L.Input.History[idx].KeyLength]='\n';
-		str[A->L.Input.History[idx].KeyLength+1]='\0';
-		strcat(items, str);
-		idx++;
+		case 1:
+		{
+			char *items=calloc(1, KEYINPUT_DEPTH), *stringNL=malloc(KEYINPUT_DEPTH);
+			if((idx >= 0) && (idx < A->L.Input.Top))
+			{
+				sprintf(stringNL, "[%2d] ", idx);
+				strcat(items, stringNL);
+				memcpy(stringNL, A->L.Input.History[idx].KeyBuffer, A->L.Input.History[idx].KeyLength);
+				stringNL[A->L.Input.History[idx].KeyLength]='\n';
+				stringNL[A->L.Input.History[idx].KeyLength+1]='\0';
+			}
+			else
+				strcpy(stringNL, "No matching history index.\n");
+			strcat(items, stringNL);
+			Output(A, items);
+			free(stringNL);
+			free(items);
+		}
+		break;
+		case EOF:
+		{
+			char *items=calloc(HISTORY_DEPTH, KEYINPUT_DEPTH), *stringNL=malloc(KEYINPUT_DEPTH);
+			while(idx < A->L.Input.Top)
+			{
+				sprintf(stringNL, "[%2d] ", idx);
+				strcat(items, stringNL);
+				memcpy(stringNL, A->L.Input.History[idx].KeyBuffer, A->L.Input.History[idx].KeyLength);
+				stringNL[A->L.Input.History[idx].KeyLength]='\n';
+				stringNL[A->L.Input.History[idx].KeyLength+1]='\0';
+				strcat(items, stringNL);
+				idx++;
+			}
+			Output(A, items);
+			free(stringNL);
+			free(items);
+		}
+		break;
+		default:
+			Proc_Usage(A, cmd);
+		break;
 	}
-	Output(A, items);
-	free(str);
-	free(items);
 }
 
 void	List_Colors(uARG *A, int cmd)
 {
-	char *items=calloc(COLOR_COUNT, 80), *stringNL=malloc(80), *formatNL=malloc(32);
-
-	sprintf(stringNL, "%d", COLOR_COUNT);
-	size_t sizeNL=strlen(stringNL);
-
-	int idx=0;
-	for(idx=0; idx < COLOR_COUNT; idx++)
+	char unexpected='\0';
+	int matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &unexpected);
+	if(matches == EOF)
 	{
-		char xrmKey[32]={0};
-		sprintf(xrmKey, "%s.%s", A->L.Colors[idx].xrmClass, A->L.Colors[idx].xrmKey);
-		sprintf(formatNL, "[%%%zdd] %%-32s: 0x%%lx\n", sizeNL);
-		sprintf(stringNL, formatNL, idx, xrmKey, A->L.Colors[idx].RGB);
-		strcat(items, stringNL);
+		char *items=calloc(COLOR_COUNT, 80), *stringNL=malloc(80), *formatNL=malloc(32);
+
+		sprintf(stringNL, "%d", COLOR_COUNT);
+		size_t sizeNL=strlen(stringNL);
+
+		int idx=0;
+		for(idx=0; idx < COLOR_COUNT; idx++)
+		{
+			char xrmKey[32]={0};
+			sprintf(xrmKey, "%s.%s", A->L.Colors[idx].xrmClass, A->L.Colors[idx].xrmKey);
+			sprintf(formatNL, "[%%%zdd] %%-32s: 0x%%lx\n", sizeNL);
+			sprintf(stringNL, formatNL, idx, xrmKey, A->L.Colors[idx].RGB);
+			strcat(items, stringNL);
+		}
+		Output(A, items);
+		free(formatNL);
+		free(stringNL);
+		free(items);
 	}
-	Output(A, items);
-	free(formatNL);
-	free(stringNL);
-	free(items);
+	else
+		Proc_Usage(A, cmd);
 }
 
 void	Get_Color(uARG *A, int cmd)
 {
-	int idx=0;
+	char unexpected='\0';
+	int idx=0, matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &idx, &unexpected);
 
-	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &idx) == 1) && (idx < COLOR_COUNT))
+	if((matches == 1) && (idx < COLOR_COUNT))
 	{
 		char *stringNL=malloc(80), *formatNL=malloc(32);
 
@@ -3801,9 +3930,10 @@ void	Get_Color(uARG *A, int cmd)
 void	Set_Color(uARG *A, int cmd)
 {
 	unsigned long int RGB=0;
-	int idx=0;
+	char unexpected='\0';
+	int idx=0, matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &idx, &RGB, &unexpected);
 
-	if((sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &idx, &RGB) == 2) && (idx < COLOR_COUNT))
+	if((matches == 2) && (idx < COLOR_COUNT))
 	{
 		A->L.Colors[idx].RGB=RGB;
 
@@ -3874,37 +4004,35 @@ void	List_Fonts(uARG *A, int cmd)
 	switch(matches)
 	{
 		case EOF:
+		{
+			if(A->font.List != NULL)
 			{
-				if(A->font.List != NULL)
-				{
-					Browse_Fonts(A);
-					break;
-				}
-				else
-					strcpy(pattern, "*");
+				Browse_Fonts(A);
+				break;
 			}
+			else
+				strcpy(pattern, "*");
+		}
 		case 1:
-			{
-				if(Search_Fonts(A, pattern) == FALSE)
-					Output(A, "No matching font names.\n");
-				else
-					Browse_Fonts(A);
-			}
+		{
+			if(Search_Fonts(A, pattern) == FALSE)
+				Output(A, "No matching font names.\n");
+			else
+				Browse_Fonts(A);
+		}
 		break;
 		default:
 			Proc_Usage(A, cmd);
 		break;
 	}
-
 	free(pattern);
 }
 
 void	Set_Font(uARG *A, int cmd)
 {
-	char *pattern=malloc(256);
-	if(sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, pattern) != 1)
-		Proc_Usage(A, cmd);
-	else
+	char *pattern=malloc(256), unexpected='\0';
+	int matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, pattern, &unexpected);
+	if( matches == 1)
 	{
 		Bool32 noerr=TRUE;
 		if(A->font.List != NULL)
@@ -3926,10 +4054,10 @@ void	Set_Font(uARG *A, int cmd)
 			{
 				if(listCount == 1)
 				{
-					strcpy(A->font.Name, pattern);
+					strcpy(A->font.Name, list[0]);
 
 					char *stringNL=malloc(256);
-					sprintf(stringNL, "Font:%s\n", list[0]);
+					sprintf(stringNL, "Font:%s\n", A->font.Name);
 					Output(A, stringNL);
 					free(stringNL);
 				}
@@ -3942,17 +4070,44 @@ void	Set_Font(uARG *A, int cmd)
 		if(noerr == FALSE)
 			Output(A, "No matching font name or index.\n");
 	}
+	else
+		Proc_Usage(A, cmd);
 	free(pattern);
 }
 
 void	Get_Font(uARG *A, int cmd)
 {
-	if(A->font.Name != NULL)
+	char unexpected='\0';
+	int matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &unexpected);
+	if((matches == EOF) && (A->font.Name != NULL))
 	{
 		char *stringNL=malloc(256);
 		sprintf(stringNL, "Font:%s\n", A->font.Name);
 		Output(A, stringNL);
 		free(stringNL);
+	}
+	else
+		Proc_Usage(A, cmd);
+}
+
+void	Set_Cursor(uARG *A, int cmd)
+{
+	char unexpected='\0';
+	int shape=0, matches=sscanf(&A->L.Input.KeyBuffer[strlen(A->Commands[cmd].Inst)], A->Commands[cmd].Spec, &shape, &unexpected);
+	switch(matches)
+	{
+		case 1:
+		{
+			if((shape >= FALSE) && (shape <= TRUE))
+				A->L.Play.cursorShape=shape;
+			else
+				Output(A, "No matching cursor shape.\n");
+		}
+		break;
+		case EOF:
+		default:
+			Proc_Usage(A, cmd);
+		break;
 	}
 }
 
@@ -4511,6 +4666,19 @@ static void *uLoop(uARG *A)
 					case XK_R:
 						if(E.xkey.state & ControlMask)
 							Play(A, G, ID_RATIO, NULL);
+						break;
+					case XK_s:
+					case XK_S:
+					{
+						if(E.xkey.state & ControlMask)
+						{
+							if(ScreenShot(A, G) == TRUE)
+								Output(A, "Screenshot saved.\n");
+							else
+								Output(A, "Screenshot failed.\n");
+							fDraw(MAIN, TRUE, FALSE);
+						}
+					}
 						break;
 					case XK_t:
 					case XK_T:
@@ -5287,6 +5455,7 @@ int main(int argc, char *argv[])
 			.RESTART=FALSE,
 			.PAUSE={FALSE},
 			.configFile=NULL,
+			.scrShotPath=NULL,
 			.Options=
 			{
 				{"-C", "%ms", &A.configFile,           "Path & file configuration name (String)\n" \
@@ -5318,6 +5487,8 @@ int main(int argc, char *argv[])
 				{"-N", "%u",  &A.L.Play.skipTaskbar,   "Remove the Widgets title name from the WM taskbar (Bool) [0/1]",       NULL                                       },
 				{"-I", "%hx", &A.Splash.attributes,    "Splash screen attributes 0x{H}{NNN} (Hex)\n" \
 				                                       "\t\t  where {H} bit:13 hides Splash and {NNN} (usec) defers start-up", NULL                                       },
+				{"-S", "%ms",  &A.scrShotPath,         "Screenshot path (String)\n" \
+				                                       "\t\t  default is '$HOME'",                                             NULL                                       },
 			},
 			.Commands=COMMANDS_LIST
 		};

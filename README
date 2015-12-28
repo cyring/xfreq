@@ -170,6 +170,10 @@
  *
  * [HISTORY]
  *
+ * R 2.1.65 : 12/28/2015
+ *         - GUI: added the screenshot of the focused widget w/ [Ctrl]+[s]
+ *                  and the command argument '-S' to specify the output path.
+ *
  * R 2.1.64 : 12/27/2015
  *         - GUI: Fix colors mgnt.
  *
@@ -222,7 +226,7 @@
  *         - Red theme.
  *         - Added Operating System data in the SYSINFO widget.
  *         - Redefined the footer in the CSTATES widget.
- * 
+ *
  * R 2.1.50: 03/16/2015
  *         - New '-B' argument to enable SmBIOS. (default is disable in the server).
  *         - Redesigned the System Information as a tree.

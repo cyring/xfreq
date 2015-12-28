@@ -658,7 +658,7 @@ typedef struct
 #define	XDB_KEY_PLAY_CSTATES	"PlayCStates"
 #define	XDB_KEY_PLAY_WALLBOARD	"PlayBrand"
 
-#define	OPTIONS_COUNT	22
+#define	OPTIONS_COUNT	23
 typedef struct
 {
 	char		*argument;
@@ -669,7 +669,7 @@ typedef struct
 } OPTIONS;
 
 #define	INSTRUCTION_LEN	16
-#define	COMMANDS_COUNT	18
+#define	COMMANDS_COUNT	19
 typedef	struct
 {
 	void	(*Proc)();
@@ -681,18 +681,19 @@ typedef	struct
 #define	COMMANDS_LIST																\
 {																		\
 	{ Proc_Help,		" %[^\n]",	"help",		"%s [p1]\nWhere: p1=command (String)\n" },					\
-	{ Proc_Menu,		NULL,		"menu",		"%s\n" },									\
-	{ Proc_Quit,		NULL,		"quit",		"%s\n" },									\
-	{ Proc_Clear,		NULL,		"clear",	"%s\n" },									\
-	{ Proc_Restart,		NULL,		"restart",	"%s\n" },									\
-	{ Proc_Release,		NULL,		"version",	"%s\n" },									\
-	{ Proc_History,		NULL,		"history",	"%s\n" },									\
-	{ List_Colors,		NULL,		"list colors",	"%s\n" },									\
-	{ Get_Color,		"%%%d",		"get color",	"%s %%i\nWhere: %%i=index (Int)\n" },						\
-	{ Set_Color,		"%%%d %x",	"set color",	"%s %%i p1\nWhere: %%i=index (Int), p1=RGB (Hex)\n" },				\
+	{ Proc_Menu,		"%c",		"menu",		"%s\n" },									\
+	{ Proc_Quit,		"%c",		"quit",		"%s\n" },									\
+	{ Proc_Clear,		"%c",		"clear",	"%s\n" },									\
+	{ Proc_Restart,		"%c",		"restart",	"%s\n" },									\
+	{ Proc_Release,		"%c",		"version",	"%s\n" },									\
+	{ Proc_History,		"%%%d %c",	"history",	"%s [%%i]\nWhere: %%i=font index (Int)\n" },					\
+	{ List_Colors,		"%c",		"list colors",	"%s\n" },									\
+	{ Get_Color,		"%%%d %c",	"get color",	"%s %%i\nWhere: %%i=index (Int)\n" },						\
+	{ Set_Color,		"%%%d %x %c",	"set color",	"%s %%i p1\nWhere: %%i=index (Int), p1=RGB (Hex)\n" },				\
 	{ List_Fonts,		"%s %c",	"list fonts",	"%s [p1]\nWhere: p1=pattern (String)\n" },					\
-	{ Get_Font,		NULL,		"get font",	"%s\n" },									\
-	{ Set_Font,		"%s",		"set font",	"%s p1 | %%i\nWhere: p1=font name (String)\nor   : %%i=font index (Int)\n" },	\
+	{ Get_Font,		"%c",		"get font",	"%s\n" },									\
+	{ Set_Font,		"%s %c",	"set font",	"%s p1 | %%i\nWhere: p1=font name (String)\nor   : %%i=font index (Int)\n" },	\
+	{ Set_Cursor,		"%d %c",	"set cursor",	"%s p1\nWhere: p1=shape# (Int)\n" },						\
 	{ Svr_Dump_MSR,		"%x %hu %hhu",	"dump msr",	"%s p1 p2 p3\nWhere: p1=address (Hex), p2=Core# (Int), p3=index (Int)\n" },	\
 	{ Svr_Read_MSR,		"%x %hu",	"read msr",	"%s p1 p2\nWhere: p1=address (Hex), p2=Core# (Int)\n" },			\
 	{ Svr_Write_MSR,	"%x %hu %llx",	"write msr",	"%s p1 p2 p3\nWhere: p1=address (Hex), p2=Core# (Int), p3=value (Hex)\n" },	\
@@ -755,7 +756,8 @@ typedef struct
 
 	unsigned int	Room;
 
-	char		*configFile;
+	char		*configFile,
+			*scrShotPath;
 	OPTIONS		Options[OPTIONS_COUNT];
 	COMMANDS	Commands[COMMANDS_COUNT];
 	char		xACL;
