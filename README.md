@@ -106,6 +106,8 @@ where options include:
         -N      Remove the Widgets title name from the WM taskbar (Bool) [0/1]
         -I      Splash screen attributes 0x{H}{NNN} (Hex)
                   where {H} bit:13 hides Splash and {NNN} (usec) defers start-up
+        -S      Screenshot path (String)
+                  default is '$HOME'
         -v      Print version information
         -h      Print out this message
 
@@ -281,8 +283,10 @@ $ xfreq-gui
 ... and in the reverse order to shutdown.
 
 ## News
+ * Added a [Ctrl]+[s] hotkey to screen shot the focused widget.
+ * Improved the fonts and colors management, and the integrated help.
  * New architectures implemented: Skylake, Broadwell
- * Web UI alpha release preview.
+ * Web UI alpha release preview.  [_Canceled_]
  * ![alt text](http://blog.cyring.free.fr/images/XFreq-WebUI.png "XFreq Web UI")
  * Bit set calculator.
  * Added Performance Monitor Features.
