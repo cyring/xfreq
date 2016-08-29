@@ -3737,15 +3737,17 @@ void	Proc_Help(uARG *A, int cmd)
 		{
 			int idx=0;
 			for(idx=0; idx < COMMANDS_COUNT; idx++)
+			{
 				if(CompareWholeString(str, A->Commands[idx].Inst) == TRUE)
 					break;
-				if(idx < COMMANDS_COUNT)
-				{
-					strcpy(items, "Usage: ");
-					sprintf(stringNL, A->Commands[idx].Usage, A->Commands[idx].Inst);
-					strcat(items, stringNL);
-				}
-				else	sprintf(items, "%s: command not found\n", str);
+			}
+			if(idx < COMMANDS_COUNT)
+			{
+				strcpy(items, "Usage: ");
+				sprintf(stringNL, A->Commands[idx].Usage, A->Commands[idx].Inst);
+				strcat(items, stringNL);
+			}
+			else	sprintf(items, "%s: command not found\n", str);
 			Output(A, items);
 		}
 		break;
